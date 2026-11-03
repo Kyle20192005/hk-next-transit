@@ -25,7 +25,7 @@ type Props = {
 
 const ETA_REFRESH_MS = 30_000;
 /** 最近嘅站要喺幾多米內先算（太遠即係唔喺呢條線附近） */
-const NEAREST_MAX_M = 1500;
+const NEAREST_MAX_M = 500;
 const BUSES_REFRESH_MS = 20_000;
 
 /**
@@ -241,7 +241,7 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
         📍{' '}
         {locating === 'busy' && '搵緊最近嘅站…'}
         {locating === 'denied' && '開咗定位就會自動打開最近嘅站'}
-        {locating === 'far' && '附近 1.5 公里內冇呢條線嘅站'}
+        {locating === 'far' && '附近 500 米內冇呢條線嘅站'}
         {locating === 'error' && '攞唔到位置'}
         {locating === 'idle' && nearest && (
           <>
