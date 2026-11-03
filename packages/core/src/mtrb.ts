@@ -61,7 +61,8 @@ export async function fetchMtrbEta(route: string, stopId: string, fetcher: typeo
       {
         company: 'MTRB' as const,
         route,
-        dir: stopId.includes('-D') ? ('I' as const) : ('O' as const),
+        // 站 ID 例如 K76-D010、K52-nD010：D = 回程（LINE_DOWN）
+        dir: /-[a-z]?D\d/.test(stopId) ? ('I' as const) : ('O' as const),
         stopId,
         eta: toHkIso(now + sec * 1000),
         seq: 0,
