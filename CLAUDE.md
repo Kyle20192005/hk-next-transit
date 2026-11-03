@@ -41,6 +41,7 @@ Vercel（Hobby）只部署 commit 作者係項目擁有者嘅 commit：commit �
 | 走法、特別班標記 | 運輸署 GTFS + JSON_BUS.json（`specialType`） |
 | 每個走法嘅時間表 | 運輸署 GTFS（`frequencies.txt`、`calendar*.txt`） |
 | 地圖走線 | CSDI「巴士路線」WFS（`FB_ROUTE_LINE`） |
+| 站到站行車時間（實測平均） | [hk-bus-time-between-stops](https://github.com/HK-Bus-ETA/hk-bus-time-between-stops)（`timeinterval.hkbuseta.com/times/all.json`），第三方、實驗性質 |
 
 App 入面一律用**城巴站 ID**。政府站 ID 只喺 pipeline 內部用。
 
@@ -66,6 +67,12 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 1. 只有一個走法經過呢個站 → certain
 2. 城巴 ETA 嘅 `seq` = 嗰班車**實際走法**入面嘅站序（唔係合併列表嘅站序），城巴獨有站都計。對 `variant.expSeq["<dir>:<stop>"]`，只吻合一個 → certain
 3. seq 分唔到（例如總站全部 seq 1）→ 到站時間減 `offsets` 倒推開車時間，對 GTFS 時間表 → likely
+
+**行車時間同巴士位置**（`packages/core/src/journey.ts`）：
+
+- pipeline 將每個走法嘅站到站時間存做 `variant.segSeconds`（對應 `variantStops` 相鄰兩站），冇實測嘅段用距離估算（`segMeasured` = false）。
+- 打開一個站：後面各站顯示「+N 分 · 約 HH:MM」（`secondsFrom`）；用 ETA 減累計行車時間倒推每架車喺邊（`busPositions`），地圖畫巴士。
+- 只用佢公開嘅數據，**唔好抄佢嘅程式碼**（GPL-3.0，會令成個項目要跟 GPL）。頁面要註明出處同「僅供參考」。
 
 ## 陷阱
 

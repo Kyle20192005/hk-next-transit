@@ -2,8 +2,8 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { lineArrows } from '@hknt/core';
-import { FOCUS_STOP_EVENT, OPEN_STOP_EVENT } from '@/lib/events';
+import { busPositions, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
+import { BUS_ETAS_EVENT, FOCUS_STOP_EVENT, OPEN_STOP_EVENT, type BusEtasDetail } from '@/lib/events';
 
 export interface MapStop {
   index: number;
@@ -35,7 +35,17 @@ function cssVar(name: string, fallback: string): string {
   return v || fallback;
 }
 
-export default function RouteMap({ lines, stops }: { lines: MapLine[]; stops: MapStop[] }) {
+/** 巴士位置每幾耐按時間推前一次 */
+const BUS_TICK_MS = 10_000;
+
+type Props = {
+  lines: MapLine[];
+  stops: MapStop[];
+  /** 揀咗嘅走法嘅累計行車秒數（index 同 stops 嘅 index 一樣）；冇就唔畫巴士 */
+  cum: number[] | null;
+};
+
+export default function RouteMap({ lines, stops, cum }: Props) {
   const el = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -116,12 +126,77 @@ export default function RouteMap({ lines, stops }: { lines: MapLine[]; stops: Ma
     };
     window.addEventListener(FOCUS_STOP_EVENT, onFocus);
 
+    // ---------- 巴士位置：由打開咗嘅站嘅 ETA 倒推，喺走線上顯示 ----------
+    // 揀咗嘅走線駁成一條連續折線，再搵每個站喺折線上嘅位置
+    const path: LatLng[] = sel ? sel.segments.flatMap((seg, i) => (i === 0 ? seg : seg.slice(1))) : [];
+    const byIndex = new Map(stops.map((s) => [s.index, s]));
+    const pathIdx = path.length
+      ? new Map(stopPathIndices(path, stops.map((s) => [s.lat, s.lng] as LatLng)).map((p, k) => [stops[k]!.index, p]))
+      : new Map<number, number>();
+    const busLayer = L.layerGroup().addTo(map);
+    let latest: BusEtasDetail = { stopIndex: null, etas: [] };
+    let fittedFor: number | null = null;
+    const busColor = sel?.special ? special : brand;
+
+    const locate = (from: number, fraction: number): L.LatLngExpression | null => {
+      const i0 = pathIdx.get(from);
+      const i1 = pathIdx.get(from + 1);
+      if (i0 !== undefined && i1 !== undefined) {
+        const p = pointOnPath(path, i0, i1, fraction);
+        if (p) return [p.lat, p.lng];
+      }
+      // 冇走線：喺兩個站之間直線估
+      const a = byIndex.get(from);
+      const b = byIndex.get(from + 1);
+      return a && b ? [a.lat + (b.lat - a.lat) * fraction, a.lng + (b.lng - a.lng) * fraction] : null;
+    };
+
+    const drawBuses = () => {
+      busLayer.clearLayers();
+      if (!cum || latest.stopIndex === null) return;
+      const target = byIndex.get(latest.stopIndex);
+      const placed: L.LatLngExpression[] = [];
+      for (const p of busPositions(cum, latest.stopIndex, latest.etas, new Date())) {
+        if (p.state === 'notDeparted') continue;
+        const where = p.state === 'between' ? locate(p.from, p.fraction) : (() => { const s = byIndex.get(p.stop); return s ? ([s.lat, s.lng] as L.LatLngExpression) : null; })();
+        if (!where) continue;
+        placed.push(where);
+        const mins = Math.round(p.secondsAway / 60);
+        L.marker(where, {
+          keyboard: false,
+          zIndexOffset: 1000,
+          icon: L.divIcon({
+            className: 'map-bus',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+            html: `<span style="background:${busColor}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="#fff" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>`,
+          }),
+        })
+          .bindTooltip(mins <= 0 ? `即將到 ${target?.name ?? ''}` : `約 ${mins} 分鐘到 ${target?.name ?? ''}`, { direction: 'top', offset: [0, -12] })
+          .addTo(busLayer);
+      }
+      // 第一次攞到位置：調整地圖，同時睇到個站同最近嗰架車
+      if (fittedFor !== latest.stopIndex && target && placed[0]) {
+        fittedFor = latest.stopIndex;
+        map.fitBounds(L.latLngBounds([[target.lat, target.lng], placed[0]]), { padding: [36, 36], maxZoom: 17 });
+      }
+    };
+    const onEtas = (e: Event) => {
+      latest = (e as CustomEvent<BusEtasDetail>).detail;
+      if (latest.stopIndex === null) fittedFor = null;
+      drawBuses();
+    };
+    window.addEventListener(BUS_ETAS_EVENT, onEtas);
+    const tick = setInterval(drawBuses, BUS_TICK_MS);
+
     return () => {
       window.removeEventListener(FOCUS_STOP_EVENT, onFocus);
+      window.removeEventListener(BUS_ETAS_EVENT, onEtas);
+      clearInterval(tick);
       map.off('zoomend', drawArrows);
       map.remove();
     };
-  }, [lines, stops]);
+  }, [lines, stops, cum]);
 
   return <div ref={el} className="route-map card" role="region" aria-label="路線地圖" />;
 }

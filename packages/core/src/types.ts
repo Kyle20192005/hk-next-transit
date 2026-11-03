@@ -32,6 +32,13 @@ export interface Variant {
   lineAligned: boolean;
   /** `${dir}:${stopId}` -> 呢個走法經過呢個站時，城巴 ETA 應該出嘅 seq */
   expSeq: Record<string, number>;
+  /**
+   * 站到站行車時間（秒），對應 variantStops() 相鄰兩個站（長度 = 站數 - 1）。
+   * 主要來自 hk-bus-time-between-stops 嘅實測平均；冇數據嘅段用距離估算。
+   */
+  segSeconds?: number[];
+  /** segSeconds 每段係咪實測 */
+  segMeasured?: boolean[];
 }
 
 export interface RouteData {

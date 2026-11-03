@@ -4,7 +4,7 @@
 輸出
   out/calendar.json        GTFS 服務日曆（邊個 serviceId 喺邊日行）
   out/ctb/index.json       城巴路線列表
-  out/ctb/<路線>.json      每條路線：站點、走法、時間表、走線、ETA seq 對照
+  out/ctb/<路線>.json      每條路線：站點、走法、時間表、走線、ETA seq 對照、站到站行車時間
   out/report/ctb_stop_map.csv  站點配對結果（A/B/C/X 分級，用嚟人手覆核）
 用法: python3 pipeline/build.py
 """
@@ -169,6 +169,33 @@ def align(gstops, cands, cstops):
     return out
 
 
+def variant_stop_order(v):
+    """走法實際停嘅城巴站（同 @hknt/core 嘅 variantStops 一樣）：按方向先後、再按 expSeq"""
+    order = []
+    for d in v['stopDirs']:
+        if d and d not in order:
+            order.append(d)
+    items = sorted(((k[0], k[2:], n) for k, n in v['expSeq'].items()), key=lambda x: (order.index(x[0]), x[2]))
+    return [sid for _, sid, _ in items]
+
+
+def segment_times(v, cstops, journey):
+    """
+    每段站到站行車時間（秒），對應 variant_stop_order 相鄰兩個站。
+    有實測數據（hk-bus-time-between-stops）就用；冇就用距離除以呢個走法實測段嘅平均車速。
+    回傳 (秒數列表, 係咪實測列表)
+    """
+    stops = variant_stop_order(v)
+    pos = lambda sid: (cstops[sid]['lat'], cstops[sid]['lng'])
+    pairs = list(zip(stops, stops[1:]))
+    measured = [journey.get(a, {}).get(b) for a, b in pairs]
+    dists = [dist(pos(a), pos(b)) for a, b in pairs]
+    ok = [(t, d) for t, d in zip(measured, dists) if t and t > 0]
+    speed = (sum(d for _, d in ok) / sum(t for t, _ in ok)) if ok and sum(t for t, _ in ok) > 0 else 5.0  # 米/秒，約 18 km/h
+    secs = [round(t) if t and t > 0 else round(d / speed) for t, d in zip(measured, dists)]
+    return secs, [bool(t and t > 0) for t in measured]
+
+
 def main():
     groutes, gtrips, first, gst, freq, gstops_all = load_gtfs()
     ctb_routes, cstops, clists = load_ctb()
@@ -176,6 +203,9 @@ def main():
     for f in json.load(open(f'{CACHE}/td_bus.json', encoding='utf-8-sig'))['features']:
         p = f['properties']
         special[str(p['routeId'])] = p['specialType'] == 1
+    # 站到站行車時間（第三方，可能冇）：{ 起點站: { 下一站: 秒 } }
+    jt_path = f'{CACHE}/journey_times.json'
+    journey = json.load(open(jt_path, encoding='utf-8')) if os.path.exists(jt_path) else {}
     lines = {(str(f['properties']['ROUTE_ID']), str(f['properties']['ROUTE_SEQ'])): f['geometry']['coordinates']
              for f in json.load(open(f'{CACHE}/csdi_lines.json', encoding='utf-8'))['features']}
 
@@ -271,6 +301,7 @@ def main():
                     if s in mine or (d, s) in orphan:
                         n += 1
                         v['expSeq'].setdefault(f'{d}:{s}', n)
+            v['segSeconds'], v['segMeasured'] = segment_times(v, cstops, journey)
         rstops = {s for l in dirs.values() for s in l} | {s for v in vs for s in v['stops'] if s}
         info = rinfo.get(rno, {})
         data = {
@@ -312,6 +343,8 @@ def main():
     print(f'城巴路線 {len(index)}，有政府走法 {len(variants_by_route)}，走法 {sum(map(len, variants_by_route.values()))}')
     print('站點配對 ' + '  '.join(f'{k}:{cls[k]} ({cls[k] / total:.1%})' for k in 'ABCXM' if cls[k]))
     print('配唔到嘅政府走法', len(unmatched_routes))
+    segs = [m for vs in variants_by_route.values() for v in vs for m in v['segMeasured']]
+    print(f'站到站行車時間：實測 {sum(segs)}/{len(segs)}（{sum(segs) / max(len(segs), 1):.1%}），其餘用距離估算')
     sizes = [os.path.getsize(f'{OUT}/ctb/{r["route"]}.json') for r in index]
     print(f'每條路線檔案：平均 {sum(sizes) / len(sizes) / 1024:.0f} KB，最大 {max(sizes) / 1024:.0f} KB，總共 {sum(sizes) / 1e6:.1f} MB')
 

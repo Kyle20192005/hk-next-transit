@@ -111,3 +111,7 @@ button.variant.variant-current { background: var(--card); border: 1px solid var(
 
 .route-map { height: clamp(150px, 26dvh, 280px); overflow: hidden; background: var(--line); z-index: 0; }
 .map-arrow { background: none; border: 0; }
+.map-bus { background: none; border: 0; }
+.map-bus > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.where { font-size: 0.8125rem; color: var(--muted); }
+.travel { flex: none; font-size: 0.875rem; color: var(--brand); font-variant-numeric: tabular-nums; }

@@ -80,3 +80,50 @@ export function smoothLine(points: LatLng[], iterations = 2, maxCut = 6): LatLng
   }
   return pts;
 }
+
+/**
+ * 每個站喺走線（一條連續折線）上最近嘅點 index。按次序向前搵，所以來回同一條路嘅走線都唔會搵錯方向。
+ */
+export function stopPathIndices(path: LatLng[], stops: LatLng[]): number[] {
+  const out: number[] = [];
+  let from = 0;
+  for (const s of stops) {
+    let best = from;
+    let bestD = Infinity;
+    // 只喺前面一段範圍入面搵，避免跳去遠處同名嘅路
+    for (let i = from; i < path.length; i++) {
+      const d = metres(path[i]!, s);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+      if (bestD < 30 && d > bestD + 400) break;
+    }
+    out.push(best);
+    from = best;
+  }
+  return out;
+}
+
+/** 走線上第 i0 點到第 i1 點之間，按距離行到 fraction（0–1）嘅位置同方向 */
+export function pointOnPath(path: LatLng[], i0: number, i1: number, fraction: number): Arrow | null {
+  if (i1 <= i0) {
+    const p = path[i0];
+    return p ? { lat: p[0], lng: p[1], bearing: 0 } : null;
+  }
+  const seg = path.slice(i0, i1 + 1);
+  const lens = seg.slice(1).map((p, i) => metres(seg[i]!, p));
+  const total = lens.reduce((a, b) => a + b, 0);
+  let left = total * Math.min(1, Math.max(0, fraction));
+  for (let i = 0; i < lens.length; i++) {
+    const len = lens[i]!;
+    if (left <= len || i === lens.length - 1) {
+      const a = seg[i]!;
+      const b = seg[i + 1]!;
+      const f = len ? Math.min(1, left / len) : 0;
+      return { lat: a[0] + (b[0] - a[0]) * f, lng: a[1] + (b[1] - a[1]) * f, bearing: bearing(a, b) };
+    }
+    left -= len;
+  }
+  return null;
+}

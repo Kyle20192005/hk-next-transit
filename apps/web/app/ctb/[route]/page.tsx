@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import {
   fmtMinutes,
   serviceWindow,
+  cumulativeSeconds,
   smoothLine,
   sortVariants,
   statusText,
@@ -67,6 +68,8 @@ export default async function RoutePage({ params, searchParams }: Props) {
     selected ? variantStops(selected) : (data.directions[dir] ?? []).map((stopId) => ({ dir, stopId }))
   ).map((s) => ({ dir: s.dir, stopId: s.stopId, name: data.stops[s.stopId]?.nameTc ?? s.stopId }));
   const dest = stops[stops.length - 1]?.name;
+  // 累計行車時間：用嚟計後面各站要幾耐、同推算巴士位置
+  const cum = selected ? cumulativeSeconds(selected) : null;
   const other = dirs.find((d) => d !== dir);
 
   const mapStops: MapStop[] = stops.flatMap((s, i) => {
@@ -105,12 +108,15 @@ export default async function RoutePage({ params, searchParams }: Props) {
 
         <VariantPicker key={dir} items={items} selectedId={selected?.id ?? null} />
 
-        {mapStops.length > 0 && <RouteMap key={`${dir}-${selected?.id}`} lines={mapLines} stops={mapStops} />}
+        {mapStops.length > 0 && <RouteMap key={`${dir}-${selected?.id}`} lines={mapLines} stops={mapStops} cum={cum} />}
       </div>
 
       <div className="route-stops card">
-        <StopList key={`${dir}-${selected?.id}`} route={data.route} stops={stops} selectedVariantId={selected?.id ?? null} />
-        <p className="muted source">資料來源：運輸署、城巴（DATA.GOV.HK）</p>
+        <StopList key={`${dir}-${selected?.id}`} route={data.route} stops={stops} selectedVariantId={selected?.id ?? null} cum={cum} />
+        <p className="muted source">
+          資料來源：運輸署、城巴（DATA.GOV.HK）。行車時間：
+          <a href="https://github.com/HK-Bus-ETA/hk-bus-time-between-stops" target="_blank" rel="noopener">hk-bus-time-between-stops</a>（實驗性質，僅供參考）
+        </p>
       </div>
     </main>
   );

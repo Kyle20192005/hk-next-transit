@@ -3,6 +3,7 @@
 - 運輸署路線資料 JSON_BUS.json（specialType 特別班標記）
 - CSDI 巴士路線走線（MultiLineString）
 - 城巴 API：路線、路線站點、站點
+- 站到站平均行車時間（hk-bus-time-between-stops）
 用法: python3 pipeline/fetch.py [--skip-existing]
 """
 import io, json, os, sys, time, zipfile, threading, urllib.request
@@ -18,6 +19,9 @@ TD_BUS_URL = 'https://static.data.gov.hk/td/routes-fares-geojson/JSON_BUS.json'
 CSDI_WFS = ('https://portal.csdi.gov.hk/server/services/common/td_rcd_1638844988873_41214/MapServer/WFSServer'
             '?service=wfs&version=2.0.0&request=GetFeature&typenames=csdi:FB_ROUTE_LINE&outputFormat=geojson')
 CTB = 'https://rt.data.gov.hk/v2/transport/citybus'
+# 站到站平均行車時間（秒），由 HK-Bus-ETA/hk-bus-time-between-stops 計算，每小時更新
+# 格式：{ 起點站ID: { 下一站ID: 秒 } }，城巴用城巴站 ID。只用數據，冇用佢嘅（GPL）程式碼。
+JOURNEY_TIMES_URL = 'https://timeinterval.hkbuseta.com/times/all.json'
 
 
 def http(url, timeout=120, tries=5):
@@ -65,6 +69,19 @@ def fetch_csdi_lines():
     print('CSDI 走線', len(feats))
 
 
+def fetch_journey_times():
+    path = os.path.join(CACHE, 'journey_times.json')
+    if done(path):
+        return
+    try:
+        data = http(JOURNEY_TIMES_URL, 120)
+        json.loads(data)  # 確認係有效 JSON 先寫
+        open(path, 'wb').write(data)
+        print('行車時間 ok')
+    except Exception as e:  # 第三方數據：攞唔到就用舊嘅或者用距離估算，唔好令成個 pipeline 失敗
+        print('行車時間下載失敗，build 時會用距離估算：', e)
+
+
 def fetch_ctb():
     path = os.path.join(CACHE, 'ctb.json')
     if done(path):
@@ -85,7 +102,7 @@ def fetch_ctb():
 if __name__ == '__main__':
     os.makedirs(CACHE, exist_ok=True)
     t = time.time()
-    ths = [threading.Thread(target=f) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb)]
+    ths = [threading.Thread(target=f) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_journey_times)]
     for th in ths: th.start()
     for th in ths: th.join()
     print(f'完成 {time.time() - t:.0f}s')

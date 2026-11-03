@@ -1,59 +1,44 @@
 'use client';
-import { forwardRef, useEffect, useState } from 'react';
-import { shortName, type Dir, type Eta } from '@hknt/core';
+import { forwardRef } from 'react';
+import { shortName, type Eta } from '@hknt/core';
 
 type Props = {
   index: number;
-  route: string;
-  stopId: string;
-  dir: Dir;
   name: string;
-  /** 用戶揀咗嘅走法；其他走法嘅班次會淡色顯示 */
-  selectedVariantId: string | null;
   open: boolean;
   onToggle: () => void;
+  /** 打開咗先有：到站時間 */
+  etas: Eta[] | null;
+  /** 每班車而家喺邊（同 etas 對應），例如「距離 3 個站」 */
+  whereLabels: (string | null)[] | null;
+  error: string | null;
+  now: number;
+  selectedVariantId: string | null;
+  /** 由打開咗嘅站去呢個站要幾多秒（只有後面嘅站先有） */
+  travelSeconds: number | null;
+  /** 下一班車預計幾時到呢個站（毫秒） */
+  nextArrival: number | null;
 };
 
-const REFRESH_MS = 30_000;
+const hhmm = (ms: number) =>
+  new Date(ms).toLocaleTimeString('zh-HK', { timeZone: 'Asia/Hong_Kong', hour: '2-digit', minute: '2-digit', hour12: false });
 
-/** 一個站：撳開顯示實時到站（開住時每 30 秒更新）。開定收由 StopList 控制。 */
+/** 一個站。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, route, stopId, dir, name, selectedVariantId, open, onToggle },
+  { index, name, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, nextArrival },
   ref,
 ) {
-  const [etas, setEtas] = useState<Eta[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const res = await fetch(`/api/eta?company=ctb&route=${encodeURIComponent(route)}&stop=${stopId}`);
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error ?? res.statusText);
-        if (cancelled) return;
-        setEtas((body.etas as Eta[]).filter((e) => e.dir === dir && e.eta));
-        setError(null);
-      } catch (e) {
-        if (!cancelled) setError((e as Error).message);
-      }
-      if (!cancelled) setNow(Date.now());
-    };
-    void tick();
-    const t = setInterval(tick, REFRESH_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(t);
-    };
-  }, [open, route, stopId, dir]);
-
   return (
     <li className={`stop${open ? ' open' : ''}`} ref={ref}>
       <button onClick={onToggle} aria-expanded={open}>
         <span className="seq">{index + 1}</span>
         <span className="stop-name">{name}</span>
+        {travelSeconds !== null && travelSeconds > 0 && (
+          <span className="travel" title="由打開咗嘅站出發嘅行車時間（實測平均）">
+            +{Math.max(1, Math.round(travelSeconds / 60))} 分
+            {nextArrival !== null && <span className="muted"> · 約 {hhmm(nextArrival)}</span>}
+          </span>
+        )}
       </button>
       {open && (
         <div className="etas" aria-live="polite">
@@ -74,6 +59,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                     {v.confidence === 'likely' ? '（推斷）' : ''}
                   </span>
                 )}
+                {whereLabels?.[i] && <span className="where">{whereLabels[i]}</span>}
                 {e.remarkTc && <span className="muted">{e.remarkTc}</span>}
               </div>
             );
