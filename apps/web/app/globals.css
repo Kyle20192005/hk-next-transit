@@ -93,7 +93,12 @@ body:has(.route-page) > header.top { flex: none; }
 /* 走法選擇：收埋時只顯示揀咗嘅一個，展開時蓋住地圖 */
 .variant-picker { position: relative; z-index: 1000; }
 button.variant { all: unset; box-sizing: border-box; display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 10px 14px; cursor: pointer; }
-button.variant.variant-current { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+button.variant.variant-current { background: var(--card); border: 1px solid var(--line); border-radius: 12px; align-items: center; padding: 8px 14px; }
+.variant-line { display: flex; gap: 8px; align-items: baseline; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; }
+/* 名稱優先：最多佔六成闊，狀態太長就截斷 */
+.variant-line strong { flex: 0 0 auto; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+.variant-line strong.special { color: var(--special); }
+.variant-line .variant-status { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .variant-current:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .variant-current:disabled { cursor: default; }
 .variant-chevron { margin-left: auto; align-self: center; color: var(--muted); font-size: 0.75rem; }

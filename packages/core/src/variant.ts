@@ -77,16 +77,17 @@ export function variantStatus(v: Variant, calendar: Calendar, now: Date): Varian
   return next === undefined ? { state: 'ended' } : { state: 'later', nextDeparture: next };
 }
 
-export function statusText(s: VariantStatus): string {
+/** 走法狀態文字；short = 收埋時用嘅簡短版 */
+export function statusText(s: VariantStatus, short = false): string {
   switch (s.state) {
     case 'running':
       return '現正服務';
     case 'later':
-      return `未來${LOOKAHEAD_MIN}分鐘沒有班次由總站開出`;
+      return short ? `${LOOKAHEAD_MIN}分鐘內冇班次` : `未來${LOOKAHEAD_MIN}分鐘沒有班次由總站開出`;
     case 'ended':
-      return '今日服務已結束';
+      return short ? '今日已結束' : '今日服務已結束';
     case 'none':
-      return '今日沒有班次';
+      return short ? '今日冇班次' : '今日沒有班次';
   }
 }
 

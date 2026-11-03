@@ -64,6 +64,7 @@ export default function RouteScreen() {
       special: v.special,
       running: status.state === 'running',
       status: statusText(status),
+      statusShort: statusText(status, true),
       window: w ? `今日 ${fmtMinutes(w[0])}–${w[1] >= 1440 ? '翌日 ' : ''}${fmtMinutes(w[1])} 由總站開出` : null,
     };
   });

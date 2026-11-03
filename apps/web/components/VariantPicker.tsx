@@ -9,6 +9,8 @@ export interface VariantItem {
   special: boolean;
   running: boolean;
   status: string;
+  /** 收埋時用嘅簡短狀態 */
+  statusShort: string;
   /** 例如「今日 06:00–09:54 由總站開出」 */
   window: string | null;
 }
@@ -45,7 +47,7 @@ export default function VariantPicker({ items, selectedId }: { items: VariantIte
         aria-haspopup="listbox"
         disabled={items.length < 2}
       >
-        <Row item={selected} n={selectedIndex + 1} />
+        <Row item={selected} n={selectedIndex + 1} compact />
         {items.length > 1 && (
           <span className="variant-chevron" aria-hidden="true">
             {open ? '▲' : '▼'}
@@ -74,7 +76,19 @@ export default function VariantPicker({ items, selectedId }: { items: VariantIte
   );
 }
 
-function Row({ item, n }: { item: VariantItem; n: number }) {
+/** compact：收埋時用，只顯示一行（編號、名稱、狀態），太長就截斷；特別班用紅色名稱代替標籤 */
+function Row({ item, n, compact = false }: { item: VariantItem; n: number; compact?: boolean }) {
+  if (compact) {
+    return (
+      <>
+        <span className={`variant-no${item.running ? ' running' : ''}`}>{n}</span>
+        <span className="variant-line">
+          <strong className={item.special ? 'special' : undefined}>{item.label}</strong>
+          <span className={`variant-status ${item.running ? 'running' : 'idle'}`}>{item.statusShort}</span>
+        </span>
+      </>
+    );
+  }
   return (
     <>
       <span className={`variant-no${item.running ? ' running' : ''}`}>{n}</span>

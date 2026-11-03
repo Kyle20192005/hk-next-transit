@@ -9,6 +9,8 @@ export interface VariantItem {
   special: boolean;
   running: boolean;
   status: string;
+  /** 收埋時用嘅簡短狀態 */
+  statusShort: string;
   window: string | null;
 }
 
@@ -37,7 +39,7 @@ export function VariantPicker({
         accessibilityLabel={`走法：${selected.label}，${selected.status}`}
         style={{ flexDirection: 'row', borderRadius: 12, borderWidth: 1, borderColor: t.line, backgroundColor: t.card }}
       >
-        <Row item={selected} n={selectedIndex + 1} />
+        <Row item={selected} n={selectedIndex + 1} compact />
         {items.length > 1 && (
           <Text style={{ alignSelf: 'center', paddingRight: 14, color: t.muted, fontSize: 12 }}>{open ? '▲' : '▼'}</Text>
         )}
@@ -77,8 +79,27 @@ export function VariantPicker({
   );
 }
 
-function Row({ item, n }: { item: VariantItem; n: number }) {
+/** compact：收埋時用，只顯示一行（編號、名稱、狀態），太長就截斷；特別班用紅色名稱代替標籤 */
+function Row({ item, n, compact = false }: { item: VariantItem; n: number; compact?: boolean }) {
   const t = useTheme();
+  if (compact) {
+    return (
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 12 }}>
+        <View
+          style={{
+            width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: item.running ? t.ok : t.idle,
+          }}
+        >
+          <Text style={{ color: t.bg, fontWeight: '700', fontSize: 13 }}>{n}</Text>
+        </View>
+        <Text numberOfLines={1} style={{ flexShrink: 0, maxWidth: '60%', color: item.special ? t.special : t.text, fontWeight: '700' }}>
+          {item.label}
+        </Text>
+        <Text numberOfLines={1} style={{ flexShrink: 1, color: item.running ? t.ok : t.idle, fontSize: 13 }}>{item.statusShort}</Text>
+      </View>
+    );
+  }
   return (
     <View style={{ flex: 1, flexDirection: 'row', gap: 12, padding: 12 }}>
       <View

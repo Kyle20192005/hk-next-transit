@@ -32,6 +32,13 @@ describe('走法狀態同排序（同城巴 App 一致）', () => {
   });
 });
 
+it('收埋時用簡短狀態', () => {
+  const [, special] = sortVariants(variantsForDir(route, 'I'), calendar, at('2026-11-03T11:00:00'));
+  expect(special!.variant.id).toBe('1000305-1');
+  expect(statusText(special!.status)).toBe('未來60分鐘沒有班次由總站開出');
+  expect(statusText(special!.status, true)).toBe('60分鐘內冇班次');
+});
+
 describe('走法站點', () => {
   const v = (id: string) => route.variants.find((x) => x.id === id)!;
 
