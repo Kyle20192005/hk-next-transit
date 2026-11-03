@@ -1,4 +1,6 @@
-export const revalidate = 3600;
+// 唔喺 build 時預先生成：build 時讀唔到數據會將「0 條路線」固定落頁面。
+// 數據 fetch 本身已經 cache 一個鐘（lib/data.ts），所以唔會每次都 call GitHub。
+export const dynamic = 'force-dynamic';
 
 import { getCtbIndex } from '@/lib/data';
 import RouteSearch from '@/components/RouteSearch';
