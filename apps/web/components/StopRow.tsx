@@ -127,7 +127,8 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                           {v.confidence === 'likely' ? '（推斷）' : ''}
                         </span>
                       )}
-                      {where && <span className="where">{where}</span>}
+                      {/* 細行唔使「距離」兩個字，等佢同公司標籤擠得落同一行 */}
+                      {where && <span className="where">{where.replace(/^距離 /, '')}</span>}
                     </span>
                   </li>
                 );

@@ -210,7 +210,10 @@ button.variant.variant-current { background: var(--card); border-radius: 14px; b
 .eta-next .where { flex-basis: 100%; font-size: 0.875rem; font-weight: 600; color: var(--text); }
 .eta-more { list-style: none; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 4px; }
 .eta-more li { display: grid; grid-template-columns: 52px 44px 1fr; column-gap: 8px; align-items: baseline; }
-.eta-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+.eta-meta { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; }
+.eta-meta > * { flex: none; }
+/* 位置文字太長就截斷，唔好斷行 */
+.eta-meta .where { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eta-more .eta-min { min-width: 52px; font-size: 1.0625rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .eta-more .eta-time { font-size: 0.8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .eta-row-other { opacity: 0.5; }
