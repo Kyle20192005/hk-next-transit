@@ -4,16 +4,16 @@ import { notFound } from 'next/navigation';
 import {
   fmtMinutes,
   serviceWindow,
-  shortName,
   sortVariants,
   statusText,
+  variantLabel,
   variantStops,
   variantsForDir,
   type Dir,
-  variantLabel,
 } from '@hknt/core';
 import { getCalendar, getCtbRoute } from '@/lib/data';
-import StopRow from '@/components/StopRow';
+import StopList from '@/components/StopList';
+import VariantPicker, { type VariantItem } from '@/components/VariantPicker';
 import RouteMap, { type MapLine, type MapStop } from '@/components/RouteMapLazy';
 
 type Props = {
@@ -31,6 +31,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+/**
+ * 路線頁：上面（標題、方向、走法、地圖）固定，只有站點列表捲動。
+ */
 export default async function RoutePage({ params, searchParams }: Props) {
   const [{ route }, { dir: dirParam, v: vParam }] = await Promise.all([params, searchParams]);
   const [data, calendar] = await Promise.all([getCtbRoute(route), getCalendar()]);
@@ -44,11 +47,24 @@ export default async function RoutePage({ params, searchParams }: Props) {
   const sorted = sortVariants(variantsForDir(data, dir), calendar, now);
   const selected = sorted.find((x) => x.variant.id === vParam)?.variant ?? sorted[0]?.variant;
 
+  const items: VariantItem[] = sorted.map(({ variant: v, status }) => {
+    const w = serviceWindow(v, calendar, now);
+    return {
+      id: v.id,
+      href: `?dir=${dir}&v=${v.id}`,
+      label: variantLabel(v),
+      special: v.special,
+      running: status.state === 'running',
+      status: statusText(status),
+      window: w ? `今日 ${fmtMinutes(w[0])}–${w[1] >= 1440 ? '翌日 ' : ''}${fmtMinutes(w[1])} 由總站開出` : null,
+    };
+  });
+
   // 站點：有政府走法就跟走法；冇就用城巴嘅合併列表
-  const stops: { dir: Dir; stopId: string }[] = selected
-    ? variantStops(selected)
-    : (data.directions[dir] ?? []).map((stopId) => ({ dir, stopId }));
-  const dest = data.stops[stops[stops.length - 1]?.stopId ?? '']?.nameTc;
+  const stops = (
+    selected ? variantStops(selected) : (data.directions[dir] ?? []).map((stopId) => ({ dir, stopId }))
+  ).map((s) => ({ dir: s.dir, stopId: s.stopId, name: data.stops[s.stopId]?.nameTc ?? s.stopId }));
+  const dest = stops[stops.length - 1]?.name;
 
   const mapStops: MapStop[] = stops.flatMap((s, i) => {
     const info = data.stops[s.stopId];
@@ -64,76 +80,37 @@ export default async function RoutePage({ params, searchParams }: Props) {
     }));
 
   return (
-    <main>
-      <h1>城巴 {data.route}</h1>
-      <div className="muted">{data.origTc} ⇄ {data.destTc}</div>
+    <main className="route-page">
+      <div className="route-top">
+        <div className="route-title">
+          <h1>城巴 {data.route}</h1>
+          <span className="muted">{data.origTc} ⇄ {data.destTc}</span>
+        </div>
 
-      {dirs.length > 1 && (
-        <nav className="tabs" aria-label="方向">
-          {dirs.map((d) => {
-            const ids = data.directions[d]!;
-            return (
-              <Link key={d} href={`?dir=${d}`} aria-current={d === dir ? 'page' : undefined} replace scroll={false}>
-                往 {data.stops[ids[ids.length - 1]!]?.nameTc}
-              </Link>
-            );
-          })}
-        </nav>
-      )}
-      {dirs.length === 1 && <p>往 {dest}</p>}
+        {dirs.length > 1 ? (
+          <nav className="tabs" aria-label="方向">
+            {dirs.map((d) => {
+              const ids = data.directions[d]!;
+              return (
+                <Link key={d} href={`?dir=${d}`} aria-current={d === dir ? 'page' : undefined} replace scroll={false}>
+                  往 {data.stops[ids[ids.length - 1]!]?.nameTc}
+                </Link>
+              );
+            })}
+          </nav>
+        ) : (
+          <p className="single-dir">往 {dest}</p>
+        )}
 
-      {sorted.length > 0 && (
-        <nav className="card variants" aria-label="走法">
-          {sorted.map(({ variant: v, status }, i) => {
-            const w = serviceWindow(v, calendar, now);
-            const active = v.id === selected?.id;
-            return (
-              <Link
-                key={v.id}
-                href={`?dir=${dir}&v=${v.id}`}
-                className={`variant${active ? ' active' : ''}`}
-                aria-current={active ? 'true' : undefined}
-                replace
-                scroll={false}
-              >
-                <span className={`variant-no${status.state === 'running' ? ' running' : ''}`}>{i + 1}</span>
-                <span className="variant-body">
-                  <span className="variant-title">
-                    {v.special && <span className="badge special">特別班</span>}
-                    <strong>{variantLabel(v)}</strong>
-                  </span>
-                  <span className={`variant-status ${status.state === 'running' ? 'running' : 'idle'}`}>
-                    {statusText(status)}
-                  </span>
-                  {w && (
-                    <span className="muted">
-                      今日 {fmtMinutes(w[0])}–{w[1] >= 1440 ? '翌日 ' : ''}
-                      {fmtMinutes(w[1])} 由總站開出
-                    </span>
-                  )}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
-      )}
+        <VariantPicker key={dir} items={items} selectedId={selected?.id ?? null} />
 
-      {mapStops.length > 0 && <RouteMap key={`${dir}-${selected?.id}`} lines={mapLines} stops={mapStops} />}
+        {mapStops.length > 0 && <RouteMap key={`${dir}-${selected?.id}`} lines={mapLines} stops={mapStops} />}
+      </div>
 
-      <ol className="stops card">
-        {stops.map((s, i) => (
-          <StopRow
-            key={`${s.dir}-${s.stopId}-${i}`}
-            index={i}
-            route={data.route}
-            stopId={s.stopId}
-            dir={s.dir}
-            name={data.stops[s.stopId]?.nameTc ?? s.stopId}
-            selectedVariantId={selected?.id ?? null}
-          />
-        ))}
-      </ol>
+      <div className="route-stops card">
+        <StopList key={`${dir}-${selected?.id}`} route={data.route} stops={stops} selectedVariantId={selected?.id ?? null} />
+        <p className="muted source">資料來源：運輸署、城巴（DATA.GOV.HK）</p>
+      </div>
     </main>
   );
 }
-

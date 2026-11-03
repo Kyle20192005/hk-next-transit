@@ -1,9 +1,8 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import { shortName, type Dir, type Eta } from '@hknt/core';
 
 type Props = {
-  /** 喺列表入面嘅位置（由 0 開始），地圖用嚟對應 */
   index: number;
   route: string;
   stopId: string;
@@ -11,62 +10,48 @@ type Props = {
   name: string;
   /** 用戶揀咗嘅走法；其他走法嘅班次會淡色顯示 */
   selectedVariantId: string | null;
+  open: boolean;
+  onToggle: () => void;
 };
 
 const REFRESH_MS = 30_000;
-/** 地圖撳站 → 打開呢行 */
-export const OPEN_STOP_EVENT = 'hknt:open-stop';
-/** 打開呢行 → 地圖移去呢個站 */
-export const FOCUS_STOP_EVENT = 'hknt:focus-stop';
 
-export default function StopRow({ index, route, stopId, dir, name, selectedVariantId }: Props) {
-  const [open, setOpen] = useState(false);
+/** 一個站：撳開顯示實時到站（開住時每 30 秒更新）。開定收由 StopList 控制。 */
+const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
+  { index, route, stopId, dir, name, selectedVariantId, open, onToggle },
+  ref,
+) {
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const ref = useRef<HTMLLIElement>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/eta?company=ctb&route=${encodeURIComponent(route)}&stop=${stopId}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? res.statusText);
-      setEtas((body.etas as Eta[]).filter((e) => e.dir === dir && e.eta));
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-    setNow(Date.now());
-  }, [route, stopId, dir]);
 
   useEffect(() => {
     if (!open) return;
-    load();
-    const t = setInterval(load, REFRESH_MS);
-    return () => clearInterval(t);
-  }, [open, load]);
-
-  // 地圖撳咗呢個站
-  useEffect(() => {
-    const onOpen = (e: Event) => {
-      if ((e as CustomEvent<number>).detail !== index) return;
-      setOpen(true);
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/eta?company=ctb&route=${encodeURIComponent(route)}&stop=${stopId}`);
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error ?? res.statusText);
+        if (cancelled) return;
+        setEtas((body.etas as Eta[]).filter((e) => e.dir === dir && e.eta));
+        setError(null);
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      }
+      if (!cancelled) setNow(Date.now());
     };
-    window.addEventListener(OPEN_STOP_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_STOP_EVENT, onOpen);
-  }, [index]);
-
-  const toggle = () => {
-    setOpen((o) => {
-      if (!o) window.dispatchEvent(new CustomEvent(FOCUS_STOP_EVENT, { detail: index }));
-      return !o;
-    });
-  };
+    void tick();
+    const t = setInterval(tick, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [open, route, stopId, dir]);
 
   return (
-    <li className="stop" ref={ref}>
-      <button onClick={toggle} aria-expanded={open}>
+    <li className={`stop${open ? ' open' : ''}`} ref={ref}>
+      <button onClick={onToggle} aria-expanded={open}>
         <span className="seq">{index + 1}</span>
         <span className="stop-name">{name}</span>
       </button>
@@ -97,4 +82,6 @@ export default function StopRow({ index, route, stopId, dir, name, selectedVaria
       )}
     </li>
   );
-}
+});
+
+export default StopRow;

@@ -17,6 +17,7 @@ export default async function Home() {
           : '・未讀到數據'}
       </p>
       <RouteSearch routes={index.routes} />
+      <p className="muted source">資料來源：運輸署、城巴（DATA.GOV.HK）</p>
     </main>
   );
 }

@@ -5,3 +5,4 @@ export * from './infer';
 export * from './ctb';
 export * from './kmb';
 export * from './variant';
+export * from './geo';

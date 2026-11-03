@@ -17,9 +17,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/">香港交通到站時間</Link>
         </header>
         {children}
-        <footer className="muted" style={{ textAlign: 'center', padding: 24 }}>
-          資料來源：運輸署、城巴（DATA.GOV.HK）
-        </footer>
       </body>
     </html>
   );
