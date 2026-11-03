@@ -164,3 +164,12 @@ describe('mergeScheduleBuses', () => {
     ]);
   });
 });
+
+describe('busFraction 行車時間 0', () => {
+  it('兩站同一位置（0 秒）唔會計出 NaN', () => {
+    const t = Date.parse('2026-11-03T12:00:00Z');
+    const f = busFraction({ from: 0, nextEta: t }, [0], t);
+    expect(Number.isNaN(f)).toBe(false);
+    expect(f).toBe(1);
+  });
+});

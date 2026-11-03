@@ -247,11 +247,14 @@ def segment_times(v, cstops, journey):
     stops = variant_stop_order(v)
     pos = lambda sid: (cstops[sid]['lat'], cstops[sid]['lng'])
     pairs = list(zip(stops, stops[1:]))
-    measured = [journey.get(a, {}).get(b) for a, b in pairs]
     dists = [dist(pos(a), pos(b)) for a, b in pairs]
+    # 實測異常（例如 682B 189 米要 43 分鐘，應該係混咗總站等車時間）：超過 10 分鐘而平均車速低過 1.5 米/秒就唔用
+    measured = [t if not (t and t > 600 and d / t < 1.5) else None
+                for t, d in zip((journey.get(a, {}).get(b) for a, b in pairs), dists)]
     ok = [(t, d) for t, d in zip(measured, dists) if t and t > 0]
     speed = (sum(d for _, d in ok) / sum(t for t, _ in ok)) if ok and sum(t for t, _ in ok) > 0 else 5.0  # 米/秒，約 18 km/h
-    secs = [round(t) if t and t > 0 else round(d / speed) for t, d in zip(measured, dists)]
+    # 最少 5 秒：兩個站座標一樣（距離 0）會計出 0 秒，前端推算位置要除以佢
+    secs = [max(5, round(t) if t and t > 0 else round(d / speed)) for t, d in zip(measured, dists)]
     return secs, [bool(t and t > 0) for t in measured]
 
 
@@ -470,6 +473,8 @@ def main():
                    'stops': {s: cstops[s] for s in sorted(rstops)}, 'directions': dirs,
                    'ctbOnlyStops': [], 'variants': vs},
                   open(f'{OUT}/ctb/{rno}.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+        if not vs:   # 城巴 API 有列但冇站（季節性路線，例如 9C 歌連臣角）：唔放入路線列表
+            continue
         index.append({'co': 'ctb', 'companies': ['CTB'], 'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'],
                       'dirs': sorted(dirs, reverse=True), 'variants': len(vs), 'special': 0})
     route_key = lambda r: (re.sub(r'\D', '', r['route']).zfill(4) if re.match(r'^\d', r['route']) else 'Z' + r['route'], r['route'], r.get('co', ''))

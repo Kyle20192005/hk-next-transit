@@ -130,7 +130,8 @@ def build_nlb(ctx):
             dir_ = 'O' if plain(b) == plain(base_to) or plain(a) == plain(base_from) else 'I'
             lst = raw['stops'][str(r['routeId'])]
             sids = lists[r['routeId']]
-            fares = {str(s['stopId']): float(s['fare']) for s in lst[:-1] if s.get('fare') not in (None, '', '0', 0)}
+            # 車費 "0.0" 即係冇資料（例如馬場線 1R），唔好顯示 $0
+            fares = {str(s['stopId']): float(s['fare']) for s in lst[:-1] if s.get('fare') not in (None, '') and float(s['fare']) > 0}
             r_special = bool(r['specialRoute']) or bool(re.search(r'[(（]', r['routeName_c']))
             # 同一組站嘅政府走法（例如上課日／非上課日）併埋，時間表合併
             groups = {}

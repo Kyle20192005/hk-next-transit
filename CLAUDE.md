@@ -140,6 +140,9 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - GTFS `stop_times.txt` 只有總站時間，中途站係空，所以 `offsets` 按走線長度比例估算。
 - 開車時間由午夜起計分鐘，過咗午夜會 >1440（例如 1475 = 翌日 00:35）。計「今日服務時段」只可以用今日嘅 serviceId，唔好混入琴晚過咗午夜嘅班次。
 - 循環線（例如 85 號）：政府成個圈一個方向，城巴拆開 O 同 I。pipeline 會將城巴 O+I 駁埋再配對，所以 `variant.stopDirs` 可以同時有 O 同 I。
+- hk-bus-time-between-stops 實測有異常（例如 682B 189 米要 43 分鐘，混咗總站等車）：`segment_times` 唔用超過 10 分鐘
+  而車速 < 1.5 米/秒嘅實測；每段最少 5 秒（兩站同一位置會計出 0，前端除 0 = NaN）。
+- 城巴 API 會列冇站嘅季節性路線（例如 9C 歌連臣角、H0）：唔放入路線列表。新巴車費 "0.0" = 冇資料。
 - CSDI 走線每段 = 第 i 站 → 第 i+1 站。少數走線段數同站數唔夾，`lineAligned: false`，畫地圖時要處理。
 - 城巴 API 冇「全部路線站點」endpoint，要逐條線 call；`fetch.py` 用 32 線程，大約 1 分鐘。
 - 政府 API 全部有開 CORS，瀏覽器可以直接 call；但我哋經 `apps/web` 嘅 API 行，方便 cache 同修正 API 改動而唔使出新版 App。

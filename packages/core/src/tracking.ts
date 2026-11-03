@@ -86,7 +86,8 @@ export function trackBuses(stopEtas: number[][], segSeconds: number[], now: numb
 
 /** 架車喺兩站之間行咗幾多（0–1），用嗰一段嘅行車時間計 */
 export function busFraction(bus: TrackedBus, segSeconds: number[], now: number): number {
-  const segMs = (segSeconds[bus.from] ?? 60) * 1000;
+  // 最少 1 秒：兩個站同一位置（行車時間 0）會變成 0/0 = NaN，令地圖位置出錯
+  const segMs = Math.max(1000, (segSeconds[bus.from] ?? 60) * 1000);
   return Math.min(1, Math.max(0, 1 - (bus.nextEta - now) / segMs));
 }
 
