@@ -108,5 +108,20 @@ export async function etasAtStop(
   }
 
   const all = (await Promise.all(parts)).flat();
-  return all.sort((a, b) => Date.parse(a.eta ?? '') - Date.parse(b.eta ?? ''));
+  return dedupe(all).sort((a, b) => Date.parse(a.eta ?? '') - Date.parse(b.eta ?? ''));
+}
+
+/**
+ * 去除重複班次：九巴就算要求唔同 service_type，都會回傳同一批車（只係改咗 service_type 欄），
+ * 例如 107 嘅「經海洋公園」（service_type 2）同正常路線（1）會出一樣嘅 16:00、16:30。
+ * 同公司、同方向、同到站時間當係同一班車，保留正常走法嗰個。特別班真係有自己嘅車，時間會唔同，唔受影響。
+ */
+function dedupe(etas: Eta[]): Eta[] {
+  const best = new Map<string, Eta>();
+  for (const e of etas) {
+    const key = `${e.company}|${e.dir}|${e.eta}`;
+    const cur = best.get(key);
+    if (!cur || (cur.variant?.special && !e.variant?.special)) best.set(key, e);
+  }
+  return [...best.values()];
 }

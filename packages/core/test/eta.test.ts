@@ -84,3 +84,28 @@ describe('九巴做主幹嘅聯營線（例如 101R）', () => {
     ]);
   });
 });
+
+describe('九巴唔同 service_type 回傳同一批車（例如 107）', () => {
+  const r107 = {
+    company: 'CTB', companies: ['CTB', 'KMB'], route: '107',
+    origTc: 'A', destTc: 'B', origEn: null, destEn: null,
+    stops: { S1: { nameTc: '華貴邨', nameEn: '', lat: 22.25, lng: 114.13, kmb: 'K1' } },
+    directions: { O: ['S1'] }, ctbOnlyStops: [],
+    variants: [
+      { id: '1491-1', govRouteId: '1491', govDir: '1', name: '九龍灣 - 華貴', special: false, stops: ['S1'], stopDirs: ['O'], stopMatch: ['A'], offsets: [0], schedules: [], line: null, lineAligned: false, expSeq: { 'O:S1': 1 }, kmb: { bound: 'I', serviceType: '1' } },
+      { id: '8468-1', govRouteId: '8468', govDir: '1', name: '九龍灣 - 華貴(經海洋公園)', special: true, stops: ['S1'], stopDirs: ['O'], stopMatch: ['A'], offsets: [0], schedules: [], line: null, lineAligned: false, expSeq: { 'O:S1': 1 }, kmb: { bound: 'I', serviceType: '2' } },
+    ],
+  } as unknown as RouteData;
+
+  it('同一班車只出一次，當正常路線', async () => {
+    const f = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('citybus')) return json([]);
+      const st = Number(url.split('/').pop());
+      return json([{ co: 'KMB', route: '107', dir: 'I', service_type: st, seq: 1, dest_tc: '', dest_en: '', eta: '2026-11-03T16:00:00+08:00', rmk_tc: '原定班次', rmk_en: '' }]);
+    }) as typeof fetch;
+    const etas = await etasAtStop(r107, 'S1', {}, f);
+    expect(etas).toHaveLength(1);
+    expect(etas[0]!.variant?.variantId).toBe('1491-1');
+  });
+});
