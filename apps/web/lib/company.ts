@@ -4,4 +4,5 @@ import type { Company } from '@hknt/core';
 export const COMPANIES: Record<Company, { name: string; bg: string; ink: string }> = {
   CTB: { name: '城巴', bg: '#ffd200', ink: '#1b1b1b' },
   KMB: { name: '九巴', bg: '#e1251b', ink: '#ffffff' },
+  LWB: { name: '龍運', bg: '#f26b21', ink: '#ffffff' },
 };

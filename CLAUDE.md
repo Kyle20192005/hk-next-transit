@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-香港公共交通實時到站 App。目前做城巴，網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
+香港公共交通實時到站 App。目前做城巴、九巴（連龍運）同聯營線，網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
+App 暫時只更新到城巴（用舊嘅 `/api/ctb`），未有九巴同新版介面。
 
 ## 結構
 
@@ -32,6 +33,22 @@ pnpm -r typecheck
 Vercel（Hobby）只部署 commit 作者係項目擁有者嘅 commit：commit 要用 `kylecom2017@gmail.com`。
 
 完成任何改動前：跑 core 測試同 `pnpm -r typecheck`。改 UI 要開 dev server 實際睇過。
+
+## 九巴同聯營線
+
+- 路線檔分 `out/ctb/<路線>.json`（城巴同大部分聯營線）同 `out/kmb/<路線>.json`（九巴、龍運）。網址 `/ctb/101`、`/kmb/1A`。
+  城巴 1 號同九巴 1 號係兩條唔同路線，所以要分公司。統一索引 `out/index.json`、`out/stops.json`；
+  `out/ctb/index.json`、`out/ctb/stops.json` 保留俾舊 App。
+- 九巴走法 = 九巴 `bound` + `service_type`（1 = 正常），直接用九巴站 ID，再配對最似嘅政府走法攞時間表、走線（`pipeline/kmb.py`）。
+- **聯營線**：政府 agency 有 `CTB` 同 `KMB`/`LWB`，或者兩邊同號碼而且起訖點一樣（`joint_by_ends`，例如 101R、X1）。
+  - 有政府城巴走法：放城巴路線檔，每個站加 `kmb`（九巴站 ID），每個走法加 `kmb: {bound, serviceType}`。
+  - 冇（例如賽馬日路線）：放九巴路線檔，每個站加 `ctb`，每個走法加 `ctb: {dir}`；城巴嗰條唔再喺統一索引出。
+  - 每間公司嘅 ETA 只有自己嘅車，`etasAtStop`（core `eta.ts`）合併兩邊。**九巴同城巴嘅去程定義可以相反**
+    （101：九巴 O = 觀塘→堅尼地城，城巴 O = 相反），所以九巴班次嘅 `dir` 會轉做呢個走法喺呢個站用嘅方向。
+  - 城巴「九巴時段」、九巴「城巴時段」係冇時間嘅佔位，要過濾走。
+- 九巴「原定班次」= 時間表時間：`Eta.scheduled = true`，介面標「原定」，唔用嚟追蹤巴士位置或者標「距離 N 個站」。
+- 九巴站名後面有編號（例如「(WT916)」），pipeline 會拎走。
+- 九巴 API 冇分開某啲短途特別班（例如 101 嘅特別班都係 service_type 1），呢啲九巴班次當係正常走法（confidence likely）。
 
 ## 數據原則：城巴為主，政府補充
 
@@ -123,5 +140,6 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 
 - 賽馬日改路等按事件嘅走法：政府數據冇。
 - ETA `seq` 規律只喺 38 號驗證過。
-- 九巴只有 ETA 雛形；新大嶼山巴士、港鐵、小巴、電車、渡輪未做。
+- 新大嶼山巴士、港鐵、小巴、電車、渡輪未做。
+- 「附近」：聯營線只列喺城巴站下面（避免同一條線喺相鄰嘅九巴站同城巴站出兩次）。
 - App 未喺實機或者模擬器測試過（只確認到 bundle 到）。

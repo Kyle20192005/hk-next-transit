@@ -14,24 +14,27 @@ import {
   variantsForDir,
   type Dir,
 } from '@hknt/core';
-import { getCalendar, getCtbRoute } from '@/lib/data';
+import { getCalendar, getRoute, isCo, type Co } from '@/lib/data';
+import { COMPANIES } from '@/lib/company';
 import StopList from '@/components/StopList';
 import VariantPicker, { type VariantItem } from '@/components/VariantPicker';
 import RouteMap, { type MapLine, type MapStop } from '@/components/RouteMapLazy';
 
 type Props = {
-  params: Promise<{ route: string }>;
+  /** co：ctb（城巴同聯營線）或 kmb（九巴、龍運） */
+  params: Promise<{ co: string; route: string }>;
   /** dir：方向；v：走法；stop：打開時自動打開嘅站（由「附近」撳入嚟） */
   searchParams: Promise<{ dir?: string; v?: string; stop?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { route } = await params;
-  const data = await getCtbRoute(route);
+  const { co, route } = await params;
+  const data = isCo(co) ? await getRoute(co, route) : null;
   if (!data) return { title: '搵唔到路線' };
+  const names = companyNames(data.companies ?? [data.company]);
   return {
-    title: `城巴 ${data.route} 到站時間`,
-    description: `城巴 ${data.route} ${data.origTc} ⇄ ${data.destTc} 實時到站時間、特別班次走法及服務時間。`,
+    title: `${names} ${data.route} 到站時間`,
+    description: `${names} ${data.route} ${data.origTc} ⇄ ${data.destTc} 實時到站時間、特別班次走法及服務時間。`,
   };
 }
 
@@ -39,9 +42,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * 路線頁：上面（標題、方向、走法、地圖）固定，只有站點列表捲動。
  */
 export default async function RoutePage({ params, searchParams }: Props) {
-  const [{ route }, { dir: dirParam, v: vParam, stop: stopParam }] = await Promise.all([params, searchParams]);
-  const [data, calendar] = await Promise.all([getCtbRoute(route), getCalendar()]);
+  const [{ co: coParam, route }, { dir: dirParam, v: vParam, stop: stopParam }] = await Promise.all([params, searchParams]);
+  if (!isCo(coParam)) notFound();
+  const co: Co = coParam;
+  const [data, calendar] = await Promise.all([getRoute(co, route), getCalendar()]);
   if (!data) notFound();
+  const companies = data.companies ?? [data.company];
 
   const now = new Date();
   const dirs = (['O', 'I'] as Dir[]).filter((d) => data.directions[d]?.length);
@@ -109,7 +115,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
             ‹
           </Link>
           <h1>
-            <small>城巴</small>
+            <small>{companyNames(companies)}</small>
             {data.route}
           </h1>
           <span className="route-dest">
@@ -136,6 +142,8 @@ export default async function RoutePage({ params, searchParams }: Props) {
 
       <div className="route-stops card">
         <StopList
+          co={co}
+          multiCompany={companies.length > 1}
           key={`${dir}-${selected?.id}`}
           route={data.route}
           stops={stops}
@@ -146,10 +154,14 @@ export default async function RoutePage({ params, searchParams }: Props) {
           initialOpen={initialOpen >= 0 ? initialOpen : null}
         />
         <p className="muted source">
-          資料來源：運輸署、城巴（DATA.GOV.HK）。行車時間：
+          資料來源：運輸署、{companyNames(companies)}（DATA.GOV.HK）。行車時間：
           <a href="https://github.com/HK-Bus-ETA/hk-bus-time-between-stops" target="_blank" rel="noopener">hk-bus-time-between-stops</a>（實驗性質，僅供參考）
         </p>
       </div>
     </main>
   );
+}
+
+function companyNames(cos: readonly string[]): string {
+  return cos.map((c) => COMPANIES[c as keyof typeof COMPANIES]?.name ?? c).join('・');
 }

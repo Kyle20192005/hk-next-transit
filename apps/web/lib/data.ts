@@ -101,6 +101,37 @@ export async function getCtbStops(): Promise<StopIndexEntry[]> {
   return (await load<{ stops: StopIndexEntry[] }>('ctb/stops.json'))?.stops ?? [];
 }
 
+/** 路線檔位置：ctb（城巴同聯營線）或 kmb（九巴、龍運） */
+export type Co = 'ctb' | 'kmb';
+export const isCo = (x: string | null | undefined): x is Co => x === 'ctb' || x === 'kmb';
+
+export function getRoute(co: Co, route: string): Promise<RouteData | null> {
+  if (!isCo(co) || !SAFE_ROUTE.test(route)) return Promise.resolve(null);
+  return load<RouteData>(`${co}/${route.toUpperCase()}.json`);
+}
+
+/** 統一路線索引（兩間公司）；舊數據冇就用城巴索引 */
+export async function getIndex(): Promise<RouteIndex> {
+  return (await load<RouteIndex>('index.json')) ?? (await getCtbIndex());
+}
+
+/** 統一站點索引項目：r = [路線檔位置, 路線, 方向, 往邊度] */
+export interface AnyStopEntry {
+  id: string;
+  co: Co;
+  n: string;
+  lat: number;
+  lng: number;
+  r: [co: Co, route: string, dir: 'O' | 'I', destTc: string][];
+}
+
+/** 統一站點索引（城巴站 + 九巴站）；舊數據冇就用城巴站 */
+export async function getAllStops(): Promise<AnyStopEntry[]> {
+  const all = await load<{ stops: AnyStopEntry[] }>('stops.json');
+  if (all) return all.stops;
+  return (await getCtbStops()).map((s) => ({ ...s, co: 'ctb' as const, r: s.r.map((x) => ['ctb', ...x] as AnyStopEntry['r'][number]) }));
+}
+
 export async function getCalendar(): Promise<Calendar> {
   return (await load<Calendar>('calendar.json')) ?? {};
 }

@@ -79,9 +79,10 @@ def hhmm_to_min(t):
 
 
 # ---------- 讀政府 GTFS ----------
-def load_gtfs():
+def load_gtfs(agency=lambda a: 'CTB' in a):
+    """政府 GTFS；agency 揀邊啲公司嘅路線（預設：有城巴份，即係城巴同聯營）"""
     routes = {r['route_id']: r for r in csv.DictReader(open(f'{G}/routes.txt', encoding='utf-8-sig'))
-              if 'CTB' in r['agency_id']}
+              if agency(r['agency_id'])}
     trips = collections.defaultdict(list)   # (route_id, dir) -> trips
     for t in csv.DictReader(open(f'{G}/trips.txt', encoding='utf-8-sig')):
         if t['route_id'] in routes:
@@ -125,6 +126,27 @@ def departures(trip, freq):
             out.add(x)
             x += max(step, 1)
     return sorted(out)
+
+
+def gov_stops(rows, gstops_all):
+    """政府走法嘅站（按站序），帶站名（所有寫法）同座標，用嚟同營辦商嘅站配對"""
+    return [{'id': r['stop_id'], 'seq': int(r['stop_sequence']),
+             'name': re.sub(r'^\[[^\]]*\]\s*', '', gstops_all[r['stop_id']]['stop_name'].split('|')[0]),
+             'names': gtfs_names(gstops_all[r['stop_id']]['stop_name']),
+             'pos': (float(gstops_all[r['stop_id']]['stop_lat']), float(gstops_all[r['stop_id']]['stop_lon']))}
+            for r in rows]
+
+
+def match_score(m):
+    return sum({'A': 4, 'B': 3, 'C': 1}[v[1]] for v in m.values())
+
+
+def variant_schedule(trips, freq):
+    """走法嘅時間表：{serviceId: 開車時間}"""
+    sched = collections.defaultdict(set)
+    for t in trips:
+        sched[t['service_id']].update(departures(t, freq))
+    return sched
 
 
 # ---------- 讀城巴 ----------
@@ -206,6 +228,13 @@ def main():
     # 站到站行車時間（第三方，可能冇）：{ 起點站: { 下一站: 秒 } }
     jt_path = f'{CACHE}/journey_times.json'
     journey = json.load(open(jt_path, encoding='utf-8')) if os.path.exists(jt_path) else {}
+    import kmb as K   # 九巴（連龍運）；放喺呢度 import，避免循環 import
+    kmbdata = K.load_kmb()
+    # 聯營路線（政府 agency 同時有城巴同九巴／龍運）：放喺城巴路線檔，九巴唔再另外出
+    joint_rnos = {r['route_short_name'] for r in csv.DictReader(open(f'{G}/routes.txt', encoding='utf-8-sig'))
+                  if 'CTB' in r['agency_id'] and ('KMB' in r['agency_id'] or 'LWB' in r['agency_id'])}
+    joint_rnos |= K.joint_by_ends(ctb_routes, kmbdata)
+    actual_joint = set()   # 真係配對到九巴嘅聯營線（九巴唔再另外出）
     lines = {(str(f['properties']['ROUTE_ID']), str(f['properties']['ROUTE_SEQ'])): f['geometry']['coordinates']
              for f in json.load(open(f'{CACHE}/csdi_lines.json', encoding='utf-8'))['features']}
 
@@ -223,16 +252,12 @@ def main():
     for (rid, d), tid in sorted(first.items()):
         rno = groutes[rid]['route_short_name']
         rows = sorted(gst[tid], key=lambda r: int(r['stop_sequence']))
-        gs = [{'id': r['stop_id'], 'seq': int(r['stop_sequence']),
-               'name': re.sub(r'^\[[^\]]*\]\s*', '', gstops_all[r['stop_id']]['stop_name'].split('|')[0]),
-               'names': gtfs_names(gstops_all[r['stop_id']]['stop_name']),
-               'pos': (float(gstops_all[r['stop_id']]['stop_lat']), float(gstops_all[r['stop_id']]['stop_lon']))}
-              for r in rows]
+        gs = gov_stops(rows, gstops_all)
         keys = [k for k in cand_lists if k[0] == rno]
         if not keys:
             unmatched_routes.append((rid, d, rno, '城巴 API 冇此路線')); continue
         best = max(((k, align(gs, [s for _, s in cand_lists[k]], cstops)) for k in keys),
-                   key=lambda x: sum({'A': 4, 'B': 3, 'C': 1}[v[1]] for v in x[1].values()))
+                   key=lambda x: match_score(x[1]))
         key, m = best
         if len(m) / len(gs) < 0.5:
             unmatched_routes.append((rid, d, rno, f'覆蓋只得 {len(m) / len(gs):.0%}')); continue
@@ -276,6 +301,7 @@ def main():
             'schedules': [{'serviceId': k, 'departures': sorted(v)} for k, v in sorted(sched.items())],
             'line': [simplify(s) for s in seg] if seg else None,
             'lineAligned': seg_ok,
+            '_gs': gs, '_agency': groutes[rid]['agency_id'],   # 暫存：聯營配對九巴用，輸出前刪走
         })
 
     # 城巴獨有站 + 每個走法預期嘅 ETA seq
@@ -304,31 +330,51 @@ def main():
             v['segSeconds'], v['segMeasured'] = segment_times(v, cstops, journey)
         rstops = {s for l in dirs.values() for s in l} | {s for v in vs for s in v['stops'] if s}
         info = rinfo.get(rno, {})
+        route_stops = {s: dict(cstops[s]) for s in sorted(rstops)}   # 複製：聯營會加 kmb 欄位
+        companies = ['CTB']
+        if rno in joint_rnos:
+            for sid, kid in K.attach_joint(vs, rno, kmbdata).items():
+                if sid in route_stops:
+                    route_stops[sid]['kmb'] = kid
+            if any('kmb' in v for v in vs):
+                actual_joint.add(rno)
+                cos = {K.company_of(v['_agency']) for v in vs if 'KMB' in v['_agency'] or 'LWB' in v['_agency']}
+                companies = sorted({'CTB'} | (cos or {'KMB'}))
+        for v in vs:
+            v.pop('_gs', None); v.pop('_agency', None)
         data = {
-            'company': 'CTB', 'route': rno,
+            'company': 'CTB', 'companies': companies, 'route': rno,
             'origTc': info.get('orig_tc'), 'destTc': info.get('dest_tc'),
             'origEn': info.get('orig_en'), 'destEn': info.get('dest_en'),
-            'stops': {s: cstops[s] for s in sorted(rstops)},
+            'stops': route_stops,
             'directions': dirs,
             'ctbOnlyStops': sorted(f'{d}:{s}' for d, s in orphan),
             'variants': vs,
         }
         json.dump(data, open(f'{OUT}/ctb/{rno}.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
-        index.append({'route': rno, 'origTc': data['origTc'], 'destTc': data['destTc'], 'dirs': sorted(dirs, reverse=True),
-                      'variants': len(vs), 'special': sum(v['special'] for v in vs)})
+        index.append({'co': 'ctb', 'companies': companies, 'route': rno, 'origTc': data['origTc'], 'destTc': data['destTc'],
+                      'dirs': sorted(dirs, reverse=True), 'variants': len(vs), 'special': sum(v['special'] for v in vs)})
     # 城巴有但政府冇嘅路線：照出（冇走法資料）
     for rno, info in rinfo.items():
         if rno in variants_by_route: continue
         dirs = {d: clists[(rno, d)] for d in ('O', 'I') if (rno, d) in clists}
         rstops = {s for l in dirs.values() for s in l}
-        json.dump({'company': 'CTB', 'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'],
+        json.dump({'company': 'CTB', 'companies': ['CTB'], 'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'],
                    'origEn': info['orig_en'], 'destEn': info['dest_en'],
                    'stops': {s: cstops[s] for s in sorted(rstops)}, 'directions': dirs,
                    'ctbOnlyStops': [], 'variants': []},
                   open(f'{OUT}/ctb/{rno}.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
-        index.append({'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'], 'dirs': sorted(dirs, reverse=True),
-                      'variants': 0, 'special': 0})
-    index.sort(key=lambda r: (re.sub(r'\D', '', r['route']).zfill(4) if re.match(r'^\d', r['route']) else 'Z' + r['route'], r['route']))
+        index.append({'co': 'ctb', 'companies': ['CTB'], 'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'],
+                      'dirs': sorted(dirs, reverse=True), 'variants': 0, 'special': 0})
+    route_key = lambda r: (re.sub(r'\D', '', r['route']).zfill(4) if re.match(r'^\d', r['route']) else 'Z' + r['route'], r['route'], r.get('co', ''))
+    index.sort(key=route_key)
+    kmb_primary_done = set()
+    kmb_index, kmb_by_stop, kstops = K.build_kmb({
+        'kmb': kmbdata, 'special': special, 'lines': lines, 'journey': journey,
+        'used_services': used_services, 'joint': actual_joint,
+        # 認到係聯營但城巴冇政府走法資料：改用九巴做主幹，加城巴站
+        'joint_kmb_primary': joint_rnos - actual_joint, 'ctb': (cstops, clists), 'kmb_primary_done': kmb_primary_done,
+    })
     # 站點索引（附近車站用）：每個城巴站有邊幾條路線、邊個方向、往邊度
     by_stop = collections.defaultdict(list)
     for (rno, d), l in clists.items():
@@ -340,8 +386,22 @@ def main():
          'r': sorted(rs, key=lambda x: (re.sub(r'\D', '', x[0]).zfill(4), x[0], x[1]))}
         for sid, rs in sorted(by_stop.items())
     ]
+    # 九巴做主幹嘅聯營線：城巴嗰條唔再喺統一索引出（路線檔照留，舊 App 用）
+    index_all = [r for r in index if r['route'] not in kmb_primary_done] + kmb_index
     json.dump({'stops': stops_index}, open(f'{OUT}/ctb/stops.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
-    json.dump({'generatedAt': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'), 'routes': index},
+    # 統一站點索引（兩間公司）：r = [co, 路線, 方向, 往邊度]
+    all_stops = [dict(e, co='ctb', r=[['ctb'] + x for x in e['r'] if x[0] not in kmb_primary_done]) for e in stops_index]
+    all_stops = [e for e in all_stops if e['r']]
+    all_stops += [
+        {'id': sid, 'co': 'kmb', 'n': kstops[sid]['nameTc'], 'lat': kstops[sid]['lat'], 'lng': kstops[sid]['lng'],
+         'r': sorted(rs, key=lambda x: (re.sub(r'\D', '', x[1]).zfill(4), x[1], x[2]))}
+        for sid, rs in sorted(kmb_by_stop.items())
+    ]
+    json.dump({'stops': all_stops}, open(f'{OUT}/stops.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+    generated = dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')
+    json.dump({'generatedAt': generated, 'routes': sorted(index_all, key=route_key)},
+              open(f'{OUT}/index.json', 'w', encoding='utf-8'), ensure_ascii=False)
+    json.dump({'generatedAt': generated, 'routes': index},
               open(f'{OUT}/ctb/index.json', 'w', encoding='utf-8'), ensure_ascii=False)
     json.dump(load_calendar(used_services), open(f'{OUT}/calendar.json', 'w'), separators=(',', ':'))
 

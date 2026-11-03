@@ -99,24 +99,29 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
       </div>
 
       <ul className="route-list" ref={listRef}>
-        {matches.slice(0, shown).map((r) => (
-          <li key={r.route}>
-            <Link href={`/ctb/${r.route}`} className="route-item">
-              <span className="route-id">
-                <span className="route-num">{r.route}</span>
-                <CompanyTag company="CTB" />
-              </span>
-              <RouteEnds r={r} />
-            </Link>
-          </li>
-        ))}
+        {matches.slice(0, shown).map((r) => {
+          const co = r.co ?? 'ctb';
+          return (
+            <li key={`${co}-${r.route}`}>
+              <Link href={`/${co}/${r.route}`} className="route-item">
+                <span className="route-id">
+                  <span className="route-num">{r.route}</span>
+                  {(r.companies ?? ['CTB']).map((c) => (
+                    <CompanyTag key={c} company={c} />
+                  ))}
+                </span>
+                <RouteEnds r={r} />
+              </Link>
+            </li>
+          );
+        })}
         {matches.length === 0 && <li className="empty">搵唔到路線</li>}
         {shown < matches.length && <li ref={sentinel} className="loading-more">載入中…</li>}
         {shown >= matches.length && matches.length > 0 && (
           <li className="list-end muted">
             共 {matches.length} 條路線{updated ? `・數據更新：${updated}` : ''}
             <br />
-            資料來源：運輸署、城巴（DATA.GOV.HK）
+            資料來源：運輸署、城巴、九巴（DATA.GOV.HK）
           </li>
         )}
       </ul>

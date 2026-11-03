@@ -2,16 +2,17 @@
 import Link from 'next/link';
 import CompanyTag from '@/components/CompanyTag';
 import { useCallback, useEffect, useState } from 'react';
-import { formatDistance } from '@hknt/core';
+import { formatDistance, type Company } from '@hknt/core';
 
 interface NearStop {
   id: string;
+  co: 'ctb' | 'kmb';
   name: string;
   distance: number;
-  routes: { route: string; dir: 'O' | 'I'; dest: string }[];
+  routes: { co: 'ctb' | 'kmb'; route: string; dir: 'O' | 'I'; dest: string; companies: Company[] }[];
 }
 interface StopEtas {
-  routes: { route: string; dir: 'O' | 'I'; dest: string; etas: { eta: string; remark: string }[] }[];
+  routes: { route: string; dir: 'O' | 'I'; etas: { eta: string; company: Company; scheduled: boolean }[] }[];
 }
 
 /** 自動載入到站時間嘅站數（其餘撳開先載入，避免一次過 call 太多） */
@@ -72,7 +73,7 @@ export default function Nearby() {
       </div>
       <ul className="nearby-list">
         {state.stops.map((s, i) => (
-          <NearbyStop key={s.id} stop={s} autoLoad={i < AUTO_LOAD} />
+          <NearbyStop key={`${s.co}-${s.id}`} stop={s} autoLoad={i < AUTO_LOAD} />
         ))}
       </ul>
     </div>
@@ -89,7 +90,7 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
     let cancelled = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/stop-etas?stop=${stop.id}`);
+        const res = await fetch(`/api/stop-etas?co=${stop.co}&stop=${stop.id}`);
         if (res.ok && !cancelled) setEtas(await res.json());
       } catch {
         /* 下次再試 */
@@ -102,7 +103,7 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
       cancelled = true;
       clearInterval(t);
     };
-  }, [open, stop.id]);
+  }, [open, stop.id, stop.co]);
 
   const etaOf = (route: string, dir: string) => etas?.routes.find((r) => r.route === route && r.dir === dir)?.etas ?? null;
 
@@ -118,11 +119,13 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
             const list = etaOf(r.route, r.dir);
             const mins = list?.map((e) => Math.max(0, Math.round((Date.parse(e.eta) - now) / 60000)));
             return (
-              <li key={`${r.route}-${r.dir}`}>
-                <Link href={`/ctb/${r.route}?dir=${r.dir}&stop=${stop.id}`} className="nearby-route">
+              <li key={`${r.co}-${r.route}-${r.dir}`}>
+                <Link href={`/${r.co}/${r.route}?dir=${r.dir}&stop=${stop.id}`} className="nearby-route">
                   <span className="route-id">
                     <span className="route-num sm">{r.route}</span>
-                    <CompanyTag company="CTB" />
+                    {r.companies.map((c) => (
+                      <CompanyTag key={c} company={c} />
+                    ))}
                   </span>
                   <span className="route-to">往 {r.dest}</span>
                   <span className="nearby-eta">
@@ -133,6 +136,7 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
                         <b>{mins[0] === 0 ? '即將' : mins[0]}</b>
                         {mins[0] !== 0 && <small> 分</small>}
                         {mins.length > 1 && <small className="muted"> · {mins.slice(1).join('、')} 分</small>}
+                        {list[0]?.scheduled && <span className="scheduled"> 原定</span>}
                       </>
                     ) : (
                       <span className="muted">冇班次</span>

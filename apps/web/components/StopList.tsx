@@ -5,6 +5,10 @@ import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
 
 type Props = {
+  /** 路線檔位置（ctb 包聯營線、kmb 包九巴同龍運） */
+  co: 'ctb' | 'kmb';
+  /** 多過一間公司營辦（聯營線）：每班車標明公司 */
+  multiCompany: boolean;
   route: string;
   stops: { dir: Dir; stopId: string; name: string }[];
   selectedVariantId: string | null;
@@ -27,7 +31,7 @@ const BUSES_REFRESH_MS = 20_000;
  * - 打開站時：攞到站時間、地圖放大過去；每班車標示「距離 N 個站／未開出」
  * - 後面嘅站顯示由打開咗嘅站出發要幾耐，同下一班車大概幾時到
  */
-export default function StopList({ route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, special, initialOpen }: Props) {
+export default function StopList({ co, multiCompany, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, special, initialOpen }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +72,7 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
     let cancelled = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/buses?company=ctb&route=${encodeURIComponent(route)}&v=${selectedVariantId}`);
+        const res = await fetch(`/api/buses?co=${co}&route=${encodeURIComponent(route)}&v=${selectedVariantId}`);
         if (!res.ok) return;
         const body = (await res.json()) as { buses: { from: number; nextEta: string }[]; segSeconds: number[] };
         if (cancelled) return;
@@ -83,7 +87,7 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
       cancelled = true;
       clearInterval(t);
     };
-  }, [route, selectedVariantId]);
+  }, [co, route, selectedVariantId]);
 
   // 通知地圖
   useEffect(() => {
@@ -98,7 +102,7 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
     let cancelled = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/eta?company=ctb&route=${encodeURIComponent(route)}&stop=${open.stopId}`);
+        const res = await fetch(`/api/eta?co=${co}&route=${encodeURIComponent(route)}&stop=${open.stopId}`);
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? res.statusText);
         if (cancelled) return;
@@ -115,7 +119,7 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
       cancelled = true;
       clearInterval(t);
     };
-  }, [openIndex, open, route]);
+  }, [openIndex, open, co, route]);
 
   const isMine = (e: Eta) => !selectedVariantId || !e.variant?.variantId || e.variant.variantId === selectedVariantId;
   const seg = live?.segSeconds ?? avgSeg;
@@ -129,7 +133,8 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
   // 每班車而家喺邊：用成條線追蹤到嘅巴士對應返呢個站嘅 ETA
   const whereLabels = useMemo(() => {
     if (!live || openIndex === null || !etas) return null;
-    const mine = etas.filter(isMine);
+    // 九巴「原定班次」唔係實時，唔配對巴士位置
+    const mine = etas.filter((e) => isMine(e) && !e.scheduled);
     const labels = labelEtas(live.buses, openIndex, mine.map((e) => Date.parse(e.eta!)), live.segSeconds, now);
     return etas.map((e) => {
       const k = mine.indexOf(e);
@@ -184,6 +189,7 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
             }}
             index={i}
             name={s.name}
+            multiCompany={multiCompany}
             terminus={i === 0 || i === stops.length - 1}
             buses={rowBuses.get(i) ?? []}
             open={openIndex === i}

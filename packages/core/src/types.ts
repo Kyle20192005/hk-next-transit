@@ -1,4 +1,4 @@
-/** 城巴方向：O = outbound，I = inbound */
+/** 方向：O = outbound，I = inbound（城巴同九巴各自定義，聯營線兩邊可以相反） */
 export type Dir = 'O' | 'I';
 
 export interface Stop {
@@ -6,13 +6,21 @@ export interface Stop {
   nameEn: string;
   lat: number;
   lng: number;
+  /** 聯營線（城巴路線檔）：同一個位置嘅九巴站 ID */
+  kmb?: string;
+  /** 聯營線（九巴路線檔，例如 101R）：同一個位置嘅城巴站 ID */
+  ctb?: string;
 }
 
-/** 政府走法（GTFS route_id + 方向），站點已換成城巴站 ID */
+/**
+ * 走法。城巴路線檔：政府走法（GTFS route_id + 方向），站點係城巴站 ID。
+ * 九巴路線檔：九巴 bound + service_type，站點係九巴站 ID，再配對政府走法攞時間表同走線。
+ */
 export interface Variant {
   id: string;
-  govRouteId: string;
-  govDir: string;
+  /** 對應嘅政府走法；九巴走法配唔到政府就係 null（冇時間表同走線） */
+  govRouteId: string | null;
+  govDir: string | null;
   name: string;
   /** 運輸署 specialType = 1，即特別班 */
   special: boolean;
@@ -39,10 +47,17 @@ export interface Variant {
   segSeconds?: number[];
   /** segSeconds 每段係咪實測 */
   segMeasured?: boolean[];
+  /** 九巴 ETA 查詢參數（九巴路線同聯營線先有）：bound 係九巴嘅方向，同城巴可以相反 */
+  kmb?: { bound: Dir; serviceType: string };
+  /** 城巴 ETA 查詢方向（九巴做主幹嘅聯營線先有） */
+  ctb?: { dir: Dir };
 }
 
 export interface RouteData {
-  company: 'CTB';
+  /** 路線檔屬邊間公司嘅數據（決定站 ID 係城巴定九巴） */
+  company: 'CTB' | 'KMB';
+  /** 實際營辦嘅公司；聯營線係 ['CTB', 'KMB'] */
+  companies?: Company[];
   route: string;
   origTc: string | null;
   destTc: string | null;
@@ -58,6 +73,10 @@ export interface RouteData {
 export interface RouteIndex {
   generatedAt: string;
   routes: {
+    /** 路線檔喺邊：ctb/<路線> 或 kmb/<路線>（舊數據冇呢欄，當 ctb） */
+    co?: 'ctb' | 'kmb';
+    /** 營辦公司；聯營線兩間 */
+    companies?: Company[];
     route: string;
     origTc: string;
     destTc: string;
@@ -74,7 +93,7 @@ export type Calendar = Record<
   { days: boolean[]; start: string; end: string; add: string[]; remove: string[] }
 >;
 
-export type Company = 'CTB' | 'KMB';
+export type Company = 'CTB' | 'KMB' | 'LWB';
 
 /** 統一格式嘅到站時間 */
 export interface Eta {
@@ -90,6 +109,8 @@ export interface Eta {
   destEn: string;
   remarkTc: string;
   remarkEn: string;
+  /** 九巴「原定班次」：時間表時間，唔係實時；唔用嚟推算巴士位置 */
+  scheduled?: boolean;
   variant?: VariantGuess;
 }
 

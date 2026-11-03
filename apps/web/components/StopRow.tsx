@@ -2,6 +2,7 @@
 import { forwardRef } from 'react';
 import { formatDistance, shortName, type Eta } from '@hknt/core';
 import BusIcon from './BusIcon';
+import CompanyTag from './CompanyTag';
 
 /**
  * 時間線上嘅巴士。兩站之間嘅前半段畫喺上一個站嗰行（站點圓點以下），後半段畫喺下一個站嗰行（圓點以上）。
@@ -21,6 +22,8 @@ const busTop = (b: RowBus) =>
 
 type Props = {
   index: number;
+  /** 聯營線：每班車標明公司 */
+  multiCompany: boolean;
   name: string;
   terminus: boolean;
   open: boolean;
@@ -47,7 +50,7 @@ const hhmm = (ms: number) =>
 
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, name, terminus, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, travelMetres, nextArrival, buses },
+  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, travelMetres, nextArrival, buses },
   ref,
 ) {
   const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null })) ?? null;
@@ -96,6 +99,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                 )}
               </span>
               <span className="eta-time">{next.e.eta!.slice(11, 16)}</span>
+              <EtaTags e={next.e} multiCompany={multiCompany} />
               {next.where && <span className="where">{next.where}</span>}
             </div>
           )}
@@ -108,6 +112,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                   <li key={i} className={other ? 'eta-row-other' : undefined}>
                     <span className="eta-min">{minsOf(e) === 0 ? '即將' : `${minsOf(e)} 分`}</span>
                     <span className="eta-time">{e.eta!.slice(11, 16)}</span>
+                    <EtaTags e={e} multiCompany={multiCompany} />
                     {/* 揀咗嘅走法唔使再標；其他走法先標出嚟 */}
                     {other && v?.name && (
                       <span className={`badge${v.special ? ' special' : ''}`} title={v.reason}>
@@ -128,3 +133,17 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
 });
 
 export default StopRow;
+
+/** 班次標籤：聯營線標公司；九巴「原定班次」標「原定」（時間表時間，唔係實時） */
+function EtaTags({ e, multiCompany }: { e: Eta; multiCompany: boolean }) {
+  return (
+    <>
+      {multiCompany && <CompanyTag company={e.company} />}
+      {e.scheduled && (
+        <span className="scheduled" title="原定班次：時間表時間，唔係實時">
+          原定
+        </span>
+      )}
+    </>
+  );
+}

@@ -8,3 +8,4 @@ export * from './variant';
 export * from './geo';
 export * from './journey';
 export * from './tracking';
+export * from './eta';
