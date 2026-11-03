@@ -8,11 +8,16 @@ import type { Calendar, RouteData, RouteIndex } from '@hknt/core';
  * 有 DATA_BASE_URL 就由 CDN 攞（每小時更新一次 cache），冇就讀本地 pipeline/out（開發用）。
  */
 const BASE = process.env.DATA_BASE_URL;
+/** 私人 GitHub repo 用：只需 Contents 讀取權限嘅 fine-grained token */
+const TOKEN = process.env.DATA_TOKEN;
 const LOCAL = path.resolve(process.cwd(), '../../pipeline/out');
 
 async function load<T>(file: string): Promise<T | null> {
   if (BASE) {
-    const res = await fetch(`${BASE}/${file}`, { next: { revalidate: 3600 } });
+    const res = await fetch(`${BASE}/${file}`, {
+      headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : undefined,
+      next: { revalidate: 3600 },
+    });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`讀取 ${file} 失敗：${res.status}`);
     return (await res.json()) as T;
