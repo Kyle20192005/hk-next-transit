@@ -4,3 +4,4 @@ export * from './schedule';
 export * from './infer';
 export * from './ctb';
 export * from './kmb';
+export * from './variant';

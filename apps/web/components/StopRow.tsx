@@ -1,26 +1,30 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
-import type { Dir, Eta } from '@hknt/core';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { shortName, type Dir, type Eta } from '@hknt/core';
 
 type Props = {
-  seq: number;
+  /** 喺列表入面嘅位置（由 0 開始），地圖用嚟對應 */
+  index: number;
   route: string;
   stopId: string;
   dir: Dir;
   name: string;
-  /** 只有部分走法停呢個站時，列出係邊幾個 */
-  onlyVariants: string[];
-  /** 停呢個站嘅走法全部都係特別班 */
-  onlySpecial: boolean;
+  /** 用戶揀咗嘅走法；其他走法嘅班次會淡色顯示 */
+  selectedVariantId: string | null;
 };
 
 const REFRESH_MS = 30_000;
+/** 地圖撳站 → 打開呢行 */
+export const OPEN_STOP_EVENT = 'hknt:open-stop';
+/** 打開呢行 → 地圖移去呢個站 */
+export const FOCUS_STOP_EVENT = 'hknt:focus-stop';
 
-export default function StopRow({ seq, route, stopId, dir, name, onlyVariants, onlySpecial }: Props) {
+export default function StopRow({ index, route, stopId, dir, name, selectedVariantId }: Props) {
   const [open, setOpen] = useState(false);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const ref = useRef<HTMLLIElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -42,19 +46,29 @@ export default function StopRow({ seq, route, stopId, dir, name, onlyVariants, o
     return () => clearInterval(t);
   }, [open, load]);
 
+  // 地圖撳咗呢個站
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      if ((e as CustomEvent<number>).detail !== index) return;
+      setOpen(true);
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    window.addEventListener(OPEN_STOP_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_STOP_EVENT, onOpen);
+  }, [index]);
+
+  const toggle = () => {
+    setOpen((o) => {
+      if (!o) window.dispatchEvent(new CustomEvent(FOCUS_STOP_EVENT, { detail: index }));
+      return !o;
+    });
+  };
+
   return (
-    <li className="stop">
-      <button onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span className="seq">{seq}</span>
-        <span className="stop-name">
-          {name}
-          {onlyVariants.length > 0 && (
-            <>
-              {' '}
-              <span className={`badge${onlySpecial ? ' special' : ''}`}>只限{onlyVariants.join('、')}</span>
-            </>
-          )}
-        </span>
+    <li className="stop" ref={ref}>
+      <button onClick={toggle} aria-expanded={open}>
+        <span className="seq">{index + 1}</span>
+        <span className="stop-name">{name}</span>
       </button>
       {open && (
         <div className="etas" aria-live="polite">
@@ -64,13 +78,14 @@ export default function StopRow({ seq, route, stopId, dir, name, onlyVariants, o
           {etas?.map((e, i) => {
             const mins = Math.max(0, Math.round((Date.parse(e.eta!) - now) / 60000));
             const v = e.variant;
+            const other = Boolean(selectedVariantId && v?.variantId && v.variantId !== selectedVariantId);
             return (
-              <div className="eta-row" key={i}>
+              <div className={`eta-row${other ? ' other' : ''}`} key={i}>
                 <span className="eta-min">{mins === 0 ? '即將' : `${mins} 分`}</span>
                 <span className="muted">{e.eta!.slice(11, 16)}</span>
                 {v?.name && (
                   <span className={`badge${v.special ? ' special' : ''}`} title={v.reason}>
-                    {v.name.match(/[（(]([^）)]+)[）)]\s*$/)?.[1] ?? v.name}
+                    {v.special ? shortName({ name: v.name }) : '正常路線'}
                     {v.confidence === 'likely' ? '（推斷）' : ''}
                   </span>
                 )}

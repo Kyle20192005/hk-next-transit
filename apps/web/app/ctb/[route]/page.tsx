@@ -1,12 +1,25 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { fmtMinutes, serviceWindow, type Dir, type Variant } from '@hknt/core';
+import {
+  fmtMinutes,
+  serviceWindow,
+  shortName,
+  sortVariants,
+  statusText,
+  variantStops,
+  variantsForDir,
+  type Dir,
+  type Variant,
+} from '@hknt/core';
 import { getCalendar, getCtbRoute } from '@/lib/data';
-import { shortName, variantsForDir } from '@/lib/variant';
 import StopRow from '@/components/StopRow';
+import RouteMap, { type MapLine, type MapStop } from '@/components/RouteMapLazy';
 
-type Props = { params: Promise<{ route: string }>; searchParams: Promise<{ dir?: string }> };
+type Props = {
+  params: Promise<{ route: string }>;
+  searchParams: Promise<{ dir?: string; v?: string }>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { route } = await params;
@@ -19,16 +32,36 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function RoutePage({ params, searchParams }: Props) {
-  const [{ route }, { dir: dirParam }] = await Promise.all([params, searchParams]);
+  const [{ route }, { dir: dirParam, v: vParam }] = await Promise.all([params, searchParams]);
   const [data, calendar] = await Promise.all([getCtbRoute(route), getCalendar()]);
   if (!data) notFound();
 
+  const now = new Date();
   const dirs = (['O', 'I'] as Dir[]).filter((d) => data.directions[d]?.length);
   const dir: Dir = dirs.includes(dirParam as Dir) ? (dirParam as Dir) : (dirs[0] ?? 'O');
-  const stopIds = data.directions[dir] ?? [];
-  const lastStop = stopIds.length ? data.stops[stopIds[stopIds.length - 1]!] : undefined;
-  const variants = variantsForDir(data, dir);
-  const now = new Date();
+
+  // 走法：現正服務嘅排先；預設揀第一個，用戶可以用 ?v= 揀其他
+  const sorted = sortVariants(variantsForDir(data, dir), calendar, now);
+  const selected = sorted.find((x) => x.variant.id === vParam)?.variant ?? sorted[0]?.variant;
+
+  // 站點：有政府走法就跟走法；冇就用城巴嘅合併列表
+  const stops: { dir: Dir; stopId: string }[] = selected
+    ? variantStops(selected)
+    : (data.directions[dir] ?? []).map((stopId) => ({ dir, stopId }));
+  const dest = data.stops[stops[stops.length - 1]?.stopId ?? '']?.nameTc;
+
+  const mapStops: MapStop[] = stops.flatMap((s, i) => {
+    const info = data.stops[s.stopId];
+    return info ? [{ index: i, name: info.nameTc, lat: info.lat, lng: info.lng }] : [];
+  });
+  const mapLines: MapLine[] = sorted
+    .filter((x) => x.variant.line)
+    .map((x) => ({
+      id: x.variant.id,
+      selected: x.variant.id === selected?.id,
+      special: x.variant.special,
+      segments: x.variant.line!.map((seg) => seg.map(([lng, lat]) => [lat, lng] as [number, number])),
+    }));
 
   return (
     <main>
@@ -39,66 +72,77 @@ export default async function RoutePage({ params, searchParams }: Props) {
         <nav className="tabs" aria-label="方向">
           {dirs.map((d) => {
             const ids = data.directions[d]!;
-            const dest = data.stops[ids[ids.length - 1]!]?.nameTc;
             return (
               <Link key={d} href={`?dir=${d}`} aria-current={d === dir ? 'page' : undefined} replace scroll={false}>
-                往 {dest}
+                往 {data.stops[ids[ids.length - 1]!]?.nameTc}
               </Link>
             );
           })}
         </nav>
       )}
-      {dirs.length === 1 && <p>往 {lastStop?.nameTc}</p>}
+      {dirs.length === 1 && <p>往 {dest}</p>}
 
-      {variants.length > 0 && (
-        <section className="card variants" aria-label="走法">
-          {variants.map((v) => {
+      {sorted.length > 0 && (
+        <nav className="card variants" aria-label="走法">
+          {sorted.map(({ variant: v, status }, i) => {
             const w = serviceWindow(v, calendar, now);
+            const active = v.id === selected?.id;
             return (
-              <div className="variant" key={v.id}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span className={`badge${v.special ? ' special' : ''}`}>{v.special ? '特別班' : '正常'}</span>
-                  <strong>{shortName(v)}</strong>
-                </div>
-                <div className="muted">
-                  {w ? `今日 ${fmtMinutes(w[0])}–${w[1] >= 1440 ? '翌日 ' : ''}${fmtMinutes(w[1])} 由總站開出` : '今日冇班次'}
-                </div>
-              </div>
+              <Link
+                key={v.id}
+                href={`?dir=${dir}&v=${v.id}`}
+                className={`variant${active ? ' active' : ''}`}
+                aria-current={active ? 'true' : undefined}
+                replace
+                scroll={false}
+              >
+                <span className={`variant-no${status.state === 'running' ? ' running' : ''}`}>{i + 1}</span>
+                <span className="variant-body">
+                  <span className="variant-title">
+                    {v.special && <span className="badge special">特別班</span>}
+                    <strong>{variantLabel(v)}</strong>
+                  </span>
+                  <span className={`variant-status ${status.state === 'running' ? 'running' : 'idle'}`}>
+                    {statusText(status)}
+                  </span>
+                  {w && (
+                    <span className="muted">
+                      今日 {fmtMinutes(w[0])}–{w[1] >= 1440 ? '翌日 ' : ''}
+                      {fmtMinutes(w[1])} 由總站開出
+                    </span>
+                  )}
+                </span>
+              </Link>
             );
           })}
-        </section>
+        </nav>
       )}
 
+      {mapStops.length > 0 && <RouteMap key={`${dir}-${selected?.id}`} lines={mapLines} stops={mapStops} />}
+
       <ol className="stops card">
-        {stopIds.map((sid, i) => {
-          const served = variants.filter((v) => `${dir}:${sid}` in v.expSeq);
-          // 只有「有走法行經呢段路但唔停呢個站」先標示；起點或終點唔同（例如中途開出嘅特別班）唔算
-          const skipped = variants.filter((v) => !served.includes(v) && passesThrough(v, dir, stopIds, i));
-          const partial = served.length > 0 && skipped.length > 0;
-          const only = partial ? served.map(shortName) : [];
-          const onlySpecial = partial && served.every((v) => v.special);
-          return (
-            <StopRow
-              key={`${sid}-${i}`}
-              seq={i + 1}
-              route={data.route}
-              stopId={sid}
-              dir={dir}
-              name={data.stops[sid]?.nameTc ?? sid}
-              onlyVariants={only}
-              onlySpecial={onlySpecial}
-            />
-          );
-        })}
+        {stops.map((s, i) => (
+          <StopRow
+            key={`${s.dir}-${s.stopId}-${i}`}
+            index={i}
+            route={data.route}
+            stopId={s.stopId}
+            dir={s.dir}
+            name={data.stops[s.stopId]?.nameTc ?? s.stopId}
+            selectedVariantId={selected?.id ?? null}
+          />
+        ))}
       </ol>
     </main>
   );
 }
 
-/** 走法喺城巴列表入面嘅範圍包唔包第 i 個站（即係行經呢段路） */
-function passesThrough(v: Variant, dir: Dir, list: string[], i: number): boolean {
-  const idx = v.stops
-    .map((s, k) => (s && v.stopDirs[k] === dir ? list.indexOf(s) : -1))
-    .filter((x) => x >= 0);
-  return idx.length > 0 && Math.min(...idx) < i && i < Math.max(...idx);
+/**
+ * 正常走法叫「正常路線」；括號入面係走法描述（例如「經華富」）先加埋，
+ * 目的地（例如 70 號嘅「交易廣場」）唔加。
+ */
+function variantLabel(v: Variant): string {
+  const short = shortName(v);
+  if (v.special) return short;
+  return short !== v.name && /經|繞|不/.test(short) ? `正常路線（${short}）` : '正常路線';
 }
