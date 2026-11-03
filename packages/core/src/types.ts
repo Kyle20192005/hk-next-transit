@@ -36,6 +36,8 @@ export interface Variant {
   schedules: { serviceId: string; departures: number[] }[];
   /** 走線：第 i 段 = 第 i 站 → 第 i+1 站，[lng, lat] */
   line: [number, number][][] | null;
+  /** 走線來源：冇 = 政府 CSDI；osm = OpenStreetMap（港鐵巴士，ODbL，地圖要註明） */
+  lineSource?: 'osm';
   /** 走線段數同站數係咪對得上 */
   lineAligned: boolean;
   /** `${dir}:${stopId}` -> 呢個走法經過呢個站時，城巴 ETA 應該出嘅 seq */

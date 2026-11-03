@@ -68,7 +68,11 @@ Vercel（Hobby）只部署 commit 作者係項目擁有者嘅 commit：commit �
   對唔到當正常路線（likely）。`noGPS = 1` = 按時間表（`scheduled`）。時間係香港時間，冇時區。
 - MTRB：`getSchedule`（POST，`routeName`）一次攞晒成條線，用 `lineRef` 分方向（O = LINE_UP、I = LINE_DOWN）。
   秒數 ≥ 100000（例如 108000）= 冇數據。行緊嘅車有真 GPS（`Eta.gps`），地圖直接用，唔使推算。
-  車費、樂悠咭（`FARE_OCTO_JOYU`）用港鐵 CSV。CSDI 冇港鐵巴士走線，地圖用虛線駁站。
+  車費、樂悠咭（`FARE_OCTO_JOYU`）用港鐵 CSV。
+- 港鐵巴士走線：CSDI 只有接駁巴士（K12–K18），其餘用 OpenStreetMap（`fetch.py` 由 network relation 6482279
+  加 K12、K14 嘅 route_master 下載，`others.py` 嘅 `osm_line_for`）。站按次序投影落走線（DP，只准向前），
+  有站離走線 > 100 米、或者兩站之間沿線距離 > 直線 3 倍 + 500 米就唔用（OSM 數據 2016–2020，有啲線改咗路），
+  返用虛線。`variant.lineSource = 'osm'` 時地圖要加「© OpenStreetMap 貢獻者」（ODbL）。
 - 營辦商 ETA 時間一律轉做 `+08:00` ISO（`toHkIso`），唔好出 UTC，否則介面顯示錯鐘數。
 - 站點列表每個站最多顯示 5 班。
 
@@ -79,7 +83,7 @@ Vercel（Hobby）只部署 commit 作者係項目擁有者嘅 commit：commit �
 | 站 ID、站名、座標、實時到站 | 城巴 API（主體） |
 | 走法、特別班標記 | 運輸署 GTFS + JSON_BUS.json（`specialType`） |
 | 每個走法嘅時間表 | 運輸署 GTFS（`frequencies.txt`、`calendar*.txt`） |
-| 地圖走線 | CSDI「巴士路線」WFS（`FB_ROUTE_LINE`） |
+| 地圖走線 | CSDI「巴士路線」WFS（`FB_ROUTE_LINE`）；港鐵巴士用 OpenStreetMap |
 | 站到站行車時間（實測平均） | [hk-bus-time-between-stops](https://github.com/HK-Bus-ETA/hk-bus-time-between-stops)（`timeinterval.hkbuseta.com/times/all.json`），第三方、實驗性質 |
 
 App 入面一律用**城巴站 ID**。政府站 ID 只喺 pipeline 內部用。

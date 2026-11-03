@@ -8,7 +8,7 @@
 
 同九巴一樣，用營辦商自己嘅站 ID，再配對最似嘅政府走法攞時間表同走線。
 """
-import collections, json, os, re
+import collections, json, math, os, re
 
 import build as B
 
@@ -178,6 +178,139 @@ def build_nlb(ctx):
     return index, by_stop, stops_info
 
 
+# ---------------- 港鐵巴士走線（OpenStreetMap） ----------------
+OSM_MAX_STOP_M = 100   # 站離走線超過呢個距離就當走線唔啱（OSM 數據可能舊過實際路線）
+
+
+def osm_assemble(ways):
+    """將 relation 入面按次序嘅 way 駁成一條線（[lng, lat]），每條 way 按需要反轉"""
+    path, last = [], None
+    for i, w in enumerate(ways):
+        c, (a, b) = w['c'], w['n']
+        if not path:
+            nxt = ways[i + 1]['n'] if i + 1 < len(ways) else []
+            if a in nxt and b not in nxt:
+                c, a, b = c[::-1], b, a
+            path, last = list(c), b
+        elif a == last:
+            path += c[1:]; last = b
+        elif b == last:
+            path += c[::-1][1:]; last = a
+        else:   # 斷開：揀近啲嗰頭駁
+            if B.dist(path[-1][::-1], c[0][::-1]) <= B.dist(path[-1][::-1], c[-1][::-1]):
+                path += c; last = b
+            else:
+                path += c[::-1]; last = a
+    return path
+
+
+class OsmPath:
+    """走線用本地米座標，方便計投影同沿線距離"""
+    def __init__(self, path):
+        self.ll = path
+        lat0 = path[0][1]
+        self.kx, self.ky = 111320 * math.cos(math.radians(lat0)), 110540
+        self.xy = [(x * self.kx, y * self.ky) for x, y in path]
+        self.cum = [0.0]
+        for (x1, y1), (x2, y2) in zip(self.xy, self.xy[1:]):
+            self.cum.append(self.cum[-1] + math.hypot(x2 - x1, y2 - y1))
+
+    def proj(self, k, p):
+        """點 p 投影落第 k 段：(距離, t, 沿線米數)"""
+        (x1, y1), (x2, y2) = self.xy[k], self.xy[k + 1]
+        dx, dy = x2 - x1, y2 - y1
+        L2 = dx * dx + dy * dy
+        t = 0.0 if not L2 else max(0.0, min(1.0, ((p[0] - x1) * dx + (p[1] - y1) * dy) / L2))
+        return math.hypot(x1 + t * dx - p[0], y1 + t * dy - p[1]), t, self.cum[k] + t * math.sqrt(L2)
+
+    def fit(self, pts):
+        """站點按次序投影落走線（只准向前）。
+        每個站嘅候選 = 走線每一段連續喺 OSM_MAX_STOP_M 內嘅路入面最近嗰點（循環線會經同一條路幾次，就有幾個候選），
+        再用 DP 揀沿線位置遞增、總距離最細嘅組合。回傳 (平均距離, [(距離, 段, t, 沿線米數)]) 或者 None"""
+        n = len(self.xy) - 1
+        cands = []
+        for lat, lng in pts:
+            q = (lng * self.kx, lat * self.ky)
+            runs, cur = [], None
+            for k in range(n):
+                h = self.proj(k, q)
+                if h[0] <= OSM_MAX_STOP_M:
+                    if not cur or h[0] < cur[0]:
+                        cur = (h[0], k, h[1], h[2])
+                elif cur:
+                    runs.append(cur); cur = None
+            if cur:
+                runs.append(cur)
+            if not runs:
+                return None
+            cands.append(runs)
+        # dp[i][c] = (總距離, 上一個候選)
+        dp = [[(c[0], None) for c in cands[0]]]
+        for i in range(1, len(cands)):
+            row = []
+            for c in cands[i]:
+                prev = [(dp[i - 1][j][0], j) for j, pc in enumerate(cands[i - 1])
+                        if dp[i - 1][j][0] is not None and pc[3] <= c[3] + 1]
+                row.append((min(prev)[0] + c[0], min(prev)[1]) if prev else (None, None))
+            dp.append(row)
+        last = [(x[0], j) for j, x in enumerate(dp[-1]) if x[0] is not None]
+        if not last:
+            return None
+        total, j = min(last)
+        out = []
+        for i in range(len(cands) - 1, -1, -1):
+            out.append(cands[i][j])
+            j = dp[i][j][1]
+        out.reverse()
+        return total / len(out), out
+
+    def point(self, k, t):
+        (x1, y1), (x2, y2) = self.ll[k], self.ll[k + 1]
+        return [x1 + t * (x2 - x1), y1 + t * (y2 - y1)]
+
+    def segments(self, hits):
+        """相鄰兩個站之間嘅走線（第 i 段 = 第 i 站 → 第 i+1 站）"""
+        out = []
+        for (_, k1, t1, _), (_, k2, t2, _) in zip(hits, hits[1:]):
+            out.append([self.point(k1, t1)] + [list(p) for p in self.ll[k1 + 1:k2 + 1]] + [self.point(k2, t2)])
+        return out
+
+
+def osm_lines():
+    """{路線號碼: [OsmPath]}；K53/K58 呢類直通車兩個號碼都放"""
+    path = f'{B.CACHE}/osm_mtrb.json'
+    if not os.path.exists(path):
+        return {}
+    out = collections.defaultdict(list)
+    for r in json.load(open(path, encoding='utf-8'))['routes']:
+        if not r['ways']:
+            continue
+        p = OsmPath(osm_assemble(r['ways']))
+        for ref in r['tags'].get('ref', '').split('/'):
+            out[ref.strip()].append(p)
+    return out
+
+
+def osm_line_for(rno, stop_list, stops_info, lines):
+    """揀最啱嘅 OSM 走線：同號碼優先，冇就用同一個基本號碼（K51A -> K51）；站同走線唔夾就唔用"""
+    pts = [(stops_info[s]['lat'], stops_info[s]['lng']) for s in stop_list]
+    base = re.sub(r'[A-Z]+$', '', rno)
+    for cands in (lines.get(rno, []), [p for ref, ps in lines.items() if ref != rno and re.sub(r'[A-Z]+$', '', ref) == base for p in ps]):
+        best = None
+        for p in cands:
+            f = p.fit(pts)
+            if not f or (best and f[0] >= best[0]):
+                continue
+            segs = p.segments(f[1])
+            # 兩站之間沿線距離離譜（兜大圈）就當走線唔啱
+            if all(B.dist(a, b) * 3 + 500 >= sum(B.dist(x[::-1], y[::-1]) for x, y in zip(sg, sg[1:]))
+                   for a, b, sg in zip(pts, pts[1:], segs)):
+                best = (f[0], segs)
+        if best:
+            return [B.simplify(sg) for sg in best[1]]
+    return None
+
+
 # ---------------- 港鐵巴士 ----------------
 def build_mtrb(ctx):
     raw = json.load(open(f'{B.CACHE}/mtrb.json', encoding='utf-8'))
@@ -193,6 +326,7 @@ def build_mtrb(ctx):
     for r in raw['mtr_bus_routes']:
         by_no[r['ROUTE_ID']].append(r)
     govs, freq = gov_variants(set(by_no))
+    osm = osm_lines()
     index, by_stop = [], collections.defaultdict(list)
     for rno, rs in sorted(by_no.items()):
         rs.sort(key=lambda r: (r['REFERENCE_ID'] != rno, r['REFERENCE_ID']))
@@ -216,6 +350,10 @@ def build_mtrb(ctx):
                     v['fares'] = {s: float(adult) for s in lst[:-1]}
                 gov = best_gov(lst, govs.get(rno, []), stops_info)
                 finish_variant(v, stops_info, gov, freq, ctx)
+                if not v['line']:   # 政府 CSDI 冇港鐵巴士走線：用 OpenStreetMap
+                    seg = osm_line_for(rno, lst, stops_info, osm)
+                    if seg:
+                        v['line'], v['lineAligned'], v['lineSource'] = seg, True, 'osm'
                 variants.append(v)
                 allstops.update(lst)
                 if not special or dir_ not in directions:
@@ -231,5 +369,6 @@ def build_mtrb(ctx):
         }
         write_route('mtrb', rno, data, index, by_stop, stops_info)
     print(f'港鐵巴士路線 {len(index)}，走法 {sum(r["variants"] for r in index)}，'
-          f'配到政府走法 {sum(1 for r in index for v in json.load(open(f"{B.OUT}/mtrb/{r["route"]}.json"))["variants"] if v["govRouteId"])}')
+          f'配到政府走法 {sum(1 for r in index for v in json.load(open(f"{B.OUT}/mtrb/{r["route"]}.json"))["variants"] if v["govRouteId"])}，'
+          f'OSM 走線 {sum(1 for r in index for v in json.load(open(f"{B.OUT}/mtrb/{r["route"]}.json"))["variants"] if v.get("lineSource") == "osm")}')
     return index, by_stop, stops_info

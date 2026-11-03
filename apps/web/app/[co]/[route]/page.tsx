@@ -173,7 +173,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
 
         <VariantPicker key={dir} items={items} selectedId={selected?.id ?? null} />
 
-        {mapStops.length > 0 && <RouteMap key={`${dir}-${selected?.id}`} lines={mapLines} stops={mapStops} multiCompany={companies.length > 1} company={data.company} />}
+        {mapStops.length > 0 && <RouteMap key={`${dir}-${selected?.id}`} lines={mapLines} stops={mapStops} multiCompany={companies.length > 1} company={data.company} osm={sorted.some((x) => x.variant.lineSource === 'osm')} />}
       </div>
 
       <div className="route-stops card">

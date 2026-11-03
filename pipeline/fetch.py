@@ -5,6 +5,7 @@
 - 城巴 API：路線、路線站點、站點
 - 九巴 API：路線、路線站點、站點
 - 新大嶼山巴士、港鐵巴士：路線、站點、車費
+- 港鐵巴士走線：OpenStreetMap（政府 CSDI 冇港鐵巴士走線；ODbL，要註明「© OpenStreetMap 貢獻者」）
 - 站到站平均行車時間（hk-bus-time-between-stops）
 用法: python3 pipeline/fetch.py [--skip-existing]
 """
@@ -25,6 +26,10 @@ CTB = 'https://rt.data.gov.hk/v2/transport/citybus'
 KMB = 'https://data.etabus.gov.hk/v1/transport/kmb'
 NLB = 'https://rt.data.gov.hk/v2/transport/nlb'
 MTRB_CSV = 'https://opendata.mtr.com.hk/data'
+# OpenStreetMap：港鐵巴士 network relation，再加冇入 network 嘅接駁巴士 route_master（K12、K14）
+OSM_API = 'https://api.openstreetmap.org/api/0.6'
+OSM_MTRB_NETWORK = 6482279
+OSM_MTRB_EXTRA_MASTERS = [8024265, 8024263]
 # 站到站平均行車時間（秒），由 HK-Bus-ETA/hk-bus-time-between-stops 計算，每小時更新
 # 格式：{ 起點站ID: { 下一站ID: 秒 } }，城巴用城巴站 ID。只用數據，冇用佢嘅（GPL）程式碼。
 JOURNEY_TIMES_URL = 'https://timeinterval.hkbuseta.com/times/all.json'
@@ -112,6 +117,31 @@ def fetch_mtrb():
     print('港鐵巴士', len(out['mtr_bus_routes']), '路線', len(out['mtr_bus_stops']), '路線站點')
 
 
+def fetch_osm_mtrb():
+    """港鐵巴士走線（OSM route relation）：每條 relation 存 tags 同按次序嘅 way（座標 + 頭尾 node ID）"""
+    path = os.path.join(CACHE, 'osm_mtrb.json')
+    if done(path):
+        return
+    get = lambda x: json.loads(http(f'{OSM_API}/{x}', 60))['elements']
+    net = get(f'relation/{OSM_MTRB_NETWORK}.json')[0]
+    masters = [m['ref'] for m in net['members'] if m['type'] == 'relation'] + OSM_MTRB_EXTRA_MASTERS
+    with ThreadPoolExecutor(4) as ex:   # OSM API 唔好問得太密
+        rids = sorted({m['ref'] for ms in ex.map(lambda i: get(f'relation/{i}.json')[0]['members'], dict.fromkeys(masters))
+                       for m in ms if m['type'] == 'relation'})
+
+        def full(rid):
+            els = get(f'relation/{rid}/full.json')
+            nodes = {e['id']: [e['lon'], e['lat']] for e in els if e['type'] == 'node'}
+            ways = {e['id']: e['nodes'] for e in els if e['type'] == 'way'}
+            rel = next(e for e in els if e['type'] == 'relation' and e['id'] == rid)
+            return {'id': rid, 'tags': rel.get('tags', {}),
+                    'ways': [{'n': [ways[m['ref']][0], ways[m['ref']][-1]], 'c': [nodes[n] for n in ways[m['ref']]]}
+                             for m in rel['members'] if m['type'] == 'way' and m['role'] in ('', 'forward', 'backward') and m['ref'] in ways]}
+        routes = list(ex.map(full, rids))
+    json.dump({'routes': routes}, open(path, 'w'), ensure_ascii=False)
+    print('OSM 港鐵巴士走線', len(routes), '條')
+
+
 def fetch_journey_times():
     path = os.path.join(CACHE, 'journey_times.json')
     if done(path):
@@ -145,7 +175,7 @@ def fetch_ctb():
 if __name__ == '__main__':
     os.makedirs(CACHE, exist_ok=True)
     t = time.time()
-    ths = [threading.Thread(target=f) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_journey_times)]
+    ths = [threading.Thread(target=f) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_osm_mtrb, fetch_journey_times)]
     for th in ths: th.start()
     for th in ths: th.join()
     print(f'完成 {time.time() - t:.0f}s')

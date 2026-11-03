@@ -27,6 +27,9 @@ const LANDSD = 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz';
 const ATTRIBUTION =
   '<a href="https://api.portal.hkmapservice.gov.hk/disclaimer" target="_blank" rel="noopener">© 地政總署</a>';
 
+const OSM_ATTRIBUTION =
+  '走線 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 貢獻者</a>';
+
 /** 箭嘴之間最少相隔幾多 px */
 const ARROW_SPACING_PX = 60;
 /** 箭嘴同站點最少相隔幾多 px */
@@ -47,9 +50,11 @@ type Props = {
   multiCompany?: boolean;
   /** 路線主要公司（走線、箭嘴、巴士預設顏色） */
   company: string;
+  /** 有走線來自 OpenStreetMap（港鐵巴士）：要註明出處（ODbL） */
+  osm?: boolean;
 };
 
-export default function RouteMap({ lines, stops, multiCompany = false, company }: Props) {
+export default function RouteMap({ lines, stops, multiCompany = false, company, osm = false }: Props) {
   const el = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,6 +62,7 @@ export default function RouteMap({ lines, stops, multiCompany = false, company }
     const map = L.map(el.current, { zoomControl: true, attributionControl: true, scrollWheelZoom: false, zoomSnap: 0.25 });
     L.tileLayer(`${LANDSD}/basemap/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10, attribution: ATTRIBUTION }).addTo(map);
     L.tileLayer(`${LANDSD}/label/hk/tc/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10 }).addTo(map);
+    if (osm) map.attributionControl.addAttribution(OSM_ATTRIBUTION);
 
     // 走線用公司代表色；城巴黃色喺地圖黃色馬路上唔顯眼，所以底下加一條深色外框
     const brand = companyColor(company) ?? cssVar('--route-line', '#c26a00');
@@ -219,7 +225,7 @@ export default function RouteMap({ lines, stops, multiCompany = false, company }
       map.off('zoomend', drawArrows);
       map.remove();
     };
-  }, [lines, stops, multiCompany, company]);
+  }, [lines, stops, multiCompany, company, osm]);
 
   const [help, setHelp] = useState(false);
   return (
