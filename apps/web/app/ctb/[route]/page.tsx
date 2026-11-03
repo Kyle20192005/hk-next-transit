@@ -67,6 +67,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
     selected ? variantStops(selected) : (data.directions[dir] ?? []).map((stopId) => ({ dir, stopId }))
   ).map((s) => ({ dir: s.dir, stopId: s.stopId, name: data.stops[s.stopId]?.nameTc ?? s.stopId }));
   const dest = stops[stops.length - 1]?.name;
+  const other = dirs.find((d) => d !== dir);
 
   const mapStops: MapStop[] = stops.flatMap((s, i) => {
     const info = data.stops[s.stopId];
@@ -84,25 +85,23 @@ export default async function RoutePage({ params, searchParams }: Props) {
   return (
     <main className="route-page">
       <div className="route-top">
-        <div className="route-title">
-          <h1>城巴 {data.route}</h1>
-          <span className="muted">{data.origTc} ⇄ {data.destTc}</span>
+        <div className="route-head">
+          <h1>
+            <span className="route-op">城巴</span> {data.route}
+          </h1>
+          <span className="route-dest">往 {dest}</span>
+          {other && (
+            <Link
+              className="swap"
+              href={`?dir=${other}`}
+              replace
+              scroll={false}
+              aria-label={`轉方向：往 ${data.stops[data.directions[other]!.at(-1)!]?.nameTc}`}
+            >
+              ⇅
+            </Link>
+          )}
         </div>
-
-        {dirs.length > 1 ? (
-          <nav className="tabs" aria-label="方向">
-            {dirs.map((d) => {
-              const ids = data.directions[d]!;
-              return (
-                <Link key={d} href={`?dir=${d}`} aria-current={d === dir ? 'page' : undefined} replace scroll={false}>
-                  往 {data.stops[ids[ids.length - 1]!]?.nameTc}
-                </Link>
-              );
-            })}
-          </nav>
-        ) : (
-          <p className="single-dir">往 {dest}</p>
-        )}
 
         <VariantPicker key={dir} items={items} selectedId={selected?.id ?? null} />
 

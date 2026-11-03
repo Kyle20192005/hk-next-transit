@@ -55,7 +55,7 @@ export function RouteMap({ lines, stops, arrows, focusIndex, onStopPress }: Prop
   const arrowColor = lines.find((l) => l.selected)?.special ? t.special : t.brand;
 
   return (
-    <View style={{ height: 220, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: t.line }}>
+    <View style={{ height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: t.line }}>
       <MapView ref={map} style={{ flex: 1 }} mapType="none" onMapReady={fit} rotateEnabled={false} pitchEnabled={false}>
         <UrlTile urlTemplate={`${LANDSD}/basemap/WGS84/{z}/{x}/{y}.png`} maximumZ={20} zIndex={-2} />
         <UrlTile urlTemplate={`${LANDSD}/label/hk/tc/WGS84/{z}/{x}/{y}.png`} maximumZ={20} zIndex={-1} />

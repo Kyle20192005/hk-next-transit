@@ -115,6 +115,7 @@ export default function RouteScreen() {
     setVariantId(null);
     setOpenIndex(null);
   };
+  const other = dirs.find((d) => d !== dir);
   const openStop = (i: number | null) => {
     setOpenIndex(i);
     if (i !== null) list.current?.scrollToIndex({ index: i, animated: true, viewPosition: 0.2 });
@@ -125,32 +126,26 @@ export default function RouteScreen() {
       <Stack.Screen options={{ title: `城巴 ${data.route}` }} />
 
       {/* 固定喺上面 */}
-      <View style={{ padding: 12, gap: 10, zIndex: 10 }}>
-        <Text style={{ color: t.muted }}>{data.origTc} ⇄ {data.destTc}</Text>
-        {dirs.length > 1 && (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {dirs.map((d) => {
-              const ids = data.directions[d]!;
-              const active = d === dir;
-              return (
-                <Pressable
-                  key={d}
-                  onPress={() => changeDir(d)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                  style={{
-                    flex: 1, padding: 8, borderRadius: 10, borderWidth: 1, alignItems: 'center',
-                    borderColor: active ? t.brand : t.line, backgroundColor: active ? t.brandSoft : t.card,
-                  }}
-                >
-                  <Text style={{ color: active ? t.brand : t.text, fontWeight: active ? '700' : '400' }}>
-                    往 {data.stops[ids[ids.length - 1]!]?.nameTc}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
+      <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8, gap: 8, zIndex: 10 }}>
+        {/* 一行：往 中環(交易廣場)　⇅ */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 40 }}>
+          <Text numberOfLines={1} style={{ flex: 1, color: t.text, fontSize: 17, fontWeight: '700' }}>
+            往 {data.stops[stops[stops.length - 1]?.stopId ?? '']?.nameTc}
+          </Text>
+          {other && (
+            <Pressable
+              onPress={() => changeDir(other)}
+              accessibilityRole="button"
+              accessibilityLabel={`轉方向：往 ${data.stops[data.directions[other]!.at(-1)!]?.nameTc}`}
+              style={({ pressed }) => ({
+                width: 40, height: 40, borderRadius: 10, borderWidth: 1, borderColor: t.line,
+                backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <Text style={{ color: t.brand, fontSize: 20 }}>⇅</Text>
+            </Pressable>
+          )}
+        </View>
         <VariantPicker
           key={dir}
           items={items}

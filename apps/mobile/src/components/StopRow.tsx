@@ -54,13 +54,13 @@ export function StopRow({ index, route, stopId, dir, name, selectedVariantId, op
         onPress={onToggle}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        style={({ pressed }) => ({ flexDirection: 'row', gap: 12, padding: 14, opacity: pressed ? 0.6 : 1 })}
+        style={({ pressed }) => ({ flexDirection: 'row', gap: 12, paddingVertical: 11, paddingHorizontal: 14, opacity: pressed ? 0.6 : 1 })}
       >
         <Text style={{ width: 28, color: t.muted }}>{index + 1}</Text>
         <Text style={{ flex: 1, color: t.text, fontSize: 16 }}>{name}</Text>
       </Pressable>
       {open && (
-        <View style={{ paddingLeft: 54, paddingRight: 14, paddingBottom: 12, gap: 6 }}>
+        <View style={{ paddingLeft: 54, paddingRight: 14, paddingBottom: 10, gap: 4 }}>
           {error && <Text style={{ color: t.muted }}>載入失敗：{error}</Text>}
           {!error && etas === null && <Text style={{ color: t.muted }}>載入中…</Text>}
           {!error && etas?.length === 0 && <Text style={{ color: t.muted }}>暫時冇班次</Text>}
@@ -70,7 +70,7 @@ export function StopRow({ index, route, stopId, dir, name, selectedVariantId, op
             const other = Boolean(selectedVariantId && v?.variantId && v.variantId !== selectedVariantId);
             return (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap', opacity: other ? 0.5 : 1 }}>
-                <Text style={{ color: t.text, fontSize: 20, fontWeight: '700', minWidth: 64 }}>
+                <Text style={{ color: t.text, fontSize: 18, fontWeight: '700', minWidth: 56 }}>
                   {mins === 0 ? '即將' : `${mins} 分`}
                 </Text>
                 <Text style={{ color: t.muted }}>{e.eta!.slice(11, 16)}</Text>

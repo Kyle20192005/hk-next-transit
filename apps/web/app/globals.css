@@ -42,9 +42,6 @@ header.top a { color: #fff; font-weight: 600; }
 h1 { font-size: 1.5rem; margin: 8px 0 4px; }
 .muted { color: var(--muted); font-size: 0.875rem; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
-.tabs { display: flex; gap: 8px; margin: 16px 0; }
-.tabs a { flex: 1; text-align: center; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
-.tabs a[aria-current="page"] { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 600; }
 .badge { display: inline-block; font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); white-space: nowrap; }
 .badge.special { background: var(--special-soft); color: var(--special); }
 .variants { margin-bottom: 16px; overflow: hidden; }
@@ -77,18 +74,26 @@ h1 { font-size: 1.5rem; margin: 8px 0 4px; }
 
 /* ---------- 路線頁：上面固定，只有站點列表捲動 ---------- */
 body:has(.route-page) { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
-body:has(.route-page) > header.top { flex: none; }
-.route-page { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 0; }
-.route-top { flex: none; display: flex; flex-direction: column; gap: 10px; }
-.route-title { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
-.route-title h1 { margin: 0; font-size: 1.375rem; }
-.route-page .tabs { margin: 0; }
-.route-page .tabs a { padding: 8px; }
-.single-dir { margin: 0; font-weight: 600; }
+body:has(.route-page) > header.top { flex: none; padding: 8px 16px; }
+.route-page { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 8px 12px 0; }
+.route-top { flex: none; display: flex; flex-direction: column; gap: 8px; }
+/* 一行：城巴 70　往 中環(交易廣場)　⇅ */
+.route-head { display: flex; gap: 10px; align-items: center; min-height: 40px; }
+.route-head h1 { margin: 0; font-size: 1.5rem; line-height: 1; white-space: nowrap; }
+.route-op { font-size: 0.875rem; font-weight: 500; color: var(--muted); }
+.route-dest { flex: 1; min-width: 0; font-size: 1.0625rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.swap { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--brand); font-size: 1.25rem; }
+.swap:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .route-stops { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 0; }
+/* 底部留位：iOS Safari 嘅浮動工具列會遮住最底嘅內容 */
+.route-stops .source { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .source { text-align: center; padding: 16px; margin: 0; }
 .stop.open { background: var(--brand-soft); }
 .stop.open .badge { background: var(--card); }
+.route-page .stop > button { padding: 10px 14px; }
+.route-page .etas { padding: 0 14px 10px 54px; }
+.route-page .eta-row { padding: 2px 0; gap: 8px; }
+.route-page .eta-min { font-size: 1.125rem; min-width: 56px; }
 
 /* 走法選擇：收埋時只顯示揀咗嘅一個，展開時蓋住地圖 */
 .variant-picker { position: relative; z-index: 1000; }
@@ -105,6 +110,5 @@ button.variant.variant-current { background: var(--card); border: 1px solid var(
 .variant-menu { position: absolute; top: calc(100% + 6px); left: 0; right: 0; overflow: hidden; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
 .variant-menu .variant { padding: 10px 14px; }
 
-.route-map { height: 220px; overflow: hidden; background: var(--line); z-index: 0; }
+.route-map { height: clamp(150px, 26dvh, 280px); overflow: hidden; background: var(--line); z-index: 0; }
 .map-arrow { background: none; border: 0; }
-@media (min-height: 900px) { .route-map { height: 300px; } }
