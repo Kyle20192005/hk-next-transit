@@ -13,26 +13,18 @@ type Props = {
   name: string;
   /** 用戶揀咗嘅走法；其他走法嘅班次會淡色顯示 */
   selectedVariantId: string | null;
-  /** 由外面（地圖）要求打開：每次變就打開一次 */
-  openSignal: number;
-  onOpen: (index: number) => void;
+  open: boolean;
+  onToggle: () => void;
 };
 
 const REFRESH_MS = 30_000;
 
-export function StopRow({ index, route, stopId, dir, name, selectedVariantId, openSignal, onOpen }: Props) {
+/** 一個站：撳開顯示實時到站（開住時每 30 秒更新）。開定收由路線頁控制，一次只開一個。 */
+export function StopRow({ index, route, stopId, dir, name, selectedVariantId, open, onToggle }: Props) {
   const t = useTheme();
-  const [open, setOpen] = useState(false);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-
-  // 地圖要求打開：signal 變咗就打開（喺 render 入面調整 state，唔使 effect）
-  const [seenSignal, setSeenSignal] = useState(openSignal);
-  if (openSignal !== seenSignal) {
-    setSeenSignal(openSignal);
-    setOpen(true);
-  }
 
   useEffect(() => {
     if (!open) return;
@@ -57,12 +49,9 @@ export function StopRow({ index, route, stopId, dir, name, selectedVariantId, op
   }, [open, route, stopId, dir]);
 
   return (
-    <View style={{ borderBottomWidth: 1, borderColor: t.line, backgroundColor: t.card }}>
+    <View style={{ borderBottomWidth: 1, borderColor: t.line, backgroundColor: open ? t.brandSoft : t.card }}>
       <Pressable
-        onPress={() => {
-          if (!open) onOpen(index);
-          setOpen((o) => !o);
-        }}
+        onPress={onToggle}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         style={({ pressed }) => ({ flexDirection: 'row', gap: 12, padding: 14, opacity: pressed ? 0.6 : 1 })}

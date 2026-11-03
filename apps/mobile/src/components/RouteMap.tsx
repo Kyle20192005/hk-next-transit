@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { useTheme } from '@/lib/theme';
 
@@ -8,6 +8,12 @@ export interface MapStop {
   name: string;
   lat: number;
   lng: number;
+}
+
+export interface MapArrow {
+  latitude: number;
+  longitude: number;
+  bearing: number;
 }
 
 export interface MapLine {
@@ -24,12 +30,14 @@ const LANDSD = 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz';
 type Props = {
   lines: MapLine[];
   stops: MapStop[];
-  /** 列表打開咗嘅站，地圖會移過去 */
+  /** 揀咗嘅走法嘅方向箭嘴 */
+  arrows: MapArrow[];
+  /** 列表打開咗嘅站，地圖會放大過去 */
   focusIndex: number | null;
   onStopPress: (index: number) => void;
 };
 
-export function RouteMap({ lines, stops, focusIndex, onStopPress }: Props) {
+export function RouteMap({ lines, stops, arrows, focusIndex, onStopPress }: Props) {
   const t = useTheme();
   const map = useRef<MapView>(null);
   const coords = stops.map((s) => ({ latitude: s.lat, longitude: s.lng }));
@@ -40,13 +48,14 @@ export function RouteMap({ lines, stops, focusIndex, onStopPress }: Props) {
   useEffect(() => {
     if (focusIndex === null) return;
     const s = stops.find((x) => x.index === focusIndex);
-    if (s) map.current?.animateToRegion({ latitude: s.lat, longitude: s.lng, latitudeDelta: 0.008, longitudeDelta: 0.008 }, 500);
+    if (s) map.current?.animateToRegion({ latitude: s.lat, longitude: s.lng, latitudeDelta: 0.004, longitudeDelta: 0.004 }, 500);
   }, [focusIndex, stops]);
 
   const ordered = [...lines].sort((a, b) => Number(a.selected) - Number(b.selected));
+  const arrowColor = lines.find((l) => l.selected)?.special ? t.special : t.brand;
 
   return (
-    <View style={{ height: 260, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: t.line }}>
+    <View style={{ height: 220, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: t.line }}>
       <MapView ref={map} style={{ flex: 1 }} mapType="none" onMapReady={fit} rotateEnabled={false} pitchEnabled={false}>
         <UrlTile urlTemplate={`${LANDSD}/basemap/WGS84/{z}/{x}/{y}.png`} maximumZ={20} zIndex={-2} />
         <UrlTile urlTemplate={`${LANDSD}/label/hk/tc/WGS84/{z}/{x}/{y}.png`} maximumZ={20} zIndex={-1} />
@@ -65,6 +74,22 @@ export function RouteMap({ lines, stops, focusIndex, onStopPress }: Props) {
         {!lines.some((l) => l.selected) && coords.length > 1 && (
           <Polyline coordinates={coords} strokeColor={t.brand} strokeWidth={3} lineDashPattern={[2, 8]} />
         )}
+        {arrows.map((a, i) => (
+          <Marker
+            key={`arrow-${i}`}
+            coordinate={{ latitude: a.latitude, longitude: a.longitude }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            flat
+            rotation={a.bearing}
+            tracksViewChanges={false}
+            tappable={false}
+            zIndex={2}
+          >
+            <Text style={{ color: arrowColor, fontSize: 14, fontWeight: '900', textShadowColor: '#fff', textShadowRadius: 2 }}>
+              ▲
+            </Text>
+          </Marker>
+        ))}
         {stops.map((s, i) => {
           const end = i === 0 || i === stops.length - 1;
           return (
