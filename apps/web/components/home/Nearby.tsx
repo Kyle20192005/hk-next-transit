@@ -1,15 +1,16 @@
 'use client';
 import Link from 'next/link';
 import CompanyTag from '@/components/CompanyTag';
+import type { Co } from '@/lib/data';
 import { useCallback, useEffect, useState } from 'react';
 import { formatDistance, type Company } from '@hknt/core';
 
 interface NearStop {
   id: string;
-  co: 'ctb' | 'kmb';
+  co: Co;
   name: string;
   distance: number;
-  routes: { co: 'ctb' | 'kmb'; route: string; dir: 'O' | 'I'; dest: string; companies: Company[] }[];
+  routes: { co: Co; route: string; dir: 'O' | 'I'; dest: string; companies: Company[] }[];
 }
 interface StopEtas {
   routes: { route: string; dir: 'O' | 'I'; etas: { eta: string; company: Company; scheduled: boolean }[] }[];

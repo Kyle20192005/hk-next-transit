@@ -4,10 +4,11 @@ import { BusStabilizer, busDistanceTo, busFraction, formatDistance, labelEtas, s
 import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
 import { companyColor, companyInk } from '@/lib/company';
+import type { Co } from '@/lib/data';
 
 type Props = {
   /** 路線檔位置（ctb 包聯營線、kmb 包九巴同龍運） */
-  co: 'ctb' | 'kmb';
+  co: Co;
   /** 多過一間公司營辦（聯營線）：每班車標明公司 */
   multiCompany: boolean;
   route: string;
@@ -26,6 +27,7 @@ type Props = {
 };
 
 const ETA_REFRESH_MS = 30_000;
+const MAX_ETAS = 5;
 /** 最近嘅站要喺幾多米內先算（太遠即係唔喺呢條線附近） */
 const NEAREST_MAX_M = 500;
 const BUSES_REFRESH_MS = 20_000;
@@ -132,9 +134,9 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
       try {
         const res = await fetch(`/api/buses?co=${co}&route=${encodeURIComponent(route)}&v=${selectedVariantId}`);
         if (!res.ok) return;
-        const body = (await res.json()) as { buses: { from: number; nextEta: string; company?: string }[]; segSeconds: number[] };
+        const body = (await res.json()) as { buses: { from: number; nextEta: string; company?: string; gps?: { lat: number; lng: number } }[]; segSeconds: number[] };
         if (cancelled) return;
-        setLive({ buses: body.buses.map((b) => ({ from: b.from, nextEta: Date.parse(b.nextEta), company: b.company })), segSeconds: body.segSeconds });
+        setLive({ buses: body.buses.map((b) => ({ from: b.from, nextEta: Date.parse(b.nextEta), company: b.company, gps: b.gps })), segSeconds: body.segSeconds });
       } catch {
         /* 下次再試 */
       }
@@ -164,7 +166,8 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? res.statusText);
         if (cancelled) return;
-        setEtas((body.etas as Eta[]).filter((e) => e.dir === open.dir && e.eta));
+        // 最多顯示 5 班（港鐵巴士會一次過俾成晚嘅班次）
+        setEtas((body.etas as Eta[]).filter((e) => e.dir === open.dir && e.eta).slice(0, MAX_ETAS));
         setFailed((body.failed as string[] | undefined) ?? []);
         setError(null);
       } catch (e) {

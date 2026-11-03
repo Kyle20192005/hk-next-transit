@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { etasAtStop, etasAtStopDetailed, type RouteData } from '../src';
+import { etasAtStop, etasAtStopDetailed, pickNlbVariant, type RouteData, type Variant } from '../src';
 
 // 聯營線：城巴路線檔，站 S1 嘅九巴站 ID 係 K1；九巴嘅 bound 同城巴相反（城巴 O = 九巴 I）
 const route = {
@@ -138,4 +138,49 @@ describe('營辦商 API 出錯', () => {
     expect(r.failed).toEqual(['CTB']);
     expect(r.etas.map((e) => e.company)).toEqual(['KMB']);
   });
+});
+
+describe('新大嶼山巴士、港鐵巴士', () => {
+  const mk = (company: 'NLB' | 'MTRB', variants: unknown[]) =>
+    ({ company, companies: [company], route: 'X', origTc: 'A', destTc: 'B', origEn: null, destEn: null,
+      stops: { S1: { nameTc: '站', nameEn: '', lat: 22.3, lng: 114 } }, directions: { O: ['S1'] }, ctbOnlyStops: [], variants }) as unknown as RouteData;
+  const v = (id: string, extra: object) => ({ id, govRouteId: null, govDir: null, name: id, special: false, stops: ['S1'], stopDirs: ['O'],
+    stopMatch: ['A'], offsets: [0], schedules: [], line: null, lineAligned: false, expSeq: { 'O:S1': 1 }, ...extra });
+
+  it('NLB：用 routeId 查，冇 GPS 當原定，香港時間轉 ISO', async () => {
+    const f = (async (input: RequestInfo | URL) => {
+      expect(String(input)).toContain('routeId=7&stopId=S1');
+      return new Response(JSON.stringify({ estimatedArrivals: [
+        { estimatedArrivalTime: '2026-11-03 19:33:47', routeVariantName: '經: 北大嶼山醫院', departed: 0, noGPS: 1 },
+      ] }));
+    }) as typeof fetch;
+    const [e] = await etasAtStop(mk('NLB', [v('7', { nlb: { routeId: '7' } })]), 'S1', {}, f);
+    expect(e).toMatchObject({ company: 'NLB', eta: '2026-11-03T19:33:47+08:00', scheduled: true, remarkTc: '經: 北大嶼山醫院' });
+    expect(e!.variant?.variantId).toBe('7');
+  });
+
+  it('MTRB：一次攞成條線，用 lineRef 分走法，帶 GPS', async () => {
+    const f = (async () =>
+      new Response(JSON.stringify({ busStop: [{ busStopId: 'S1', isSuspended: '0', bus: [
+        { busId: '331', arrivalTimeInSecond: '120', departureTimeInSecond: '150', isScheduled: '0', lineRef: 'X_B', busLocation: { latitude: 22.31, longitude: 114.01 }, busRemark: null },
+        { busId: '540', arrivalTimeInSecond: '108000', departureTimeInSecond: '600', isScheduled: '1', lineRef: 'X_B', busLocation: { latitude: 0, longitude: 0 }, busRemark: null },
+        { busId: '999', arrivalTimeInSecond: '60', departureTimeInSecond: '60', isScheduled: '0', lineRef: 'X_OTHER', busLocation: { latitude: 0, longitude: 0 }, busRemark: null },
+      ] }] }))) as unknown as typeof fetch;
+    const etas = await etasAtStop(mk('MTRB', [v('X-O', { mtrb: { lineRef: 'X_B' } })]), 'S1', {}, f);
+    expect(etas.every((e) => e.eta!.endsWith('+08:00'))).toBe(true);
+    expect(etas.map((e) => [e.busId, e.scheduled, Boolean(e.gps)])).toEqual([
+      ['999', false, false],
+      ['331', false, true],
+      ['540', true, false],
+    ]);
+  });
+});
+
+describe('pickNlbVariant', () => {
+  const mk = (id: string, via?: string) => ({ id, nlb: { routeId: '13', ...(via ? { via } : {}) } }) as unknown as Variant;
+  const vs = [mk('n'), mk('a', '經北大嶼山醫院'), mk('b', '經沙咀懲教所'), mk('c', '經沙咀懲教所及塘福懲教所')];
+  it('冇備註 = 正常路線', () => expect(pickNlbVariant(vs, '')).toEqual({ hit: vs[0], sure: true }));
+  it('經: xx 對走法', () => expect(pickNlbVariant(vs, '經: 北大嶼山醫院').hit.id).toBe('a'));
+  it('完全一樣優先', () => expect(pickNlbVariant(vs, '經: 沙咀懲教所').hit.id).toBe('b'));
+  it('對唔到 = 正常路線（唔肯定）', () => expect(pickNlbVariant(vs, '經: 某地')).toEqual({ hit: vs[0], sure: false }));
 });

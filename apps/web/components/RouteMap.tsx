@@ -176,7 +176,8 @@ export default function RouteMap({ lines, stops, multiCompany = false, company }
       let nearest: L.LatLngExpression | null = null;
       for (const { bus: b, progress } of stabilizer.update(latest.buses, latest.segSeconds, now)) {
         const from = Math.min(Math.floor(progress), lastStop - 1);
-        const where = locate(from, Math.min(1, progress - from));
+        // 有真實 GPS（港鐵巴士）就直接用，冇先推算
+        const where: L.LatLngExpression | null = b.gps ? [b.gps.lat, b.gps.lng] : locate(from, Math.min(1, progress - from));
         if (!where) continue;
         const next = byIndex.get(from + 1);
         const mins = Math.max(0, Math.round((b.nextEta - now) / 60000));

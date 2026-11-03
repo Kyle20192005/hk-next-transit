@@ -21,7 +21,17 @@ export async function GET(req: NextRequest) {
   const now = Date.now();
   let etasFor: (route: string, dir: string) => Eta[];
 
-  if (co === 'kmb') {
+  if (co === 'nlb' || co === 'mtrb') {
+    // 新大嶼山巴士、港鐵巴士：逐條路線用路線檔查（走法明確，唔使時間表）
+    const lists = await Promise.all(
+      [...new Set(entry.r.map(([, route]) => route))].map(async (route) => {
+        const data = await getRoute(co, route);
+        return [route, data ? await etasAtStop(data, stop, {}, liveFetch).catch(() => []) : []] as const;
+      }),
+    );
+    const byRoute = new Map<string, Eta[]>(lists);
+    etasFor = (route, dir) => (byRoute.get(route) ?? []).filter((e) => e.dir === dir);
+  } else if (co === 'kmb') {
     const all = await fetchKmbStopEta(stop, liveFetch).catch(() => []);
     etasFor = (route, dir) => all.filter((e) => e.route === route && e.dir === dir);
   } else {

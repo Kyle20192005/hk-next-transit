@@ -5,6 +5,8 @@ export const COMPANIES: Record<Company, { name: string; bg: string; ink: string 
   CTB: { name: '城巴', bg: '#FFD800', ink: '#1b1b1b' },
   KMB: { name: '九巴', bg: '#D01A1E', ink: '#ffffff' },
   LWB: { name: '龍運', bg: '#F26B21', ink: '#ffffff' },
+  NLB: { name: '新大嶼山', bg: '#1B8F4C', ink: '#ffffff' },
+  MTRB: { name: '港鐵巴士', bg: '#9E1B32', ink: '#ffffff' },
 };
 
 /** 公司代表色（地圖走線、時間線、巴士圖示） */

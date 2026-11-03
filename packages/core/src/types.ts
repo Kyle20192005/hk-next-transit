@@ -53,11 +53,15 @@ export interface Variant {
   ctb?: { dir: Dir };
   /** 每個站上車嘅成人車費（港元），key = 站 ID（分段收費：後面上車可能平啲） */
   fares?: Record<string, number>;
+  /** 新大嶼山巴士：ETA 用 routeId 查（每個 routeId 就係一個走法） */
+  nlb?: { routeId: string; via?: string };
+  /** 港鐵巴士：ETA 成條線一次攞，用 lineRef 分走法 */
+  mtrb?: { lineRef: string };
 }
 
 export interface RouteData {
   /** 路線檔屬邊間公司嘅數據（決定站 ID 係城巴定九巴） */
-  company: 'CTB' | 'KMB';
+  company: 'CTB' | 'KMB' | 'NLB' | 'MTRB';
   /** 實際營辦嘅公司；聯營線係 ['CTB', 'KMB'] */
   companies?: Company[];
   /** 樂悠咭（$2 計劃）適唔適用：機場 A／NA、馬場、旅遊、包車路線唔適用 */
@@ -78,7 +82,7 @@ export interface RouteIndex {
   generatedAt: string;
   routes: {
     /** 路線檔喺邊：ctb/<路線> 或 kmb/<路線>（舊數據冇呢欄，當 ctb） */
-    co?: 'ctb' | 'kmb';
+    co?: 'ctb' | 'kmb' | 'nlb' | 'mtrb';
     /** 營辦公司；聯營線兩間 */
     companies?: Company[];
     route: string;
@@ -97,7 +101,7 @@ export type Calendar = Record<
   { days: boolean[]; start: string; end: string; add: string[]; remove: string[] }
 >;
 
-export type Company = 'CTB' | 'KMB' | 'LWB';
+export type Company = 'CTB' | 'KMB' | 'LWB' | 'NLB' | 'MTRB';
 
 /** 統一格式嘅到站時間 */
 export interface Eta {
@@ -115,6 +119,10 @@ export interface Eta {
   remarkEn: string;
   /** 九巴「原定班次」：時間表時間，唔係實時；唔用嚟推算巴士位置 */
   scheduled?: boolean;
+  /** 營辦商提供嘅真實位置（港鐵巴士行緊嘅車先有） */
+  gps?: { lat: number; lng: number };
+  /** 營辦商嘅車輛編號（港鐵巴士） */
+  busId?: string;
   variant?: VariantGuess;
 }
 

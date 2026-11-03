@@ -421,6 +421,10 @@ def main():
         # 認到係聯營但城巴冇政府走法資料：改用九巴做主幹，加城巴站
         'joint_kmb_primary': joint_rnos - actual_joint, 'ctb': (cstops, clists), 'kmb_primary_done': kmb_primary_done,
     })
+    # 新大嶼山巴士、港鐵巴士
+    import others as O
+    octx = {'lines': lines, 'journey': journey, 'used_services': used_services}
+    other_parts = [('nlb',) + O.build_nlb(octx), ('mtrb',) + O.build_mtrb(octx)]
     # 站點索引（附近車站用）：每個城巴站有邊幾條路線、邊個方向、往邊度
     by_stop = collections.defaultdict(list)
     for (rno, d), l in clists.items():
@@ -433,7 +437,7 @@ def main():
         for sid, rs in sorted(by_stop.items())
     ]
     # 九巴做主幹嘅聯營線：城巴嗰條唔再喺統一索引出（路線檔照留，舊 App 用）
-    index_all = [r for r in index if r['route'] not in kmb_primary_done] + kmb_index
+    index_all = [r for r in index if r['route'] not in kmb_primary_done] + kmb_index + [r for _, idx, _, _ in other_parts for r in idx]
     json.dump({'stops': stops_index}, open(f'{OUT}/ctb/stops.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     # 統一站點索引（兩間公司）：r = [co, 路線, 方向, 往邊度]
     all_stops = [dict(e, co='ctb', r=[['ctb'] + x for x in e['r'] if x[0] not in kmb_primary_done]) for e in stops_index]
@@ -443,6 +447,12 @@ def main():
          'r': sorted(rs, key=lambda x: (re.sub(r'\D', '', x[1]).zfill(4), x[1], x[2]))}
         for sid, rs in sorted(kmb_by_stop.items())
     ]
+    for co, _, ob, oinfo in other_parts:
+        all_stops += [
+            {'id': sid, 'co': co, 'n': oinfo[sid]['nameTc'], 'lat': oinfo[sid]['lat'], 'lng': oinfo[sid]['lng'],
+             'r': sorted(rs, key=lambda x: (re.sub(r'\D', '', x[1]).zfill(4), x[1], x[2]))}
+            for sid, rs in sorted(ob.items())
+        ]
     json.dump({'stops': all_stops}, open(f'{OUT}/stops.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     generated = dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')
     json.dump({'generatedAt': generated, 'routes': sorted(index_all, key=route_key)},

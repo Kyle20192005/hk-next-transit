@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const co = coParam(req);
   const route = q.get('route') ?? '';
   const stop = q.get('stop') ?? '';
-  if (!co) return err(400, 'co 要係 ctb 或 kmb');
+  if (!co) return err(400, 'co 要係 ctb、kmb、nlb 或 mtrb');
   if (!SAFE_ROUTE.test(route) || !SAFE_STOP.test(stop)) return err(400, 'route 或 stop 格式唔啱');
 
   const [data, calendar] = await Promise.all([getRoute(co, route), getCalendar()]);

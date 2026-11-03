@@ -17,6 +17,8 @@ export interface TrackedBus {
   nextEta: number;
   /** 營辦公司（聯營線地圖用唔同顏色；由 API 根據下一站嘅 ETA 補返） */
   company?: string;
+  /** 營辦商提供嘅真實位置（港鐵巴士）；有就地圖直接用，唔使推算 */
+  gps?: { lat: number; lng: number };
 }
 
 /** 一架車喺上游站嘅 ETA 同預期差幾多都當係同一架（毫秒）：最少 2 分鐘，或者呢段行車時間嘅一半 */

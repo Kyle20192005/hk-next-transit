@@ -4,6 +4,7 @@
 - CSDI 巴士路線走線（MultiLineString）
 - 城巴 API：路線、路線站點、站點
 - 九巴 API：路線、路線站點、站點
+- 新大嶼山巴士、港鐵巴士：路線、站點、車費
 - 站到站平均行車時間（hk-bus-time-between-stops）
 用法: python3 pipeline/fetch.py [--skip-existing]
 """
@@ -22,6 +23,8 @@ CSDI_WFS = ('https://portal.csdi.gov.hk/server/services/common/td_rcd_1638844988
 CTB = 'https://rt.data.gov.hk/v2/transport/citybus'
 # 九巴：有「全部」endpoint，三次 call 就攞晒
 KMB = 'https://data.etabus.gov.hk/v1/transport/kmb'
+NLB = 'https://rt.data.gov.hk/v2/transport/nlb'
+MTRB_CSV = 'https://opendata.mtr.com.hk/data'
 # 站到站平均行車時間（秒），由 HK-Bus-ETA/hk-bus-time-between-stops 計算，每小時更新
 # 格式：{ 起點站ID: { 下一站ID: 秒 } }，城巴用城巴站 ID。只用數據，冇用佢嘅（GPL）程式碼。
 JOURNEY_TIMES_URL = 'https://timeinterval.hkbuseta.com/times/all.json'
@@ -82,6 +85,33 @@ def fetch_kmb():
     print('九巴', len(data['route']), '路線（連 service_type）', len(data['route_stop']), '路線站點', len(data['stop']), '站')
 
 
+def fetch_nlb():
+    """新大嶼山巴士：路線列表，再逐個 routeId 攞站（每個 routeId 已經係一個方向或者走法，站有車費）"""
+    path = os.path.join(CACHE, 'nlb.json')
+    if done(path):
+        return
+    routes = json.loads(http(f'{NLB}/route.php?action=list', 60))['routes']
+    with ThreadPoolExecutor(8) as ex:
+        stops = list(ex.map(lambda r: json.loads(http(f"{NLB}/stop.php?action=list&routeId={r['routeId']}", 60))['stops'], routes))
+    json.dump({'routes': routes, 'stops': {str(r['routeId']): s for r, s in zip(routes, stops)}},
+              open(path, 'w'), ensure_ascii=False)
+    print('新大嶼山巴士', len(routes), 'routeId')
+
+
+def fetch_mtrb():
+    """港鐵巴士及接駁巴士：路線、車站、車費（三個 CSV）"""
+    path = os.path.join(CACHE, 'mtrb.json')
+    if done(path):
+        return
+    import csv as _csv
+    out = {}
+    for name in ('mtr_bus_routes', 'mtr_bus_stops', 'mtr_bus_fares'):
+        text = http(f'{MTRB_CSV}/{name}.csv', 60).decode('utf-8-sig')
+        out[name] = list(_csv.DictReader(io.StringIO(text)))
+    json.dump(out, open(path, 'w'), ensure_ascii=False)
+    print('港鐵巴士', len(out['mtr_bus_routes']), '路線', len(out['mtr_bus_stops']), '路線站點')
+
+
 def fetch_journey_times():
     path = os.path.join(CACHE, 'journey_times.json')
     if done(path):
@@ -115,7 +145,7 @@ def fetch_ctb():
 if __name__ == '__main__':
     os.makedirs(CACHE, exist_ok=True)
     t = time.time()
-    ths = [threading.Thread(target=f) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_journey_times)]
+    ths = [threading.Thread(target=f) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_journey_times)]
     for th in ths: th.start()
     for th in ths: th.join()
     print(f'完成 {time.time() - t:.0f}s')

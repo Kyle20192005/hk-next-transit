@@ -10,3 +10,5 @@ export * from './journey';
 export * from './tracking';
 export * from './eta';
 export * from './fare';
+export * from './nlb';
+export * from './mtrb';

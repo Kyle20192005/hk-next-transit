@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-香港公共交通實時到站 App。目前做城巴、九巴（連龍運）同聯營線，網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
+香港公共交通實時到站 App。目前做城巴、九巴（連龍運）、聯營線、新大嶼山巴士同港鐵巴士，網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
 App 暫時只更新到城巴（用舊嘅 `/api/ctb`），未有九巴同新版介面。
 
 ## 結構
@@ -54,6 +54,23 @@ Vercel（Hobby）只部署 commit 作者係項目擁有者嘅 commit：commit �
 - 九巴就算要求唔同 service_type，都可能回傳同一批車（例如 107 嘅 1 同 2），只係改咗 `service_type` 欄，
   所以唔可以靠呢欄分走法；`etasAtStop` 會將同公司、同方向、同到站時間嘅班次去重，保留正常走法。
 - 九巴 API 冇分開某啲短途特別班（例如 101 嘅特別班都係 service_type 1），呢啲九巴班次當係正常走法（confidence likely）。
+
+## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）
+
+`pipeline/others.py`（由 `build.py` 呼叫），路線檔 `out/nlb/<路線>.json`、`out/mtrb/<路線>.json`，網址 `/nlb/11`、`/mtrb/K76`。
+用營辦商自己嘅站 ID，再配對政府走法攞時間表、走線。公司色：新大嶼山 #1B8F4C、港鐵巴士 #9E1B32（白字）。
+
+- NLB：每個 `routeId` 係一個方向，但站點列表會合埋幾個政府走法（例如 11 號經／唔經懲教所、北大嶼山醫院），
+  所以好似城巴咁拆：每個政府走法配去最似嘅 routeId（政府站 ≥ 80% 配到），一個 routeId 有幾個就拆做幾個走法
+  （id `<routeId>-<政府 route_id>`，`nlb: {routeId, via}`）。站點一樣嘅政府走法（例如上課日／非上課日）併埋。
+  名用 NLB 自己嘅（方向啱）再加政府括號。車費喺 NLB 站點列表。
+- NLB ETA：每個 routeId 只 call 一次，用備註「經: …」（`routeVariantName`）對走法（`pickNlbVariant`），
+  對唔到當正常路線（likely）。`noGPS = 1` = 按時間表（`scheduled`）。時間係香港時間，冇時區。
+- MTRB：`getSchedule`（POST，`routeName`）一次攞晒成條線，用 `lineRef` 分方向（O = LINE_UP、I = LINE_DOWN）。
+  秒數 ≥ 100000（例如 108000）= 冇數據。行緊嘅車有真 GPS（`Eta.gps`），地圖直接用，唔使推算。
+  車費、樂悠咭（`FARE_OCTO_JOYU`）用港鐵 CSV。CSDI 冇港鐵巴士走線，地圖用虛線駁站。
+- 營辦商 ETA 時間一律轉做 `+08:00` ISO（`toHkIso`），唔好出 UTC，否則介面顯示錯鐘數。
+- 站點列表每個站最多顯示 5 班。
 
 ## 數據原則：城巴為主，政府補充
 
@@ -160,6 +177,6 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 
 - 賽馬日改路等按事件嘅走法：政府數據冇。
 - ETA `seq` 規律只喺 38 號驗證過。
-- 新大嶼山巴士、港鐵、小巴、電車、渡輪未做。
+- 港鐵、輕鐵、小巴、電車、渡輪未做。
 - 「附近」：聯營線只列喺城巴站下面（避免同一條線喺相鄰嘅九巴站同城巴站出兩次）。
 - App 未喺實機或者模擬器測試過（只確認到 bundle 到）。

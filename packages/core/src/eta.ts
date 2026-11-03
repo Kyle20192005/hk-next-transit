@@ -2,6 +2,8 @@ import type { Calendar, Company, Eta, RouteData, Variant } from './types';
 import { fetchCtbEta } from './ctb';
 import { fetchKmbEta } from './kmb';
 import { inferAll } from './infer';
+import { fetchNlbEta } from './nlb';
+import { fetchMtrbEta } from './mtrb';
 
 /**
  * 某條路線喺某個站嘅到站時間：聯營線合併城巴同九巴兩間公司嘅車，按時間排。
@@ -38,6 +40,53 @@ export async function etasAtStopDetailed(
     failed.add(co);
     return [] as Eta[];
   };
+
+  // 新大嶼山巴士、港鐵巴士：走法已經明確（NLB routeId、MTRB lineRef），唔使推斷
+  if (route.company === 'NLB' || route.company === 'MTRB') {
+    const passing = route.variants
+      .map((v) => ({ v, key: Object.keys(v.expSeq).find((k) => k.slice(2) === stopId) }))
+      .filter((x): x is { v: Variant; key: string } => Boolean(x.key));
+    const tag = (v: Variant, dir: Eta['dir']) => (e: Eta): Eta => ({
+      ...e,
+      dir,
+      stopId,
+      variant: { variantId: v.id, name: v.name, special: v.special, confidence: 'certain', reason: '營辦商資料指明走法' },
+    });
+    if (route.company === 'NLB') {
+      // 一個 routeId 可以拆咗做幾個走法（例如 11 號經／唔經懲教所）：每個 routeId 只問一次，
+      // 再用 ETA 嘅「經: …」對走法；對唔到就當正常走法（likely）
+      const byRid = new Map<string, { v: Variant; key: string }[]>();
+      for (const p of passing) if (p.v.nlb) byRid.set(p.v.nlb.routeId, [...(byRid.get(p.v.nlb.routeId) ?? []), p]);
+      for (const [rid, group] of byRid) {
+        const dir = group[0]!.key[0] as Eta['dir'];
+        parts.push(
+          retry(() => fetchNlbEta(rid, stopId, dir, route.route, fetcher))
+            .then((etas) =>
+              etas.map((e) => {
+                const { hit, sure } = pickNlbVariant(group.map((g) => g.v), e.remarkTc);
+                const tagged = tag(hit, group.find((g) => g.v === hit)!.key[0] as Eta['dir'])(e);
+                return sure ? tagged : { ...tagged, variant: { ...tagged.variant!, confidence: 'likely' as const, reason: '按 ETA 備註估計走法' } };
+              }),
+            )
+            .catch(fail('NLB')),
+        );
+      }
+    } else {
+      parts.push(
+        retry(() => fetchMtrbEta(route.route, stopId, fetcher))
+          .then((etas) =>
+            etas.flatMap((e) => {
+              const hit = passing.find((p) => p.v.mtrb?.lineRef === e.lineRef) ?? passing.find((p) => p.key[0] === e.dir);
+              if (!hit) return [];
+              const { lineRef: _lr, ...rest } = e;
+              void _lr;
+              return [tag(hit.v, hit.key[0] as Eta['dir'])(rest)];
+            }),
+          )
+          .catch(fail('MTRB')),
+      );
+    }
+  }
 
   if (route.company === 'CTB' && companies.includes('CTB')) {
     parts.push(
@@ -141,4 +190,19 @@ function dedupe(etas: Eta[]): Eta[] {
     if (!cur || (cur.variant?.special && !e.variant?.special)) best.set(key, e);
   }
   return [...best.values()];
+}
+
+/** 「經: 北大嶼山醫院」-> 北大嶼山醫院（拎走空格同標點，方便比較） */
+const viaKey = (x: string) => x.replace(/^經[:：]?/, '').replace(/[\s:：、及和]/g, '');
+
+/** 新大嶼山巴士：按 ETA 備註（routeVariantName）揀走法 */
+export function pickNlbVariant(vs: Variant[], remark: string): { hit: Variant; sure: boolean } {
+  const normal = vs.find((v) => !v.nlb?.via) ?? vs[0]!;
+  if (vs.length === 1) return { hit: vs[0]!, sure: true };
+  const via = viaKey(remark ?? '');
+  if (!via) return { hit: normal, sure: Boolean(vs.find((v) => !v.nlb?.via)) };
+  const exact = vs.find((v) => v.nlb?.via && viaKey(v.nlb.via) === via);
+  if (exact) return { hit: exact, sure: true };
+  const part = vs.find((v) => v.nlb?.via && (viaKey(v.nlb.via).includes(via) || via.includes(viaKey(v.nlb.via))));
+  return { hit: part ?? normal, sure: false };
 }

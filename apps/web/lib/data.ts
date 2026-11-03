@@ -101,9 +101,10 @@ export async function getCtbStops(): Promise<StopIndexEntry[]> {
   return (await load<{ stops: StopIndexEntry[] }>('ctb/stops.json'))?.stops ?? [];
 }
 
-/** 路線檔位置：ctb（城巴同聯營線）或 kmb（九巴、龍運） */
-export type Co = 'ctb' | 'kmb';
-export const isCo = (x: string | null | undefined): x is Co => x === 'ctb' || x === 'kmb';
+/** 路線檔位置：ctb（城巴同聯營線）、kmb（九巴、龍運）、nlb（新大嶼山巴士）、mtrb（港鐵巴士） */
+export type Co = 'ctb' | 'kmb' | 'nlb' | 'mtrb';
+export const CO_LIST: readonly Co[] = ['ctb', 'kmb', 'nlb', 'mtrb'];
+export const isCo = (x: string | null | undefined): x is Co => CO_LIST.includes(x as Co);
 
 export function getRoute(co: Co, route: string): Promise<RouteData | null> {
   if (!isCo(co) || !SAFE_ROUTE.test(route)) return Promise.resolve(null);

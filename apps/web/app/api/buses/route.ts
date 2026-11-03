@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const route = q.get('route') ?? '';
   const variantId = q.get('v') ?? '';
   const co = coParam(req);
-  if (!co) return err(400, 'co 要係 ctb 或 kmb');
+  if (!co) return err(400, 'co 要係 ctb、kmb、nlb 或 mtrb');
   if (!SAFE_ROUTE.test(route) || !/^[A-Za-z0-9-]{1,20}$/.test(variantId)) return err(400, 'route 或 v 格式唔啱');
 
   const [data, calendar] = await Promise.all([getRoute(co, route), getCalendar()]);
@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
   // 只留屬於呢個走法嘅班次：推斷到係呢個走法，或者推斷唔到但 seq 吻合
   // 每個站：到站時間 -> 公司（追蹤完之後用嚟標明每架車屬邊間公司）
   const companyAt = perStop.map((etas) => new Map(etas.filter((e) => e.eta).map((e) => [Date.parse(e.eta!), e.company])));
+  // 港鐵巴士有真實 GPS：同樣用到站時間對返架車
+  const gpsAt = perStop.map((etas) => new Map(etas.filter((e) => e.eta && e.gps).map((e) => [Date.parse(e.eta!), e.gps!])));
   const stopEtas = perStop.map((etas, i) => {
     const s = stops[i]!;
     return etas
@@ -60,6 +62,7 @@ export async function GET(req: NextRequest) {
         from: b.from,
         nextEta: new Date(b.nextEta).toISOString(),
         company: companyAt[b.from + 1]?.get(b.nextEta) ?? data.company,
+        gps: gpsAt[b.from + 1]?.get(b.nextEta),
       })),
       // ?debug=1：每個站屬於呢個走法嘅 ETA，方便檢查追蹤結果
       ...(q.get('debug') === '1' ? { stopEtas: stopEtas.map((l, i) => ({ stop: stops[i]!.stopId, etas: l.map((t) => new Date(t).toISOString()) })) } : {}),
