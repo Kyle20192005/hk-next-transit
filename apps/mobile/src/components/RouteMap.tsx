@@ -16,6 +16,14 @@ export interface MapArrow {
   bearing: number;
 }
 
+export interface MapBus {
+  key: number;
+  latitude: number;
+  longitude: number;
+  /** 仲有幾多分鐘到打開咗嘅站 */
+  minutes: number;
+}
+
 export interface MapLine {
   id: string;
   selected: boolean;
@@ -32,12 +40,14 @@ type Props = {
   stops: MapStop[];
   /** 揀咗嘅走法嘅方向箭嘴 */
   arrows: MapArrow[];
+  /** 駛緊去打開咗嘅站嘅巴士 */
+  buses: MapBus[];
   /** 列表打開咗嘅站，地圖會放大過去 */
   focusIndex: number | null;
   onStopPress: (index: number) => void;
 };
 
-export function RouteMap({ lines, stops, arrows, focusIndex, onStopPress }: Props) {
+export function RouteMap({ lines, stops, arrows, buses, focusIndex, onStopPress }: Props) {
   const t = useTheme();
   const map = useRef<MapView>(null);
   const coords = stops.map((s) => ({ latitude: s.lat, longitude: s.lng }));
@@ -113,6 +123,24 @@ export function RouteMap({ lines, stops, arrows, focusIndex, onStopPress }: Prop
             </Marker>
           );
         })}
+        {buses.map((b) => (
+          <Marker
+            key={`bus-${b.key}`}
+            coordinate={{ latitude: b.latitude, longitude: b.longitude }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            title={b.minutes <= 0 ? '即將到站' : `約 ${b.minutes} 分鐘到站`}
+            zIndex={5}
+          >
+            <View
+              style={{
+                width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#fff',
+                backgroundColor: arrowColor, alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 13 }}>🚌</Text>
+            </View>
+          </Marker>
+        ))}
       </MapView>
     </View>
   );

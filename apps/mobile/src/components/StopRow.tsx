@@ -1,63 +1,50 @@
-import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { shortName, type Dir, type Eta } from '@hknt/core';
-import { api } from '@/lib/api';
+import { shortName, type Eta } from '@hknt/core';
 import { useTheme } from '@/lib/theme';
 import { Badge } from './Badge';
 
 type Props = {
   index: number;
-  route: string;
-  stopId: string;
-  dir: Dir;
   name: string;
-  /** 用戶揀咗嘅走法；其他走法嘅班次會淡色顯示 */
-  selectedVariantId: string | null;
   open: boolean;
   onToggle: () => void;
+  /** 打開咗先有：到站時間 */
+  etas: Eta[] | null;
+  /** 每班車而家喺邊（同 etas 對應），例如「距離 3 個站」 */
+  whereLabels: (string | null)[] | null;
+  error: string | null;
+  now: number;
+  selectedVariantId: string | null;
+  /** 由打開咗嘅站去呢個站要幾多秒（只有後面嘅站先有） */
+  travelSeconds: number | null;
+  /** 下一班車預計幾時到呢個站（毫秒） */
+  nextArrival: number | null;
 };
 
-const REFRESH_MS = 30_000;
+const hhmm = (ms: number) =>
+  new Date(ms).toLocaleTimeString('zh-HK', { timeZone: 'Asia/Hong_Kong', hour: '2-digit', minute: '2-digit', hour12: false });
 
-/** 一個站：撳開顯示實時到站（開住時每 30 秒更新）。開定收由路線頁控制，一次只開一個。 */
-export function StopRow({ index, route, stopId, dir, name, selectedVariantId, open, onToggle }: Props) {
+/** 一個站。開定收、到站時間由路線頁控制，一次只開一個。 */
+export function StopRow({
+  index, name, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, nextArrival,
+}: Props) {
   const t = useTheme();
-  const [etas, setEtas] = useState<Eta[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const body = await api.eta(route, stopId);
-        if (cancelled) return;
-        setEtas(body.etas.filter((e) => e.dir === dir && e.eta));
-        setError(null);
-      } catch (e) {
-        if (!cancelled) setError((e as Error).message);
-      }
-      if (!cancelled) setNow(Date.now());
-    };
-    void tick();
-    const id = setInterval(tick, REFRESH_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [open, route, stopId, dir]);
-
   return (
     <View style={{ borderBottomWidth: 1, borderColor: t.line, backgroundColor: open ? t.brandSoft : t.card }}>
       <Pressable
         onPress={onToggle}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        style={({ pressed }) => ({ flexDirection: 'row', gap: 12, paddingVertical: 11, paddingHorizontal: 14, opacity: pressed ? 0.6 : 1 })}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14, opacity: pressed ? 0.6 : 1 })}
       >
         <Text style={{ width: 28, color: t.muted }}>{index + 1}</Text>
         <Text style={{ flex: 1, color: t.text, fontSize: 16 }}>{name}</Text>
+        {travelSeconds !== null && travelSeconds > 0 && (
+          <Text style={{ color: t.brand, fontSize: 13 }}>
+            +{Math.max(1, Math.round(travelSeconds / 60))} 分
+            {nextArrival !== null && <Text style={{ color: t.muted }}> · 約 {hhmm(nextArrival)}</Text>}
+          </Text>
+        )}
       </Pressable>
       {open && (
         <View style={{ paddingLeft: 54, paddingRight: 14, paddingBottom: 10, gap: 4 }}>
@@ -80,6 +67,7 @@ export function StopRow({ index, route, stopId, dir, name, selectedVariantId, op
                     special={v.special}
                   />
                 )}
+                {whereLabels?.[i] && <Text style={{ color: t.muted, fontSize: 13 }}>{whereLabels[i]}</Text>}
               </View>
             );
           })}

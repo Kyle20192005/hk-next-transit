@@ -5,6 +5,13 @@ import {
   fmtMinutes,
   lineArrows,
   serviceWindow,
+  busPositions,
+  cumulativeSeconds,
+  pointOnPath,
+  secondsFrom,
+  stopPathIndices,
+  type Eta,
+  type LatLng,
   smoothLine,
   sortVariants,
   statusText,
@@ -18,7 +25,7 @@ import {
 import { api } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { StopRow } from '@/components/StopRow';
-import { RouteMap, type MapArrow, type MapLine, type MapStop } from '@/components/RouteMap';
+import { RouteMap, type MapArrow, type MapBus, type MapLine, type MapStop } from '@/components/RouteMap';
 import { VariantPicker, type VariantItem } from '@/components/VariantPicker';
 
 /** 路線頁：上面（方向、走法、地圖）固定，只有站點列表捲動；站點一次只開一個 */
@@ -31,6 +38,9 @@ export default function RouteScreen() {
   const [dir, setDir] = useState<Dir>('O');
   const [variantId, setVariantId] = useState<string | null>(null);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [etas, setEtas] = useState<Eta[] | null>(null);
+  const [etaError, setEtaError] = useState<string | null>(null);
+  const [etaNow, setEtaNow] = useState(() => Date.now());
   const list = useRef<FlatList<{ dir: Dir; stopId: string }>>(null);
 
   useEffect(() => {
@@ -107,6 +117,75 @@ export default function RouteScreen() {
     [selected],
   );
 
+  // 打開咗嘅站：攞到站時間（每 30 秒），巴士位置每 10 秒按時間推前
+  const openStopItem = openIndex !== null ? stops[openIndex] : undefined;
+  useEffect(() => {
+    if (!data || !openStopItem) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const body = await api.eta(data.route, openStopItem.stopId);
+        if (cancelled) return;
+        setEtas(body.etas.filter((e) => e.dir === openStopItem.dir && e.eta));
+        setEtaError(null);
+      } catch (e) {
+        if (!cancelled) setEtaError((e as Error).message);
+      }
+      if (!cancelled) setEtaNow(Date.now());
+    };
+    void tick();
+    const a = setInterval(tick, 30_000);
+    const b = setInterval(() => setEtaNow(Date.now()), 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(a);
+      clearInterval(b);
+    };
+  }, [data, openStopItem]);
+
+  const cum = useMemo(() => (selected ? cumulativeSeconds(selected) : null), [selected]);
+  const isMine = (e: Eta) => !selected || !e.variant?.variantId || e.variant.variantId === selected.id;
+  const travel = cum && openIndex !== null ? secondsFrom(cum, openIndex) : null;
+  const nextAtOpen =
+    etas?.filter(isMine).map((e) => Date.parse(e.eta!)).filter((x) => x >= etaNow - 60_000).sort((a, b) => a - b)[0] ?? null;
+  const whereLabels =
+    cum && openIndex !== null && etas
+      ? etas.map((e) => {
+          if (!isMine(e)) return null;
+          const [p] = busPositions(cum, openIndex, [e], new Date(etaNow));
+          if (!p) return null;
+          if (p.state === 'notDeparted') return '未開出';
+          if (p.state === 'at' || (p.state === 'between' && p.from === openIndex - 1 && p.fraction > 0.7)) return '即將到站';
+          return `距離 ${openIndex - p.from} 個站`;
+        })
+      : null;
+  // 地圖上嘅巴士：沿住揀咗嘅走線放
+  const buses: MapBus[] = (() => {
+    if (!cum || openIndex === null || !etas) return [];
+    const sel = mapLines.find((l) => l.selected);
+    const path: LatLng[] = sel
+      ? sel.segments.flatMap((seg, i) => (i === 0 ? seg : seg.slice(1))).map((p) => [p.latitude, p.longitude] as LatLng)
+      : [];
+    const idx = path.length ? stopPathIndices(path, mapStops.map((m) => [m.lat, m.lng] as LatLng)) : [];
+    const at = (stopIndex: number) => mapStops.findIndex((m) => m.index === stopIndex);
+    return busPositions(cum, openIndex, etas.filter(isMine), new Date(etaNow)).flatMap((p, k): MapBus[] => {
+      if (p.state === 'notDeparted') return [];
+      if (p.state === 'at') {
+        const m = mapStops[at(p.stop)];
+        return m ? [{ key: k, latitude: m.lat, longitude: m.lng, minutes: 0 }] : [];
+      }
+      const a = at(p.from);
+      const b = at(p.from + 1);
+      const pt = idx[a] !== undefined && idx[b] !== undefined ? pointOnPath(path, idx[a]!, idx[b]!, p.fraction) : null;
+      if (pt) return [{ key: k, latitude: pt.lat, longitude: pt.lng, minutes: Math.round(p.secondsAway / 60) }];
+      const ma = mapStops[a];
+      const mb = mapStops[b];
+      return ma && mb
+        ? [{ key: k, latitude: ma.lat + (mb.lat - ma.lat) * p.fraction, longitude: ma.lng + (mb.lng - ma.lng) * p.fraction, minutes: Math.round(p.secondsAway / 60) }]
+        : [];
+    });
+  })();
+
   if (error) return <Text style={{ padding: 16, color: t.muted }}>載入失敗：{error}</Text>;
   if (!data) return <ActivityIndicator style={{ marginTop: 32 }} />;
 
@@ -118,6 +197,8 @@ export default function RouteScreen() {
   const other = dirs.find((d) => d !== dir);
   const openStop = (i: number | null) => {
     setOpenIndex(i);
+    setEtas(null);
+    setEtaError(null);
     if (i !== null) list.current?.scrollToIndex({ index: i, animated: true, viewPosition: 0.2 });
   };
 
@@ -161,6 +242,7 @@ export default function RouteScreen() {
             lines={mapLines}
             stops={mapStops}
             arrows={arrows}
+            buses={buses}
             focusIndex={openIndex}
             onStopPress={openStop}
           />
@@ -173,20 +255,25 @@ export default function RouteScreen() {
         style={{ flex: 1 }}
         data={stops}
         keyExtractor={(s, i) => `${s.dir}-${s.stopId}-${i}`}
-        extraData={openIndex}
+        extraData={[openIndex, etas, etaNow]}
         onScrollToIndexFailed={({ averageItemLength, index }) =>
           list.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })
         }
         renderItem={({ item: s, index: i }) => (
           <StopRow
             index={i}
-            route={data.route}
-            stopId={s.stopId}
-            dir={s.dir}
             name={data.stops[s.stopId]?.nameTc ?? s.stopId}
             selectedVariantId={selected?.id ?? null}
             open={openIndex === i}
             onToggle={() => openStop(openIndex === i ? null : i)}
+            etas={openIndex === i ? etas : null}
+            whereLabels={openIndex === i ? whereLabels : null}
+            error={openIndex === i ? etaError : null}
+            now={etaNow}
+            travelSeconds={openIndex !== null && i > openIndex ? (travel?.[i] ?? null) : null}
+            nextArrival={
+              openIndex !== null && i > openIndex && travel?.[i] != null && nextAtOpen !== null ? nextAtOpen + travel[i]! * 1000 : null
+            }
           />
         )}
       />
