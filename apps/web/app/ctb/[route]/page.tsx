@@ -5,6 +5,8 @@ import {
   fmtMinutes,
   serviceWindow,
   smoothLine,
+  stopCumMetres,
+  type LatLng,
   sortVariants,
   statusText,
   variantLabel,
@@ -84,6 +86,17 @@ export default async function RoutePage({ params, searchParams }: Props) {
       segments: x.variant.line!.map((seg) => smoothLine(seg.map(([lng, lat]) => [lat, lng] as [number, number]))),
     }));
 
+  // 每個站沿走線嘅累計距離（米），用嚟顯示「仲有幾遠」
+  const selLine = mapLines.find((l) => l.selected);
+  const path: LatLng[] = selLine ? selLine.segments.flatMap((seg, i) => (i === 0 ? seg : seg.slice(1))) : [];
+  const cumMetres = stopCumMetres(
+    path,
+    stops.map((s) => {
+      const info = data.stops[s.stopId];
+      return (info ? [info.lat, info.lng] : [0, 0]) as LatLng;
+    }),
+  ).map((m) => Math.round(m));
+
   return (
     <main className="route-page">
       <div className="route-top">
@@ -111,7 +124,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
       </div>
 
       <div className="route-stops card">
-        <StopList key={`${dir}-${selected?.id}`} route={data.route} stops={stops} selectedVariantId={selected?.id ?? null} segSeconds={segSeconds} />
+        <StopList key={`${dir}-${selected?.id}`} route={data.route} stops={stops} selectedVariantId={selected?.id ?? null} segSeconds={segSeconds} cumMetres={cumMetres} />
         <p className="muted source">
           資料來源：運輸署、城巴（DATA.GOV.HK）。行車時間：
           <a href="https://github.com/HK-Bus-ETA/hk-bus-time-between-stops" target="_blank" rel="noopener">hk-bus-time-between-stops</a>（實驗性質，僅供參考）

@@ -127,3 +127,25 @@ export function pointOnPath(path: LatLng[], i0: number, i1: number, fraction: nu
   }
   return null;
 }
+
+/**
+ * 每個站沿走線由第一個站起計嘅累計距離（米）。
+ * 有走線就沿走線量；冇走線（path 少過 2 點）就用站與站之間嘅直線距離。
+ */
+export function stopCumMetres(path: LatLng[], stops: LatLng[]): number[] {
+  if (path.length < 2) {
+    const out = [0];
+    for (let i = 1; i < stops.length; i++) out.push(out[i - 1]! + metres(stops[i - 1]!, stops[i]!));
+    return out;
+  }
+  const along = [0];
+  for (let i = 1; i < path.length; i++) along.push(along[i - 1]! + metres(path[i - 1]!, path[i]!));
+  const idx = stopPathIndices(path, stops);
+  return idx.map((i) => along[i]! - along[idx[0]!]!);
+}
+
+/** 距離文字：一公里以下用「米」（取十位），以上用「公里」（一位小數） */
+export function formatDistance(m: number): string {
+  if (m < 1000) return `${Math.max(10, Math.round(m / 10) * 10)} 米`;
+  return `${(m / 1000).toFixed(1)} 公里`;
+}

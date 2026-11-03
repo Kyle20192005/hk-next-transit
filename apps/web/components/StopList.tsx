@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
+import { busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { FOCUS_STOP_EVENT, OPEN_STOP_EVENT, publishBuses } from '@/lib/events';
 import StopRow from './StopRow';
 
@@ -10,6 +10,8 @@ type Props = {
   selectedVariantId: string | null;
   /** 平均行車時間（秒），攞到即時數據之前先用 */
   segSeconds: number[] | null;
+  /** 每個站沿走線嘅累計距離（米） */
+  cumMetres: number[];
 };
 
 const ETA_REFRESH_MS = 30_000;
@@ -21,7 +23,7 @@ const BUSES_REFRESH_MS = 20_000;
  * - 打開站時：攞到站時間、地圖放大過去；每班車標示「距離 N 個站／未開出」
  * - 後面嘅站顯示由打開咗嘅站出發要幾耐，同下一班車大概幾時到
  */
-export default function StopList({ route, stops, selectedVariantId, segSeconds: avgSeg }: Props) {
+export default function StopList({ route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -124,9 +126,13 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
       const k = mine.indexOf(e);
       if (k < 0) return null;
       const l = labels[k]!;
-      return l.kind === 'notDeparted' ? '未開出' : l.kind === 'arriving' ? '即將到站' : `距離 ${l.stopsAway} 個站`;
+      if (l.kind === 'notDeparted') return '未開出';
+      // 沿路線仲有幾遠
+      const m = busDistanceTo(l.bus, busFraction(l.bus, live.segSeconds, now), openIndex, cumMetres);
+      const dist = m === null || m < 50 ? '' : ` · ${formatDistance(m)}`;
+      return l.kind === 'arriving' ? `即將到站${dist}` : `距離 ${l.stopsAway} 個站${dist}`;
     });
-  }, [live, openIndex, etas, selectedVariantId]);
+  }, [live, openIndex, etas, selectedVariantId, now, cumMetres]);
 
   // 下一班（揀咗嘅走法）喺打開咗嘅站嘅到站時間
   const nextAtOpen = useMemo(() => {
@@ -154,6 +160,7 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
             now={now}
             selectedVariantId={selectedVariantId}
             travelSeconds={openIndex !== null && i > openIndex ? tr : null}
+            travelMetres={openIndex !== null && i > openIndex ? (cumMetres[i] ?? 0) - (cumMetres[openIndex] ?? 0) : null}
             nextArrival={openIndex !== null && i > openIndex && tr !== null && nextAtOpen !== null ? nextAtOpen + tr * 1000 : null}
           />
         );

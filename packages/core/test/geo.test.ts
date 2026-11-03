@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bearing, lineArrows, smoothLine } from '../src';
+import { bearing, formatDistance, lineArrows, smoothLine, stopCumMetres } from '../src';
 
 describe('方向箭嘴', () => {
   it('方向角度', () => {
@@ -50,5 +50,28 @@ describe('走線圓角化', () => {
   it('得兩點嘅線唔郁', () => {
     const line: [number, number][] = [[22.28, 114.15], [22.29, 114.15]];
     expect(smoothLine(line)).toEqual(line);
+  });
+});
+
+describe('距離', () => {
+  it('沿走線量，唔係直線', () => {
+    // 向北 111 米再向東約 103 米；頭尾兩站直線距離約 151 米，但沿路行係 214 米
+    const path: [number, number][] = [[22.28, 114.15], [22.281, 114.15], [22.281, 114.151]];
+    const cum = stopCumMetres(path, [[22.28, 114.15], [22.281, 114.151]]);
+    expect(cum[0]).toBe(0);
+    expect(cum[1]).toBeGreaterThan(210);
+    expect(cum[1]).toBeLessThan(220);
+  });
+
+  it('冇走線就用直線', () => {
+    const cum = stopCumMetres([], [[22.28, 114.15], [22.281, 114.15]]);
+    expect(cum[1]).toBeCloseTo(111.3, 0);
+  });
+
+  it('顯示文字', () => {
+    expect(formatDistance(4)).toBe('10 米');
+    expect(formatDistance(846)).toBe('850 米');
+    expect(formatDistance(1234)).toBe('1.2 公里');
+    expect(formatDistance(15050)).toBe('15.1 公里');
   });
 });

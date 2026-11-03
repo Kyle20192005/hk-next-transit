@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { shortName, type Eta } from '@hknt/core';
+import { formatDistance, shortName, type Eta } from '@hknt/core';
 import { useTheme } from '@/lib/theme';
 import { Badge } from './Badge';
 
@@ -17,6 +17,8 @@ type Props = {
   selectedVariantId: string | null;
   /** 由打開咗嘅站去呢個站要幾多秒（只有後面嘅站先有） */
   travelSeconds: number | null;
+  /** 由打開咗嘅站沿路線去呢個站有幾遠（米） */
+  travelMetres: number | null;
   /** 下一班車預計幾時到呢個站（毫秒） */
   nextArrival: number | null;
 };
@@ -26,7 +28,7 @@ const hhmm = (ms: number) =>
 
 /** 一個站。開定收、到站時間由路線頁控制，一次只開一個。 */
 export function StopRow({
-  index, name, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, nextArrival,
+  index, name, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, travelMetres, nextArrival,
 }: Props) {
   const t = useTheme();
   return (
@@ -38,13 +40,18 @@ export function StopRow({
         style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14, opacity: pressed ? 0.6 : 1 })}
       >
         <Text style={{ width: 28, color: t.muted }}>{index + 1}</Text>
-        <Text style={{ flex: 1, color: t.text, fontSize: 16 }}>{name}</Text>
-        {travelSeconds !== null && travelSeconds > 0 && (
-          <Text style={{ color: t.brand, fontSize: 13 }}>
-            +{Math.max(1, Math.round(travelSeconds / 60))} 分
-            {nextArrival !== null && <Text style={{ color: t.muted }}> · 約 {hhmm(nextArrival)}</Text>}
-          </Text>
-        )}
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: t.text, fontSize: 16 }}>{name}</Text>
+          {travelSeconds !== null && travelSeconds > 0 && (
+            <Text style={{ color: t.brand, fontSize: 13 }}>
+              +{Math.max(1, Math.round(travelSeconds / 60))} 分
+              <Text style={{ color: t.muted }}>
+                {travelMetres !== null && travelMetres > 0 ? ` · ${formatDistance(travelMetres)}` : ''}
+                {nextArrival !== null ? ` · 約 ${hhmm(nextArrival)}` : ''}
+              </Text>
+            </Text>
+          )}
+        </View>
       </Pressable>
       {open && (
         <View style={{ paddingLeft: 54, paddingRight: 14, paddingBottom: 10, gap: 4 }}>
@@ -61,7 +68,8 @@ export function StopRow({
                   {mins === 0 ? '即將' : `${mins} 分`}
                 </Text>
                 <Text style={{ color: t.muted }}>{e.eta!.slice(11, 16)}</Text>
-                {v?.name && (
+                {/* 揀咗嘅走法唔使再標；其他走法先標出嚟 */}
+                {v?.name && (!selectedVariantId || v.variantId !== selectedVariantId) && (
                   <Badge
                     label={`${v.special ? shortName({ name: v.name }) : '正常路線'}${v.confidence === 'likely' ? '（推斷）' : ''}`}
                     special={v.special}

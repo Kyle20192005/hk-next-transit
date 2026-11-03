@@ -6,6 +6,9 @@ import {
   lineArrows,
   serviceWindow,
   busFraction,
+  busDistanceTo,
+  formatDistance,
+  stopCumMetres,
   labelEtas,
   type TrackedBus,
   pointOnPath,
@@ -182,6 +185,21 @@ export default function RouteScreen() {
   const travel = cum && openIndex !== null ? secondsFrom(cum, openIndex) : null;
   const nextAtOpen =
     etas?.filter(isMine).map((e) => Date.parse(e.eta!)).filter((x) => x >= etaNow - 60_000).sort((a, b) => a - b)[0] ?? null;
+  // 每個站沿走線嘅累計距離（米）
+  const cumMetres = useMemo(() => {
+    const sel = mapLines.find((l) => l.selected);
+    const path: LatLng[] = sel
+      ? sel.segments.flatMap((sg, i) => (i === 0 ? sg : sg.slice(1))).map((p) => [p.latitude, p.longitude] as LatLng)
+      : [];
+    return stopCumMetres(
+      path,
+      stops.map((st) => {
+        const info = data?.stops[st.stopId];
+        return (info ? [info.lat, info.lng] : [0, 0]) as LatLng;
+      }),
+    );
+  }, [mapLines, stops, data]);
+
   // 每班車而家喺邊：用成條線追蹤到嘅巴士對應返呢個站嘅 ETA
   const whereLabels = (() => {
     if (!live || openIndex === null || !etas) return null;
@@ -191,7 +209,11 @@ export default function RouteScreen() {
       const k = mine.indexOf(e);
       if (k < 0) return null;
       const l = labels[k]!;
-      return l.kind === 'notDeparted' ? '未開出' : l.kind === 'arriving' ? '即將到站' : `距離 ${l.stopsAway} 個站`;
+      if (l.kind === 'notDeparted') return '未開出';
+      // 沿路線仲有幾遠（50 米內唔顯示）
+      const m = busDistanceTo(l.bus, busFraction(l.bus, live.segSeconds, busNow), openIndex, cumMetres);
+      const dist = m === null || m < 50 ? '' : ` · ${formatDistance(m)}`;
+      return l.kind === 'arriving' ? `即將到站${dist}` : `距離 ${l.stopsAway} 個站${dist}`;
     });
   })();
   // 地圖上嘅巴士：沿住揀咗嘅走線放
@@ -303,6 +325,7 @@ export default function RouteScreen() {
             error={openIndex === i ? etaError : null}
             now={etaNow}
             travelSeconds={openIndex !== null && i > openIndex ? (travel?.[i] ?? null) : null}
+            travelMetres={openIndex !== null && i > openIndex ? (cumMetres[i] ?? 0) - (cumMetres[openIndex] ?? 0) : null}
             nextArrival={
               openIndex !== null && i > openIndex && travel?.[i] != null && nextAtOpen !== null ? nextAtOpen + travel[i]! * 1000 : null
             }

@@ -1,6 +1,6 @@
 'use client';
 import { forwardRef } from 'react';
-import { shortName, type Eta } from '@hknt/core';
+import { formatDistance, shortName, type Eta } from '@hknt/core';
 
 type Props = {
   index: number;
@@ -16,6 +16,8 @@ type Props = {
   selectedVariantId: string | null;
   /** 由打開咗嘅站去呢個站要幾多秒（只有後面嘅站先有） */
   travelSeconds: number | null;
+  /** 由打開咗嘅站沿路線去呢個站有幾遠（米） */
+  travelMetres: number | null;
   /** 下一班車預計幾時到呢個站（毫秒） */
   nextArrival: number | null;
 };
@@ -25,20 +27,23 @@ const hhmm = (ms: number) =>
 
 /** 一個站。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, name, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, nextArrival },
+  { index, name, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, travelMetres, nextArrival },
   ref,
 ) {
   return (
     <li className={`stop${open ? ' open' : ''}`} ref={ref}>
       <button onClick={onToggle} aria-expanded={open}>
         <span className="seq">{index + 1}</span>
-        <span className="stop-name">{name}</span>
-        {travelSeconds !== null && travelSeconds > 0 && (
-          <span className="travel" title="由打開咗嘅站出發嘅行車時間（實測平均）">
-            +{Math.max(1, Math.round(travelSeconds / 60))} 分
-            {nextArrival !== null && <span className="muted"> · 約 {hhmm(nextArrival)}</span>}
-          </span>
-        )}
+        <span className="stop-name">
+          {name}
+          {travelSeconds !== null && travelSeconds > 0 && (
+            <span className="travel" title="由打開咗嘅站出發（行車時間係實測平均，僅供參考）">
+              +{Math.max(1, Math.round(travelSeconds / 60))} 分
+              {travelMetres !== null && travelMetres > 0 && <span className="muted"> · {formatDistance(travelMetres)}</span>}
+              {nextArrival !== null && <span className="muted"> · 約 {hhmm(nextArrival)}</span>}
+            </span>
+          )}
+        </span>
       </button>
       {open && (
         <div className="etas" aria-live="polite">
@@ -53,7 +58,8 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
               <div className={`eta-row${other ? ' other' : ''}`} key={i}>
                 <span className="eta-min">{mins === 0 ? '即將' : `${mins} 分`}</span>
                 <span className="muted">{e.eta!.slice(11, 16)}</span>
-                {v?.name && (
+                {/* 揀咗嘅走法唔使再標；其他走法先標出嚟 */}
+                {v?.name && (!selectedVariantId || v.variantId !== selectedVariantId) && (
                   <span className={`badge${v.special ? ' special' : ''}`} title={v.reason}>
                     {v.special ? shortName({ name: v.name }) : '正常路線'}
                     {v.confidence === 'likely' ? '（推斷）' : ''}

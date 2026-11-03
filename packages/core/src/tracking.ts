@@ -114,3 +114,12 @@ export function hourlySlot(now: Date, calendar: Calendar): { weekday: number; ho
   );
   return { weekday: holiday ? 0 : (weekday + 1) % 7, hour: String(Math.floor(minutes / 60)).padStart(2, '0') };
 }
+
+/** 架車沿路線去第 stopIndex 個站仲有幾遠（米）；cumMetres = 每個站嘅累計距離 */
+export function busDistanceTo(bus: TrackedBus, fraction: number, stopIndex: number, cumMetres: number[]): number | null {
+  const a = cumMetres[bus.from];
+  const b = cumMetres[bus.from + 1];
+  const target = cumMetres[stopIndex];
+  if (a === undefined || b === undefined || target === undefined) return null;
+  return Math.max(0, target - (a + (b - a) * fraction));
+}

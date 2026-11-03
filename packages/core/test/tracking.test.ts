@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { busFraction, hourlySlot, labelEtas, trackBuses, trackLine, type Calendar } from '../src';
+import { busDistanceTo, busFraction, hourlySlot, labelEtas, trackBuses, trackLine, type Calendar } from '../src';
 
 const now = Date.parse('2026-11-03T12:00:00+08:00');
 const m = (min: number) => now + min * 60_000;
@@ -45,6 +45,11 @@ it('同一架車喺相鄰兩站嘅 ETA 差做嗰段行車時間', () => {
   const { segSeconds } = trackLine(etas, [120, 120], now);
   expect(segSeconds[0]).toBe(180); // 9 → 12
   expect(segSeconds[1]).toBe(180); // 4 → 7
+});
+
+it('架車去某個站仲有幾遠', () => {
+  // 4 個站，每站相隔 500 米；車喺第 2、3 站之間行咗四成，去第 4 站
+  expect(busDistanceTo({ from: 1, nextEta: now }, 0.4, 3, [0, 500, 1000, 1500])).toBe(800);
 });
 
 describe('按時段行車時間', () => {
