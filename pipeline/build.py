@@ -276,8 +276,14 @@ def main():
                   if 'CTB' in r['agency_id'] and ('KMB' in r['agency_id'] or 'LWB' in r['agency_id'])}
     joint_rnos |= K.joint_by_ends(ctb_routes, kmbdata)
     actual_joint = set()   # 真係配對到九巴嘅聯營線（九巴唔再另外出）
-    lines = {(str(f['properties']['ROUTE_ID']), str(f['properties']['ROUTE_SEQ'])): f['geometry']['coordinates']
-             for f in json.load(open(f'{CACHE}/csdi_lines.json', encoding='utf-8'))['features']}
+    csdi = json.load(open(f'{CACHE}/csdi_lines.json', encoding='utf-8'))['features']
+    lines = {(str(f['properties']['ROUTE_ID']), str(f['properties']['ROUTE_SEQ'])): f['geometry']['coordinates'] for f in csdi}
+    # 路線號碼 -> 城巴走線（GTFS 未有嘅新路線，例如 770，CSDI 可能已經有）
+    ctb_lines_by_no = collections.defaultdict(list)
+    for f in csdi:
+        if 'CTB' in str(f['properties'].get('COMPANY_CODE', '')):
+            ctb_lines_by_no[str(f['properties']['ROUTE_NAMEE']).strip()].append(f['geometry']['coordinates'])
+    del csdi
 
     # 每條城巴路線嘅候選列表：O、I，循環線多一個 O+I
     cand_lists = {}
@@ -418,6 +424,13 @@ def main():
                  'stops': list(l), 'stopDirs': [d] * len(l), 'stopMatch': ['A'] * len(l),
                  'expSeq': {f'{d}:{x}': i + 1 for i, x in reversed(list(enumerate(l)))},
                  'schedules': [], 'line': None, 'lineAligned': False}
+            # 走線：CSDI 同號碼嘅城巴走線，站按次序投影落去再切開（同港鐵巴士用 OSM 一樣）
+            import others as O
+            seg = O.fit_line([(cstops[x]['lat'], cstops[x]['lng']) for x in l],
+                             [O.OsmPath([p for k, sg in enumerate(segs) for p in (sg if k == 0 else sg[1:])])
+                              for segs in ctb_lines_by_no.get(rno, []) if segs])
+            if seg:
+                v['line'], v['lineAligned'] = seg, True
             v['segSeconds'], v['segMeasured'] = segment_times(v, cstops, journey)
             v['offsets'] = [0]
             for x in v['segSeconds']:

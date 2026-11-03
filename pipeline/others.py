@@ -291,23 +291,29 @@ def osm_lines():
     return out
 
 
+def fit_line(pts, cands):
+    """站點 [(lat, lng)] 揀最夾嘅走線（OsmPath），切做每兩站一段；全部唔夾回傳 None。
+    兩站之間沿線距離離譜（兜大圈）就當走線唔啱"""
+    best = None
+    for p in cands:
+        f = p.fit(pts)
+        if not f or (best and f[0] >= best[0]):
+            continue
+        segs = p.segments(f[1])
+        if all(B.dist(a, b) * 3 + 500 >= sum(B.dist(x[::-1], y[::-1]) for x, y in zip(sg, sg[1:]))
+               for a, b, sg in zip(pts, pts[1:], segs)):
+            best = (f[0], segs)
+    return [B.simplify(sg) for sg in best[1]] if best else None
+
+
 def osm_line_for(rno, stop_list, stops_info, lines):
     """揀最啱嘅 OSM 走線：同號碼優先，冇就用同一個基本號碼（K51A -> K51）；站同走線唔夾就唔用"""
     pts = [(stops_info[s]['lat'], stops_info[s]['lng']) for s in stop_list]
     base = re.sub(r'[A-Z]+$', '', rno)
     for cands in (lines.get(rno, []), [p for ref, ps in lines.items() if ref != rno and re.sub(r'[A-Z]+$', '', ref) == base for p in ps]):
-        best = None
-        for p in cands:
-            f = p.fit(pts)
-            if not f or (best and f[0] >= best[0]):
-                continue
-            segs = p.segments(f[1])
-            # 兩站之間沿線距離離譜（兜大圈）就當走線唔啱
-            if all(B.dist(a, b) * 3 + 500 >= sum(B.dist(x[::-1], y[::-1]) for x, y in zip(sg, sg[1:]))
-                   for a, b, sg in zip(pts, pts[1:], segs)):
-                best = (f[0], segs)
-        if best:
-            return [B.simplify(sg) for sg in best[1]]
+        seg = fit_line(pts, cands)
+        if seg:
+            return seg
     return None
 
 
