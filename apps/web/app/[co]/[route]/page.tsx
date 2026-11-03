@@ -76,7 +76,13 @@ export default async function RoutePage({ params, searchParams }: Props) {
   // 站點：有政府走法就跟走法；冇就用城巴嘅合併列表
   const stops = (
     selected ? variantStops(selected) : (data.directions[dir] ?? []).map((stopId) => ({ dir, stopId }))
-  ).map((s) => ({ dir: s.dir, stopId: s.stopId, name: data.stops[s.stopId]?.nameTc ?? s.stopId }));
+  ).map((s) => ({
+    dir: s.dir,
+    stopId: s.stopId,
+    name: data.stops[s.stopId]?.nameTc ?? s.stopId,
+    lat: data.stops[s.stopId]?.lat,
+    lng: data.stops[s.stopId]?.lng,
+  }));
   const dest = stops[stops.length - 1]?.name;
   // 平均行車時間：攞到即時數據之前先用
   const segSeconds = selected?.segSeconds ?? null;

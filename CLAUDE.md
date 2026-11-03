@@ -140,6 +140,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 主題色黃色（`--brand` 只做底色，上面用 `--on-brand` 深色字）；白底上嘅重點字用 `--accent`（深琥珀）；
   地圖走線、時間線、巴士圖示用 `--route-line`（深橙，因為地圖馬路本身係黃／橙色）。
 - 公司標籤（`components/CompanyTag.tsx`、`lib/company.ts`）：巴士圖示 + 公司名，用公司代表色（城巴黃、九巴紅）。
+- 站點列表頂有「📍 最近嘅站」（固定喺列表頂）：定位搵呢個走法 1.5 公里內最近嘅站（唔計終點站），打開佢同標「最近 · N 米」。
+  已經容許定位（`navigator.permissions` 係 granted）就開頁自動做，唔會彈問題；否則要撳先問。
 - 時間線豎線畫喺 `li.stop::before`（成個站嘅高度），唔好畫喺按鈕入面，否則行與行之間同打開咗嘅到站時間部分會斷線。
 - 新增營辦商：喺 `packages/core/src/` 加 adapter，輸出統一嘅 `Eta` 類型。
 

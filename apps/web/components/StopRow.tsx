@@ -43,6 +43,8 @@ type Props = {
   selectedVariantId: string | null;
   /** 由打開咗嘅站去呢個站要幾多秒（只有後面嘅站先有） */
   travelSeconds: number | null;
+  /** 呢個係用戶最近嘅站：同用戶相距幾多米 */
+  nearestMetres: number | null;
   /** 由打開咗嘅站沿路線去呢個站有幾遠（米） */
   travelMetres: number | null;
   /** 下一班車預計幾時到呢個站（毫秒） */
@@ -56,7 +58,7 @@ const hhmm = (ms: number) =>
 
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, travelSeconds, travelMetres, nextArrival, buses },
+  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, nearestMetres, travelSeconds, travelMetres, nextArrival, buses },
   ref,
 ) {
   const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null })) ?? null;
@@ -79,7 +81,10 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
           <span className="tl-dot" />
         </span>
         <span className="stop-name">
-          {name}
+          <span>
+            {name}
+            {nearestMetres !== null && <span className="nearest-tag">📍 最近 · {formatDistance(nearestMetres)}</span>}
+          </span>
           {travelSeconds !== null && travelSeconds > 0 && (
             <span className="travel" title="由打開咗嘅站出發（行車時間係實測平均，僅供參考）">
               +{Math.max(1, Math.round(travelSeconds / 60))} 分

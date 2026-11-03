@@ -11,7 +11,7 @@ type Props = {
   /** 多過一間公司營辦（聯營線）：每班車標明公司 */
   multiCompany: boolean;
   route: string;
-  stops: { dir: Dir; stopId: string; name: string }[];
+  stops: { dir: Dir; stopId: string; name: string; lat?: number; lng?: number }[];
   selectedVariantId: string | null;
   /** 平均行車時間（秒），攞到即時數據之前先用 */
   segSeconds: number[] | null;
@@ -24,6 +24,8 @@ type Props = {
 };
 
 const ETA_REFRESH_MS = 30_000;
+/** 最近嘅站要喺幾多米內先算（太遠即係唔喺呢條線附近） */
+const NEAREST_MAX_M = 1500;
 const BUSES_REFRESH_MS = 20_000;
 
 /**
@@ -53,7 +55,8 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
       const box = row?.closest<HTMLElement>('.route-stops');
       if (!row || !box) return;
       const top = row.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
-      box.scrollTo({ top: Math.max(0, top - 4), behavior: 'smooth' });
+      const bar = box.querySelector<HTMLElement>('.nearest-bar')?.offsetHeight ?? 0; // 頂部固定嘅「最近嘅站」
+      box.scrollTo({ top: Math.max(0, top - 4 - bar), behavior: 'smooth' });
     });
   };
 
@@ -61,6 +64,53 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
   useEffect(() => {
     if (initialOpen !== null) openStop(initialOpen);
   }, [initialOpen]);
+
+  // ---------- 最近嘅站：用定位搵呢個走法最近嘅站，打開佢 ----------
+  const [nearest, setNearest] = useState<{ index: number; metres: number } | null>(null);
+  const [locating, setLocating] = useState<'idle' | 'busy' | 'denied' | 'far' | 'error'>('idle');
+  const findNearest = (openIt: boolean) => {
+    if (!('geolocation' in navigator)) return setLocating('error');
+    setLocating('busy');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: la, longitude: lo } = pos.coords;
+        let best: { index: number; metres: number } | null = null;
+        stops.forEach((s, i) => {
+          if (s.lat === undefined || s.lng === undefined || i === stops.length - 1) return; // 終點站唔使
+          const dy = (s.lat - la) * 111320;
+          const dx = (s.lng - lo) * 111320 * Math.cos((la * Math.PI) / 180);
+          const m = Math.hypot(dx, dy);
+          if (!best || m < best.metres) best = { index: i, metres: m };
+        });
+        const b = best as { index: number; metres: number } | null;
+        if (!b || b.metres > NEAREST_MAX_M) {
+          setNearest(null);
+          setLocating('far');
+          return;
+        }
+        setNearest(b);
+        setLocating('idle');
+        if (openIt) openStop(b.index);
+      },
+      (err) => setLocating(err.code === err.PERMISSION_DENIED ? 'denied' : 'error'),
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
+    );
+  };
+  // 已經容許過定位（唔會彈問題）：開頁就自動搵；冇指定站先自動打開
+  useEffect(() => {
+    let cancelled = false;
+    navigator.permissions
+      ?.query({ name: 'geolocation' })
+      .then((p) => {
+        if (!cancelled && p.state === 'granted') findNearest(initialOpen === null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // 只喺開頁時做一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const onOpen = (e: Event) => openStop((e as CustomEvent<number>).detail);
@@ -181,6 +231,18 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
   }, [live, busNow, stabilizer, stops, multiCompany, company]);
 
   return (
+    <>
+    <div className="nearest-bar">
+      <button className="nearest-btn" onClick={() => findNearest(true)} disabled={locating === 'busy'}>
+        📍 {locating === 'busy' ? '定位中…' : '最近嘅站'}
+      </button>
+      <span className="muted" role="status">
+        {locating === 'denied' && '冇定位權限，請喺瀏覽器設定容許'}
+        {locating === 'far' && '附近冇呢條線嘅站（1.5 公里內）'}
+        {locating === 'error' && '攞唔到位置，請再試'}
+        {locating === 'idle' && nearest && `最近：${stops[nearest.index]?.name}`}
+      </span>
+    </div>
     <ol className="stops" style={{ ['--line-color' as string]: companyColor(company) ?? 'var(--route-line)' }}>
       {stops.map((s, i) => {
         const tr = travel?.[i] ?? null;
@@ -203,6 +265,7 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
             failed={openIndex === i ? failed : []}
             now={now}
             selectedVariantId={selectedVariantId}
+            nearestMetres={nearest?.index === i ? nearest.metres : null}
             travelSeconds={openIndex !== null && i > openIndex ? tr : null}
             travelMetres={openIndex !== null && i > openIndex ? (cumMetres[i] ?? 0) - (cumMetres[openIndex] ?? 0) : null}
             nextArrival={openIndex !== null && i > openIndex && tr !== null && nextAtOpen !== null ? nextAtOpen + tr * 1000 : null}
@@ -210,5 +273,6 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
         );
       })}
     </ol>
+    </>
   );
 }
