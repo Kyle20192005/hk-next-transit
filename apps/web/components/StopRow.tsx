@@ -1,13 +1,23 @@
 'use client';
 import { forwardRef } from 'react';
 import { formatDistance, shortName, type Eta } from '@hknt/core';
+import BusIcon from './BusIcon';
 
-/** 時間線上嘅巴士：top = 喺呢行入面嘅垂直位置（百分比） */
+/**
+ * 時間線上嘅巴士。兩站之間嘅前半段畫喺上一個站嗰行（站點圓點以下），後半段畫喺下一個站嗰行（圓點以上）。
+ * half = 'below'：t = 0–1 由圓點去到呢行底；half = 'above'：t = 0–1 由呢行頂去到圓點。
+ */
 export interface RowBus {
   key: number;
-  top: number;
+  half: 'below' | 'above';
+  t: number;
   label: string;
 }
+
+const busTop = (b: RowBus) =>
+  b.half === 'below'
+    ? `calc(var(--tl-dot-y) + (100% - var(--tl-dot-y)) * ${b.t.toFixed(3)})`
+    : `calc(var(--tl-dot-y) * ${b.t.toFixed(3)})`;
 
 type Props = {
   index: number;
@@ -35,12 +45,6 @@ type Props = {
 const hhmm = (ms: number) =>
   new Date(ms).toLocaleTimeString('zh-HK', { timeZone: 'Asia/Hong_Kong', hour: '2-digit', minute: '2-digit', hour12: false });
 
-const BUS_SVG = (
-  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-    <path fill="#fff" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z" />
-  </svg>
-);
-
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
   { index, name, terminus, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, travelMetres, nextArrival, buses },
@@ -55,16 +59,15 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
 
   return (
     <li className={`stop${open ? ' open' : ''}${terminus ? ' terminus' : ''}`} ref={ref}>
+      {buses.map((b) => (
+        <span key={b.key} className="tl-bus" style={{ top: busTop(b) }} title={b.label} aria-hidden="true">
+          <BusIcon />
+        </span>
+      ))}
       <button onClick={onToggle} aria-expanded={open}>
         <span className="seq">{index + 1}</span>
         <span className="tl" aria-hidden="true">
-          <span className="tl-line" />
           <span className="tl-dot" />
-          {buses.map((b) => (
-            <span key={b.key} className="tl-bus" style={{ top: `${b.top}%` }} title={b.label}>
-              {BUS_SVG}
-            </span>
-          ))}
         </span>
         <span className="stop-name">
           {name}

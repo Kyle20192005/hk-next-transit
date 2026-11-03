@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import CompanyTag from '@/components/CompanyTag';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RouteIndex } from '@hknt/core';
 import Keypad from './Keypad';
@@ -103,7 +104,7 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
             <Link href={`/ctb/${r.route}`} className="route-item">
               <span className="route-id">
                 <span className="route-num">{r.route}</span>
-                <span className="co">城巴</span>
+                <CompanyTag company="CTB" />
               </span>
               <span className="route-text">
                 <span className="route-to">往 {r.destTc}</span>

@@ -164,10 +164,10 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
       const from = Math.min(Math.floor(progress), last - 1);
       const f = Math.min(1, progress - from);
       // 兩站之間：前半段畫喺上一個站嗰行嘅下半，後半段畫喺下一個站嗰行嘅上半
-      const [row, top] = f < 0.5 ? [from, 50 + f * 100] : [from + 1, (f - 0.5) * 100];
+      const [row, half, t] = f < 0.5 ? [from, 'below' as const, f * 2] : [from + 1, 'above' as const, (f - 0.5) * 2];
       const mins = Math.max(0, Math.round((bus.nextEta - busNow) / 60000));
       const label = mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`;
-      out.set(row, [...(out.get(row) ?? []), { key: id, top, label }]);
+      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label }]);
     }
     return out;
   }, [live, busNow, stabilizer, stops]);

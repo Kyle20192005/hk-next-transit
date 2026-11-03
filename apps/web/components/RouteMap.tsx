@@ -120,6 +120,8 @@ export default function RouteMap({ lines, stops }: Props) {
       const found = markers.find((m) => m.stop.index === (e as CustomEvent<number>).detail);
       if (!found) return;
       map.flyTo(found.marker.getLatLng(), 17, { duration: 0.6 });
+      // 每次只保留一個站名，唔好疊埋一齊
+      for (const m of markers) if (m !== found) m.marker.closeTooltip();
       found.marker.openTooltip();
     };
     window.addEventListener(FOCUS_STOP_EVENT, onFocus);
