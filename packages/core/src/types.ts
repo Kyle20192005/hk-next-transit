@@ -121,6 +121,8 @@ export interface Eta {
   remarkEn: string;
   /** 九巴「原定班次」：時間表時間，唔係實時；唔用嚟推算巴士位置 */
   scheduled?: boolean;
+  /** 呢個時間唔係由 GPS 計（新大嶼山巴士 noGPS = 1）：唔用嚟追蹤位置 */
+  noGps?: boolean;
   /** 營辦商提供嘅真實位置（港鐵巴士行緊嘅車先有） */
   gps?: { lat: number; lng: number };
   /** 營辦商嘅車輛編號（港鐵巴士） */

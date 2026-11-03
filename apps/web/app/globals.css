@@ -195,6 +195,7 @@ button.variant.variant-current { background: var(--card); border-radius: 14px; b
 .tl-dot { position: absolute; left: 50%; top: calc(var(--tl-dot-y) - 6px); width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--card); border: 3px solid var(--line-color, var(--route-line)); box-shadow: 0 0 0 1px rgba(0,0,0,.35); z-index: 1; }
 .stop.terminus .tl-dot { width: 18px; height: 18px; margin: -9px 0 0 -9px; background: var(--card); border: 5px solid var(--text); }
 /* 時間線上嘅巴士：相對成個站（li）定位 */
+.tl-bus.is-schedule, .map-bus.is-schedule > span { opacity: 0.5; }
 .tl-bus { position: absolute; left: var(--tl-x); width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--line-color, var(--route-line)); border: 2px solid var(--card); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); z-index: 2; pointer-events: none; }
 .stop-name { flex: 1; min-width: 0; display: flex; flex-direction: column; padding-left: 4px; font-size: 1rem; }
 .stop.open .stop-name { font-weight: 700; }

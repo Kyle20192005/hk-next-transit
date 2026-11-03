@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BusStabilizer, busDistanceTo, busFraction, hourlySlot, labelEtas, scheduleBuses, trackBuses, trackLine, type Calendar, type Variant } from '../src';
+import { BusStabilizer, busDistanceTo, busFraction, hourlySlot, labelEtas, mergeScheduleBuses, scheduleBuses, trackBuses, trackLine, type Calendar, type Variant } from '../src';
 
 const now = Date.parse('2026-11-03T12:00:00+08:00');
 const m = (min: number) => now + min * 60_000;
@@ -143,6 +143,24 @@ describe('scheduleBuses', () => {
     expect(buses).toEqual([
       { from: 1, nextEta: Date.parse('2026-11-03T02:10:00Z') }, // 10:00 開，10:05 過第一站
       { from: 0, nextEta: Date.parse('2026-11-03T02:09:00Z') }, // 10:04 開
+    ]);
+  });
+});
+
+describe('mergeScheduleBuses', () => {
+  it('實時車剔走位置最接近嘅時間表班次，剩低嘅標 schedule', () => {
+    const t = Date.parse('2026-11-03T12:00:00Z');
+    const seg = [300, 300, 300];
+    const live = [{ from: 1, nextEta: t + 100_000 }];
+    const sched = [
+      { from: 1, nextEta: t + 60_000 }, // 同實時車差 40 秒：當係同一架
+      { from: 0, nextEta: t + 200_000 },
+      { from: 2, nextEta: t + 30_000 },
+    ];
+    expect(mergeScheduleBuses(live, sched, seg, t)).toEqual([
+      { from: 2, nextEta: t + 30_000, schedule: true },
+      { from: 1, nextEta: t + 100_000 },
+      { from: 0, nextEta: t + 200_000, schedule: true },
     ]);
   });
 });

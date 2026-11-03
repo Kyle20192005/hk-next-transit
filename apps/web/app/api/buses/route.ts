@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { etasAtStop, scheduleBuses, trackLine, variantStops } from '@hknt/core';
+import { etasAtStop, mergeScheduleBuses, scheduleBuses, trackLine, variantStops } from '@hknt/core';
 import { getCalendar, getRoute } from '@/lib/data';
 import { coParam, SAFE_ROUTE } from '@/lib/params';
 import { segmentsNow } from '@/lib/journey';
@@ -27,25 +27,6 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const stops = variantStops(v);
 
-  // 新大嶼山巴士：大部分車冇 GPS，到站時間係時間表時間（相鄰站之間仲會自相矛盾），追蹤唔到；
-  // 改用政府時間表推算位置
-  if (data.company === 'NLB') {
-    // 時間表本身係平均，用平均行車時間（而家時段實測樣本少，個別段會好離譜）
-    const segSeconds = v.segSeconds ?? (await segmentsNow(v, stops, calendar, now)).segSeconds;
-    return NextResponse.json(
-      {
-        route: data.route,
-        variant: v.id,
-        fetchedAt: now.toISOString(),
-        segSeconds,
-        hourlySegments: 0,
-        source: 'schedule',
-        buses: scheduleBuses(v, calendar, segSeconds, now).map((b) => ({ from: b.from, nextEta: new Date(b.nextEta).toISOString(), company: 'NLB' })),
-      },
-      { headers: { ...CORS, 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=10' } },
-    );
-  }
-
   let perStop;
   try {
     perStop = await Promise.all(stops.map((s) => etasAtStop(data, s.stopId, calendar, liveFetch).catch(() => [])));
@@ -60,14 +41,22 @@ export async function GET(req: NextRequest) {
   const stopEtas = perStop.map((etas, i) => {
     const s = stops[i]!;
     return etas
-      .filter((e) => e.dir === s.dir && e.eta && !e.scheduled)
+      // 冇 GPS 嘅時間（新大嶼山巴士 noGPS）只係時間表，唔用嚟追蹤
+      .filter((e) => e.dir === s.dir && e.eta && !e.scheduled && !e.noGps)
       .filter((e) => e.variant?.variantId === v.id || (!e.variant?.variantId && e.seq === s.seq))
       .map((e) => Date.parse(e.eta!));
   });
 
   // 行車時間：先用而家時段嘅實測，再用 ETA 本身嘅時間差修正（令位置同到站時間一致）
   const { segSeconds: hourlySeg, hourly } = await segmentsNow(v, stops, calendar, now);
-  const { buses, segSeconds } = trackLine(stopEtas, hourlySeg, now.getTime());
+  const tracked = trackLine(stopEtas, hourlySeg, now.getTime());
+  const { segSeconds } = tracked;
+  // 新大嶼山巴士：好多車冇 GPS，追蹤唔到；用政府時間表補返（同實時車重複嘅剔走），地圖半透明顯示。
+  // 時間表本身係平均，所以用平均行車時間（而家時段實測樣本少，個別段會好離譜）
+  const buses =
+    data.company === 'NLB'
+      ? mergeScheduleBuses(tracked.buses, scheduleBuses(v, calendar, v.segSeconds ?? segSeconds, now), segSeconds, now.getTime())
+      : tracked.buses;
 
   return NextResponse.json(
     {
@@ -82,6 +71,7 @@ export async function GET(req: NextRequest) {
         nextEta: new Date(b.nextEta).toISOString(),
         company: companyAt[b.from + 1]?.get(b.nextEta) ?? data.company,
         gps: gpsAt[b.from + 1]?.get(b.nextEta),
+        ...(b.schedule ? { schedule: true } : {}),
       })),
       // ?debug=1：每個站屬於呢個走法嘅 ETA，方便檢查追蹤結果
       ...(q.get('debug') === '1' ? { stopEtas: stopEtas.map((l, i) => ({ stop: stops[i]!.stopId, etas: l.map((t) => new Date(t).toISOString()) })) } : {}),

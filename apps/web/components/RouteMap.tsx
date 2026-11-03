@@ -194,13 +194,13 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
           keyboard: false,
           zIndexOffset: 1000,
           icon: L.divIcon({
-            className: 'map-bus',
+            className: b.schedule ? 'map-bus is-schedule' : 'map-bus',
             iconSize: [28, 28],
             iconAnchor: [14, 14],
             html: `<span style="background:${(multiCompany && companyColor(b.company)) || busColor}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="${multiCompany && b.company ? companyInk(b.company) : ink}" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>`,
           }),
         })
-          .bindTooltip(mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`, { direction: 'top', offset: [0, -12] })
+          .bindTooltip((b.schedule ? '按時間表估計：' : '') + (mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`), { direction: 'top', offset: [0, -12] })
           .addTo(busLayer);
       }
       // 打開站後第一次：調整地圖，同時睇到個站同最近嗰架車
@@ -276,11 +276,11 @@ function MapHelpText({ company, multiCompany }: { company: string; multiCompany:
     return (
       <>
         <strong>巴士位置點樣計？</strong>
-        <p>新大嶼山巴士大部分車都冇 GPS，到站時間係按時間表計，所以地圖上嘅巴士位置係<b>按時間表推算</b>：</p>
+        <p>地圖上嘅巴士位置係<b>推算</b>出嚟：</p>
         <ul>
-          <li>由政府時間表搵出已經由總站開出、未到終點嘅班次。</li>
-          <li>按開車時間同每段路嘅行車時間（實測平均）估計去到邊。</li>
-          <li>實際班次可能提早、延誤或者取消。</li>
+          <li>有 GPS 嘅車：每 20 秒讀取每個站嘅到站時間，推算佢喺邊兩個站之間。</li>
+          <li>新大嶼山巴士好多車冇 GPS，到站時間只係時間表：呢啲車<b>按政府時間表估計</b>，地圖上半透明顯示，實際可能提早、延誤或者取消。</li>
+          <li>到站時間推遲時，巴士會停喺原位，唔會倒退。</li>
         </ul>
         <p className="muted">僅供參考，以新大嶼山巴士到站時間為準。</p>
       </>

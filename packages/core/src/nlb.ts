@@ -9,7 +9,7 @@ interface NlbEtaRaw {
   routeVariantName: string;
   /** 1 = 已經由總站開出 */
   departed: number;
-  /** 1 = 冇 GPS。新巴大部分車都係 1，開出咗嘅車時間仍然按實際開車計，可以用嚟推算位置 */
+  /** 1 = 冇 GPS，時間係時間表時間；0 = 按巴士 GPS 計（未開出都可以係 0，即係架車喺總站） */
   noGPS: number;
 }
 
@@ -39,7 +39,9 @@ export async function fetchNlbEta(
       destEn: '',
       remarkTc: r.routeVariantName ?? '',
       remarkEn: '',
-      // 未開出 = 時間表時間（介面標「原定」，唔用嚟推算位置）；開出咗就當實時
-      scheduled: r.departed !== 1,
+      // 冇 GPS 又未開出 = 純時間表時間（介面標「原定」）
+      scheduled: r.noGPS === 1 && r.departed !== 1,
+      // 冇 GPS：開出咗都只係時間表時間（相鄰站仲會矛盾），唔用嚟追蹤位置
+      noGps: r.noGPS === 1,
     }));
 }

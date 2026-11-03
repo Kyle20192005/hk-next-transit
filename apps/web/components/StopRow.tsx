@@ -11,6 +11,8 @@ import { COMPANIES } from '@/lib/company';
  */
 export interface RowBus {
   key: number;
+  /** 按時間表推算（冇實時數據）：半透明 */
+  schedule?: boolean;
   half: 'below' | 'above';
   t: number;
   label: string;
@@ -73,7 +75,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
   return (
     <li className={`stop${open ? ' open' : ''}${terminus ? ' terminus' : ''}`} ref={ref}>
       {buses.map((b) => (
-        <span key={b.key} className="tl-bus" style={{ top: busTop(b), ...(b.color ? { background: b.color, color: b.ink } : {}) }} title={b.label} aria-hidden="true">
+        <span key={b.key} className={`tl-bus${b.schedule ? ' is-schedule' : ''}`} style={{ top: busTop(b), ...(b.color ? { background: b.color, color: b.ink } : {}) }} title={b.label} aria-hidden="true">
           <BusIcon />
         </span>
       ))}

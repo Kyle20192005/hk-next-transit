@@ -134,9 +134,9 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
       try {
         const res = await fetch(`/api/buses?co=${co}&route=${encodeURIComponent(route)}&v=${selectedVariantId}`);
         if (!res.ok) return;
-        const body = (await res.json()) as { buses: { from: number; nextEta: string; company?: string; gps?: { lat: number; lng: number } }[]; segSeconds: number[] };
+        const body = (await res.json()) as { buses: { from: number; nextEta: string; company?: string; gps?: { lat: number; lng: number }; schedule?: boolean }[]; segSeconds: number[] };
         if (cancelled) return;
-        setLive({ buses: body.buses.map((b) => ({ from: b.from, nextEta: Date.parse(b.nextEta), company: b.company, gps: b.gps })), segSeconds: body.segSeconds });
+        setLive({ buses: body.buses.map((b) => ({ from: b.from, nextEta: Date.parse(b.nextEta), company: b.company, gps: b.gps, schedule: b.schedule })), segSeconds: body.segSeconds });
       } catch {
         /* 下次再試 */
       }
@@ -233,8 +233,8 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
       // 兩站之間：前半段畫喺上一個站嗰行嘅下半，後半段畫喺下一個站嗰行嘅上半
       const [row, half, t] = f < 0.5 ? [from, 'below' as const, f * 2] : [from + 1, 'above' as const, (f - 0.5) * 2];
       const mins = Math.max(0, Math.round((bus.nextEta - busNow) / 60000));
-      const label = mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`;
-      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label, color: companyColor(multiCompany ? (bus.company ?? company) : company), ink: companyInk(multiCompany ? (bus.company ?? company) : company) }]);
+      const label = (bus.schedule ? '按時間表估計：' : '') + (mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`);
+      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label, schedule: bus.schedule, color: companyColor(multiCompany ? (bus.company ?? company) : company), ink: companyInk(multiCompany ? (bus.company ?? company) : company) }]);
     }
     return out;
   }, [live, busNow, stabilizer, stops, multiCompany, company]);

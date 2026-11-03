@@ -20,6 +20,8 @@ export interface TrackedBus {
   company?: string;
   /** 營辦商提供嘅真實位置（港鐵巴士）；有就地圖直接用，唔使推算 */
   gps?: { lat: number; lng: number };
+  /** 按時間表推算（冇實時數據）：地圖半透明顯示 */
+  schedule?: boolean;
 }
 
 /** 一架車喺上游站嘅 ETA 同預期差幾多都當係同一架（毫秒）：最少 2 分鐘，或者呢段行車時間嘅一半 */
@@ -252,4 +254,31 @@ export function scheduleBuses(variant: Variant, calendar: Calendar, segSeconds: 
   }
   // 同 trackLine 一樣：由最前（最遠）嘅車排到最後
   return out.sort((a, b) => b.from - a.from || a.nextEta - b.nextEta);
+}
+
+/**
+ * 合併實時追蹤到嘅車同按時間表推算嘅車（新大嶼山巴士：有啲車有 GPS、有啲冇）。
+ * 每架實時車剔走沿線位置最接近（相差 toleranceMs 內）嘅時間表班次，避免同一架車出兩次；
+ * 剩低嘅時間表班次標 schedule。
+ */
+export function mergeScheduleBuses(
+  live: TrackedBus[],
+  scheduled: TrackedBus[],
+  segSeconds: number[],
+  now: number,
+  toleranceMs = 5 * 60_000,
+): TrackedBus[] {
+  const cum = [0];
+  for (const s of segSeconds) cum.push(cum[cum.length - 1]! + s * 1000);
+  const progress = (b: TrackedBus) => cum[b.from + 1]! - (b.nextEta - now);
+  const left = scheduled.map((b) => ({ b, p: progress(b) }));
+  for (const b of live) {
+    const p = progress(b);
+    let best = -1;
+    left.forEach((x, i) => {
+      if (Math.abs(x.p - p) <= toleranceMs && (best < 0 || Math.abs(x.p - p) < Math.abs(left[best]!.p - p))) best = i;
+    });
+    if (best >= 0) left.splice(best, 1);
+  }
+  return [...live, ...left.map((x) => ({ ...x.b, schedule: true }))].sort((a, b) => b.from - a.from || a.nextEta - b.nextEta);
 }
