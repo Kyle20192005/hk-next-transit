@@ -96,15 +96,19 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
     );
   };
-  // 已經容許過定位（唔會彈問題）：開頁就自動搵；冇指定站先自動打開
+  // 開頁自動搵最近嘅站（第一次瀏覽器會問一次權限）；由「附近」撳入嚟（指定咗站）就唔使打開
+  // 用戶拒絕過（denied）就唔再問
   useEffect(() => {
     let cancelled = false;
-    navigator.permissions
-      ?.query({ name: 'geolocation' })
-      .then((p) => {
-        if (!cancelled && p.state === 'granted') findNearest(initialOpen === null);
-      })
-      .catch(() => {});
+    const run = () => !cancelled && findNearest(initialOpen === null);
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then((p) => (p.state === 'denied' ? !cancelled && setLocating('denied') : run()))
+        .catch(run);
+    } else {
+      run();
+    }
     return () => {
       cancelled = true;
     };
@@ -232,16 +236,25 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
 
   return (
     <>
-    <div className="nearest-bar">
-      <button className="nearest-btn" onClick={() => findNearest(true)} disabled={locating === 'busy'}>
-        📍 {locating === 'busy' ? '定位中…' : '最近嘅站'}
-      </button>
-      <span className="muted" role="status">
-        {locating === 'denied' && '冇定位權限，請喺瀏覽器設定容許'}
-        {locating === 'far' && '附近冇呢條線嘅站（1.5 公里內）'}
-        {locating === 'error' && '攞唔到位置，請再試'}
-        {locating === 'idle' && nearest && `最近：${stops[nearest.index]?.name}`}
+    <div className="nearest-bar" role="status">
+      <span className="nearest-text">
+        📍{' '}
+        {locating === 'busy' && '搵緊最近嘅站…'}
+        {locating === 'denied' && '開咗定位就會自動打開最近嘅站'}
+        {locating === 'far' && '附近 1.5 公里內冇呢條線嘅站'}
+        {locating === 'error' && '攞唔到位置'}
+        {locating === 'idle' && nearest && (
+          <>
+            最近：<b>{stops[nearest.index]?.name}</b> · {formatDistance(nearest.metres)}
+          </>
+        )}
+        {locating === 'idle' && !nearest && '最近嘅站'}
       </span>
+      {locating !== 'busy' && (
+        <button className="link-btn" onClick={() => findNearest(true)}>
+          {nearest ? '重新定位' : '定位'}
+        </button>
+      )}
     </div>
     <ol className="stops" style={{ ['--line-color' as string]: companyColor(company) ?? 'var(--route-line)' }}>
       {stops.map((s, i) => {
