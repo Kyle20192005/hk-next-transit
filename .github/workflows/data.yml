@@ -1,0 +1,38 @@
+name: 更新交通數據
+
+on:
+  schedule:
+    - cron: '17 20 * * *'   # 每日香港時間 04:17（UTC 20:17）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data
+  cancel-in-progress: false
+
+jobs:
+  build-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: 下載原始數據
+        run: python3 pipeline/fetch.py
+      - name: 生成數據
+        run: python3 pipeline/build.py
+      - name: 發佈到 data 分支
+        # 用獨立分支，唔會令 main 嘅 git 歷史越嚟越大。
+        # 網頁版設定 DATA_BASE_URL=https://raw.githubusercontent.com/<owner>/<repo>/data
+        run: |
+          cd pipeline/out
+          git init -q -b data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "數據更新 $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data

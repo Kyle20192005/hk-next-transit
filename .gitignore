@@ -1,0 +1,11 @@
+node_modules/
+.next/
+dist/
+.turbo/
+.expo/
+*.tsbuildinfo
+.env*.local
+# pipeline 中間檔（下載嘅原始數據）
+pipeline/cache/
+pipeline/out/
+__pycache__/
