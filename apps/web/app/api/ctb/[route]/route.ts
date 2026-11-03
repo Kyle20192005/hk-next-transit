@@ -8,6 +8,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ route: string 
   const data = await getCtbRoute(route);
   if (!data) return NextResponse.json({ error: `搵唔到城巴 ${route}` }, { status: 404, headers: CORS });
   return NextResponse.json(data, {
-    headers: { ...CORS, 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' },
+    headers: { ...CORS, 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' },
   });
 }

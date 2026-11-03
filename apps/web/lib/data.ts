@@ -36,10 +36,31 @@ function remote(file: string): { url: string; headers: Record<string, string>; v
   return { url: `${BASE}/${file}`, headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}, via: 'url' };
 }
 
+/** 數據版本（index.json 嘅 generatedAt）檢查頻率 */
+const VERSION_REVALIDATE_S = 300;
+
+/**
+ * 數據版本：用嚟做 cache key。Vercel 嘅 fetch cache 喺重新部署之後都會保留，
+ * 如果淨係靠時間過期，數據更新咗都要等成個鐘先見到；加版本落網址，數據一更新就用新嘅。
+ */
+async function dataVersion(): Promise<string> {
+  const { url, headers } = remote('ctb/index.json');
+  try {
+    const res = await fetch(url, { headers, next: { revalidate: VERSION_REVALIDATE_S } });
+    if (!res.ok) return '';
+    return ((await res.json()) as RouteIndex).generatedAt ?? '';
+  } catch {
+    return '';
+  }
+}
+
 async function load<T>(file: string): Promise<T | null> {
   if (BASE) {
-    const { url, headers } = remote(file);
-    const res = await fetch(url, { headers, next: { revalidate: 3600 } });
+    const { url: base, headers } = remote(file);
+    const isIndex = file === 'ctb/index.json';
+    const version = isIndex ? '' : await dataVersion();
+    const url = version ? `${base}${base.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}` : base;
+    const res = await fetch(url, { headers, next: { revalidate: isIndex ? VERSION_REVALIDATE_S : 86400 } });
     if (res.status === 404) {
       // 私人 repo 冇權限時 GitHub 都係回 404，所以要寫 log，唔好靜靜雞當冇數據
       console.warn(`[data] ${file}：404（檔案唔存在，或者冇權限讀取）`);
