@@ -72,3 +72,52 @@ export function serviceSummary(variant: Variant, calendar: Calendar, at: Date): 
     headwayMax: gaps.length ? Math.max(...gaps) : null,
   };
 }
+
+/** 時間表一個時段：start–end 每 headway 分鐘一班；單一班次 headway = null */
+export interface TimetablePeriod {
+  start: number;
+  end: number;
+  headway: number | null;
+}
+
+/**
+ * 將開車時間（由午夜起計分鐘）還原做時段：最少三班、相隔一樣嘅連續班次併做一段，
+ * 例如 06:00、06:08、06:16 → 06:00–06:16 每 8 分鐘；段與段首尾相接（同 GTFS frequencies 一樣）。
+ * 唔成段嘅零散班次逐班列出（headway = null）。
+ */
+export function timetablePeriods(departures: number[]): TimetablePeriod[] {
+  const deps = [...new Set(departures)].sort((a, b) => a - b);
+  const n = deps.length;
+  const gap = (k: number) => deps[k + 1]! - deps[k]!;
+  const out: TimetablePeriod[] = [];
+  let shared = false; // deps[i] 係咪已經係上一段嘅尾班
+  let i = 0;
+  while (i < n) {
+    if (i + 2 < n && gap(i) === gap(i + 1)) {
+      let j = i + 2;
+      while (j + 1 < n && gap(j) === gap(i)) j++;
+      out.push({ start: deps[i]!, end: deps[j]!, headway: gap(i) });
+      i = j;
+      shared = true;
+      if (i === n - 1) break;
+      continue;
+    }
+    if (!shared) out.push({ start: deps[i]!, end: deps[i]!, headway: null });
+    shared = false;
+    i++;
+  }
+  return out;
+}
+
+/** 服務日子文字：例如「星期一至五」、「星期六」、「星期日及公眾假期」 */
+export function serviceDaysLabel(days: boolean[]): string {
+  const names = ['一', '二', '三', '四', '五', '六', '日'];
+  const on = days.map((d, i) => (d ? i : -1)).filter((i) => i >= 0);
+  if (!on.length) return '特別日子';
+  if (on.length === 7) return '每日';
+  if (on.length === 1 && on[0] === 6) return '星期日及公眾假期';
+  // 連續日子用「至」
+  const contiguous = on.every((d, k) => k === 0 || d === on[k - 1]! + 1);
+  if (contiguous && on.length > 2) return `星期${names[on[0]!]}至${names[on[on.length - 1]!]}`;
+  return `星期${on.map((i) => names[i]).join('、')}`;
+}

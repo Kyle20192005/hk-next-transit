@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation';
 import {
   fmtMinutes,
   serviceWindow,
-  serviceSummary,
+  activeServiceIds,
+  hkParts,
   formatFare,
   joyYouFare,
   smoothLine,
@@ -20,6 +21,7 @@ import {
 import { getCalendar, getRoute, isCo, type Co } from '@/lib/data';
 import { COMPANIES } from '@/lib/company';
 import StopList from '@/components/StopList';
+import TimetableDrawer from '@/components/TimetableDrawer';
 import VariantPicker, { type VariantItem } from '@/components/VariantPicker';
 import RouteMap, { type MapLine, type MapStop } from '@/components/RouteMapLazy';
 
@@ -92,24 +94,14 @@ export default async function RoutePage({ params, searchParams }: Props) {
     const adult = i < stops.length - 1 ? selected?.fares?.[s.stopId] : undefined;
     return adult === undefined ? null : { adult: formatFare(adult), joyYou: joyYou ? formatFare(joyYouFare(adult)) : null };
   });
-  // 服務時間同班次（揀咗嘅走法，今日）
-  const summary = selected ? serviceSummary(selected, calendar, now) : null;
-  const hw = summary?.headwayNow ?? null;
-  const serviceLine = summary
-    ? [
-        `${fmtMinutes(summary.first)}–${summary.last >= 1440 ? '翌日' : ''}${fmtMinutes(summary.last)}`,
-        hw !== null
-          ? `約 ${hw} 分鐘一班`
-          : summary.headwayMin !== null && summary.headwayMax !== null
-            ? summary.headwayMin === summary.headwayMax
-              ? `${summary.headwayMin} 分鐘一班`
-              : `${summary.headwayMin}–${summary.headwayMax} 分鐘一班`
-            : '每日一班',
-        ...(joyYou ? [] : ['不設樂悠咭優惠']),
-      ].join(' · ')
-    : joyYou
-      ? null
-      : '不設樂悠咭優惠';
+  // 標題列第二行：只喺唔適用樂悠咭時提示；詳細班次放喺右邊 drawer
+  const serviceLine = joyYou ? null : '不設樂悠咭優惠';
+  // 詳細班次 drawer：呢個方向所有走法嘅時間表，同埋用到嘅服務日曆
+  const drawerVariants = sorted.map(({ variant: x }) => ({ id: x.id, label: variantLabel(x), special: x.special, schedules: x.schedules }));
+  const usedServices = new Set(drawerVariants.flatMap((x) => x.schedules.map((sc) => sc.serviceId)));
+  const drawerCalendar = Object.fromEntries(Object.entries(calendar).filter(([id]) => usedServices.has(id)));
+  const todayServiceIds = [...activeServiceIds(drawerCalendar, now)];
+  const nowMinutes = hkParts(now).minutes;
   const dest = stops[stops.length - 1]?.name;
   // 平均行車時間：攞到即時數據之前先用
   const segSeconds = selected?.segSeconds ?? null;
@@ -158,6 +150,14 @@ export default async function RoutePage({ params, searchParams }: Props) {
             </span>
             {serviceLine && <span className="route-service">{serviceLine}</span>}
           </span>
+          <TimetableDrawer
+            key={`${dir}-${selected?.id}`}
+            variants={drawerVariants}
+            selectedId={selected?.id ?? null}
+            calendar={drawerCalendar}
+            todayServiceIds={todayServiceIds}
+            nowMinutes={nowMinutes}
+          />
           {other && (
             <Link
               className="swap"

@@ -148,7 +148,9 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 樂悠咭（`joyYouFare`）：2026-04-03 起「兩蚊兩折」，成人 $10 或以下收 $2（低過 $2 收原價），超過 $10 收兩成、四捨五入至一毫。
   唔適用：機場 A／NA、馬場（…R）、城巴旅遊 H 線、包車／預約（`pipeline/build.py` 嘅 `joyyou_ok`，政府數據冇標記，按號碼同名判斷；
   「新增長途路線」冇清單，判斷唔到）。路線檔 `joyYou: false` 時標題列寫「不設樂悠咭優惠」。
-- 標題列第二行：揀咗嘅走法今日服務時間（頭班–尾班）同而家班次（`serviceSummary`，前 30 至後 60 分鐘嘅班次相隔中位數）。
+- 詳細班次：標題列「🕒 班次」掣，撳開右邊 drawer（`components/TimetableDrawer.tsx`）。按服務日子分頁（`serviceDaysLabel`，預設今日），
+  可以揀走法；時段由開車時間還原（`timetablePeriods`：最少三班相隔一樣先併做「每 N 分鐘」，零散班次逐班列），今日而家嘅時段標「而家」並捲到。
+  標題列第二行只用嚟寫「不設樂悠咭優惠」。
 - 新增營辦商：喺 `packages/core/src/` 加 adapter，輸出統一嘅 `Eta` 類型。
 
 ## 已知未做
