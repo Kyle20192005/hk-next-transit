@@ -57,7 +57,15 @@ export interface RouteData {
 
 export interface RouteIndex {
   generatedAt: string;
-  routes: { route: string; origTc: string; destTc: string; variants: number; special: number }[];
+  routes: {
+    route: string;
+    origTc: string;
+    destTc: string;
+    /** 有邊幾個方向（O = 由 orig 往 dest，I = 回程）；只有 O 即係單向 */
+    dirs?: Dir[];
+    variants: number;
+    special: number;
+  }[];
 }
 
 /** GTFS 服務日曆 */

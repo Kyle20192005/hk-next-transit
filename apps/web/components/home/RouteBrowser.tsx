@@ -106,10 +106,7 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
                 <span className="route-num">{r.route}</span>
                 <CompanyTag company="CTB" />
               </span>
-              <span className="route-text">
-                <span className="route-to">往 {r.destTc}</span>
-                <span className="route-from">由 {r.origTc}</span>
-              </span>
+              <RouteEnds r={r} />
             </Link>
           </li>
         ))}
@@ -134,5 +131,41 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
         />
       )}
     </>
+  );
+}
+
+/**
+ * 起訖點：
+ * - 雙向：「中環 (港澳碼頭)」/「⇄ 跑馬地 (上)」
+ * - 單向：「往 X」/「由 Y」
+ * - 循環線（起訖點一樣）：「X」/「循環線」
+ */
+function RouteEnds({ r }: { r: Routes[number] }) {
+  const dirs = r.dirs ?? ['O'];
+  if (r.origTc === r.destTc) {
+    return (
+      <span className="route-text">
+        <span className="route-to">{r.origTc}</span>
+        <span className="route-from">循環線</span>
+      </span>
+    );
+  }
+  if (dirs.includes('O') && dirs.includes('I')) {
+    return (
+      <span className="route-text" aria-label={`來往 ${r.origTc} 及 ${r.destTc}`}>
+        <span className="route-to">{r.origTc}</span>
+        <span className="route-to">
+          <span className="route-arrow" aria-hidden="true">⇄</span> {r.destTc}
+        </span>
+      </span>
+    );
+  }
+  // 單向：只有回程（I）就倒轉
+  const [from, to] = dirs.includes('I') ? [r.destTc, r.origTc] : [r.origTc, r.destTc];
+  return (
+    <span className="route-text">
+      <span className="route-to">往 {to}</span>
+      <span className="route-from">由 {from}</span>
+    </span>
   );
 }

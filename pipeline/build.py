@@ -314,7 +314,7 @@ def main():
             'variants': vs,
         }
         json.dump(data, open(f'{OUT}/ctb/{rno}.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
-        index.append({'route': rno, 'origTc': data['origTc'], 'destTc': data['destTc'],
+        index.append({'route': rno, 'origTc': data['origTc'], 'destTc': data['destTc'], 'dirs': sorted(dirs, reverse=True),
                       'variants': len(vs), 'special': sum(v['special'] for v in vs)})
     # 城巴有但政府冇嘅路線：照出（冇走法資料）
     for rno, info in rinfo.items():
@@ -326,7 +326,8 @@ def main():
                    'stops': {s: cstops[s] for s in sorted(rstops)}, 'directions': dirs,
                    'ctbOnlyStops': [], 'variants': []},
                   open(f'{OUT}/ctb/{rno}.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
-        index.append({'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'], 'variants': 0, 'special': 0})
+        index.append({'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'], 'dirs': sorted(dirs, reverse=True),
+                      'variants': 0, 'special': 0})
     index.sort(key=lambda r: (re.sub(r'\D', '', r['route']).zfill(4) if re.match(r'^\d', r['route']) else 'Z' + r['route'], r['route']))
     # 站點索引（附近車站用）：每個城巴站有邊幾條路線、邊個方向、往邊度
     by_stop = collections.defaultdict(list)
