@@ -49,13 +49,14 @@ export async function GET(req: NextRequest) {
 
   // 行車時間：先用而家時段嘅實測，再用 ETA 本身嘅時間差修正（令位置同到站時間一致）
   const { segSeconds: hourlySeg, hourly } = await segmentsNow(v, stops, calendar, now);
-  const tracked = trackLine(stopEtas, hourlySeg, now.getTime());
+  // 新大嶼山巴士用平均行車時間：時間表推算嘅車都要用同一套，前端先推得準（有 GPS 嘅段 trackLine 會用 ETA 時間差修正）
+  const baseSeg = data.company === 'NLB' && v.segSeconds ? v.segSeconds : hourlySeg;
+  const tracked = trackLine(stopEtas, baseSeg, now.getTime());
   const { segSeconds } = tracked;
-  // 新大嶼山巴士：好多車冇 GPS，追蹤唔到；用政府時間表補返（同實時車重複嘅剔走），地圖半透明顯示。
-  // 時間表本身係平均，所以用平均行車時間（而家時段實測樣本少，個別段會好離譜）
+  // 新大嶼山巴士：好多車冇 GPS，追蹤唔到；用政府時間表補返（同實時車重複嘅剔走），地圖半透明顯示
   const buses =
     data.company === 'NLB'
-      ? mergeScheduleBuses(tracked.buses, scheduleBuses(v, calendar, v.segSeconds ?? segSeconds, now), segSeconds, now.getTime())
+      ? mergeScheduleBuses(tracked.buses, scheduleBuses(v, calendar, baseSeg, now), segSeconds, now.getTime())
       : tracked.buses;
 
   return NextResponse.json(
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
       fetchedAt: now.toISOString(),
       segSeconds,
       /** 有幾多段用咗而家時段嘅實測行車時間（其餘用平均） */
-      hourlySegments: hourly,
+      hourlySegments: baseSeg === hourlySeg ? hourly : 0,
       buses: buses.map((b) => ({
         from: b.from,
         nextEta: new Date(b.nextEta).toISOString(),
