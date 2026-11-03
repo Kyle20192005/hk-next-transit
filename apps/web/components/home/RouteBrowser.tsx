@@ -135,37 +135,29 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
 }
 
 /**
- * 起訖點：
- * - 雙向：「中環 (港澳碼頭)」/「⇄ 跑馬地 (上)」
- * - 單向：「往 X」/「由 Y」
- * - 循環線（起訖點一樣）：「X」/「循環線」
+ * 起訖點：三種路線用同一個格式（一句，太長自然斷行），用箭嘴分方向：
+ * - 雙向：「中環 (港澳碼頭) ⇄ 跑馬地 (上)」
+ * - 單向：「黃泥涌道 (樂活道) → 中環」
+ * - 循環線（起訖點一樣）：「中環 (天星碼頭) ↻ 循環線」
  */
 function RouteEnds({ r }: { r: Routes[number] }) {
   const dirs = r.dirs ?? ['O'];
+  let from = r.origTc;
+  let to = r.destTc;
+  let arrow = '⇄';
+  let label = `來往 ${from} 及 ${to}`;
   if (r.origTc === r.destTc) {
-    return (
-      <span className="route-text">
-        <span className="route-to">{r.origTc}</span>
-        <span className="route-from">循環線</span>
-      </span>
-    );
+    to = '循環線';
+    arrow = '↻';
+    label = `${from} 循環線`;
+  } else if (!(dirs.includes('O') && dirs.includes('I'))) {
+    if (dirs.includes('I')) [from, to] = [r.destTc, r.origTc]; // 只有回程就倒轉
+    arrow = '→';
+    label = `由 ${from} 往 ${to}`;
   }
-  if (dirs.includes('O') && dirs.includes('I')) {
-    return (
-      <span className="route-text" aria-label={`來往 ${r.origTc} 及 ${r.destTc}`}>
-        <span className="route-to">{r.origTc}</span>
-        <span className="route-to">
-          <span className="route-arrow" aria-hidden="true">⇄</span> {r.destTc}
-        </span>
-      </span>
-    );
-  }
-  // 單向：只有回程（I）就倒轉
-  const [from, to] = dirs.includes('I') ? [r.destTc, r.origTc] : [r.origTc, r.destTc];
   return (
-    <span className="route-text">
-      <span className="route-to">往 {to}</span>
-      <span className="route-from">由 {from}</span>
+    <span className="route-text route-ends" aria-label={label}>
+      {from} <span className="route-arrow" aria-hidden="true">{arrow}</span> {to}
     </span>
   );
 }
