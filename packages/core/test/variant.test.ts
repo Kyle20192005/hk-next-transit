@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sortVariants, statusText, variantStops, variantsForDir, shortName, type Calendar, type RouteData } from '../src';
+import { variantLabel, sortVariants, statusText, variantStops, variantsForDir, shortName, type Calendar, type RouteData } from '../src';
 import route38 from './fixtures/ctb-38.json';
 import calendar38 from './fixtures/calendar-38.json';
 
@@ -47,5 +47,11 @@ describe('走法站點', () => {
   it('簡稱', () => {
     expect(shortName(v('1540-1'))).toBe('不經華富');
     expect(shortName(v('1000305-1'))).toBe('銅鑼灣(中央圖書館) - 置富');
+  });
+
+  it('顯示名稱：正常路線只加走法描述，唔加目的地', () => {
+    expect(variantLabel(v('1000304-1'))).toBe('正常路線（經華富）');
+    expect(variantLabel(v('1540-1'))).toBe('不經華富');
+    expect(variantLabel({ name: '華貴 - 中環(交易廣場)', special: false })).toBe('正常路線');
   });
 });

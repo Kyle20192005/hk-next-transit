@@ -8,6 +8,16 @@ export function shortName(v: Pick<Variant, 'name'>): string {
   return m?.[1] ?? v.name;
 }
 
+/**
+ * 走法顯示名稱：正常走法叫「正常路線」；括號入面係走法描述（例如「經華富」）先加埋，
+ * 目的地（例如 70 號嘅「交易廣場」）唔加。特別班用簡稱。
+ */
+export function variantLabel(v: Pick<Variant, 'name' | 'special'>): string {
+  const short = shortName(v);
+  if (v.special) return short;
+  return short !== v.name && /經|繞|不/.test(short) ? `正常路線（${short}）` : '正常路線';
+}
+
 /** 呢個方向有邊幾個走法（循環線嘅走法兩個方向都會出現） */
 export function variantsForDir(route: RouteData, dir: Dir): Variant[] {
   return route.variants.filter((v) => v.stopDirs.includes(dir));

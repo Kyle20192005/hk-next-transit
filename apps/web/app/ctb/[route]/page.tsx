@@ -10,7 +10,7 @@ import {
   variantStops,
   variantsForDir,
   type Dir,
-  type Variant,
+  variantLabel,
 } from '@hknt/core';
 import { getCalendar, getCtbRoute } from '@/lib/data';
 import StopRow from '@/components/StopRow';
@@ -137,12 +137,3 @@ export default async function RoutePage({ params, searchParams }: Props) {
   );
 }
 
-/**
- * 正常走法叫「正常路線」；括號入面係走法描述（例如「經華富」）先加埋，
- * 目的地（例如 70 號嘅「交易廣場」）唔加。
- */
-function variantLabel(v: Variant): string {
-  const short = shortName(v);
-  if (v.special) return short;
-  return short !== v.name && /經|繞|不/.test(short) ? `正常路線（${short}）` : '正常路線';
-}
