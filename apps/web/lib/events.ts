@@ -24,3 +24,13 @@ export function publishBuses(detail: BusesDetail) {
 export function latestBuses(): BusesDetail | null {
   return lastBuses;
 }
+
+/** 最後一次「地圖放大去某個站」：地圖延遲載入時補返（例如由「附近」撳入嚟、一開頁就打開咗站） */
+let lastFocus: number | null = null;
+export function publishFocus(index: number) {
+  lastFocus = index;
+  window.dispatchEvent(new CustomEvent(FOCUS_STOP_EVENT, { detail: index }));
+}
+export function latestFocus(): number | null {
+  return lastFocus;
+}

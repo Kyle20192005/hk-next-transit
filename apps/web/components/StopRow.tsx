@@ -2,14 +2,22 @@
 import { forwardRef } from 'react';
 import { formatDistance, shortName, type Eta } from '@hknt/core';
 
+/** 時間線上嘅巴士：top = 喺呢行入面嘅垂直位置（百分比） */
+export interface RowBus {
+  key: number;
+  top: number;
+  label: string;
+}
+
 type Props = {
   index: number;
   name: string;
+  terminus: boolean;
   open: boolean;
   onToggle: () => void;
   /** 打開咗先有：到站時間 */
   etas: Eta[] | null;
-  /** 每班車而家喺邊（同 etas 對應），例如「距離 3 個站」 */
+  /** 每班車而家喺邊（同 etas 對應），例如「距離 3 個站 · 1.2 公里」 */
   whereLabels: (string | null)[] | null;
   error: string | null;
   now: number;
@@ -20,20 +28,44 @@ type Props = {
   travelMetres: number | null;
   /** 下一班車預計幾時到呢個站（毫秒） */
   nextArrival: number | null;
+  /** 喺呢行時間線上顯示嘅巴士 */
+  buses: RowBus[];
 };
 
 const hhmm = (ms: number) =>
   new Date(ms).toLocaleTimeString('zh-HK', { timeZone: 'Asia/Hong_Kong', hour: '2-digit', minute: '2-digit', hour12: false });
 
-/** 一個站。開定收、到站時間由 StopList 控制。 */
+const BUS_SVG = (
+  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+    <path fill="#fff" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z" />
+  </svg>
+);
+
+/** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, name, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, travelMetres, nextArrival },
+  { index, name, terminus, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, travelMetres, nextArrival, buses },
   ref,
 ) {
+  const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null })) ?? null;
+  // 下一班：揀咗嘅走法（或者推斷唔到走法）最早嗰班；其餘列喺下面
+  const isMine = (e: Eta) => !selectedVariantId || !e.variant?.variantId || e.variant.variantId === selectedVariantId;
+  const next = list?.find((x) => isMine(x.e)) ?? null;
+  const rest = list?.filter((x) => x !== next) ?? [];
+  const minsOf = (e: Eta) => Math.max(0, Math.round((Date.parse(e.eta!) - now) / 60000));
+
   return (
-    <li className={`stop${open ? ' open' : ''}`} ref={ref}>
+    <li className={`stop${open ? ' open' : ''}${terminus ? ' terminus' : ''}`} ref={ref}>
       <button onClick={onToggle} aria-expanded={open}>
         <span className="seq">{index + 1}</span>
+        <span className="tl" aria-hidden="true">
+          <span className="tl-line" />
+          <span className="tl-dot" />
+          {buses.map((b) => (
+            <span key={b.key} className="tl-bus" style={{ top: `${b.top}%` }} title={b.label}>
+              {BUS_SVG}
+            </span>
+          ))}
+        </span>
         <span className="stop-name">
           {name}
           {travelSeconds !== null && travelSeconds > 0 && (
@@ -48,28 +80,44 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
       {open && (
         <div className="etas" aria-live="polite">
           {error && <div className="muted">載入失敗：{error}</div>}
-          {!error && etas === null && <div className="muted">載入中…</div>}
-          {!error && etas?.length === 0 && <div className="muted">暫時冇班次</div>}
-          {etas?.map((e, i) => {
-            const mins = Math.max(0, Math.round((Date.parse(e.eta!) - now) / 60000));
-            const v = e.variant;
-            const other = Boolean(selectedVariantId && v?.variantId && v.variantId !== selectedVariantId);
-            return (
-              <div className={`eta-row${other ? ' other' : ''}`} key={i}>
-                <span className="eta-min">{mins === 0 ? '即將' : `${mins} 分`}</span>
-                <span className="muted">{e.eta!.slice(11, 16)}</span>
-                {/* 揀咗嘅走法唔使再標；其他走法先標出嚟 */}
-                {v?.name && (!selectedVariantId || v.variantId !== selectedVariantId) && (
-                  <span className={`badge${v.special ? ' special' : ''}`} title={v.reason}>
-                    {v.special ? shortName({ name: v.name }) : '正常路線'}
-                    {v.confidence === 'likely' ? '（推斷）' : ''}
-                  </span>
+          {!error && list === null && <div className="muted">載入中…</div>}
+          {!error && list?.length === 0 && <div className="muted">暫時冇班次</div>}
+          {next && (
+            <div className="eta-next">
+              <span className="eta-big">
+                {minsOf(next.e) === 0 ? '即將到站' : (
+                  <>
+                    {minsOf(next.e)}
+                    <small>分鐘</small>
+                  </>
                 )}
-                {whereLabels?.[i] && <span className="where">{whereLabels[i]}</span>}
-                {e.remarkTc && <span className="muted">{e.remarkTc}</span>}
-              </div>
-            );
-          })}
+              </span>
+              <span className="eta-time">{next.e.eta!.slice(11, 16)}</span>
+              {next.where && <span className="where">{next.where}</span>}
+            </div>
+          )}
+          {rest.length > 0 && (
+            <ul className="eta-more">
+              {rest.map(({ e, where }, i) => {
+                const v = e.variant;
+                const other = !isMine(e);
+                return (
+                  <li key={i} className={other ? 'eta-row-other' : undefined}>
+                    <span className="eta-min">{minsOf(e) === 0 ? '即將' : `${minsOf(e)} 分`}</span>
+                    <span className="eta-time">{e.eta!.slice(11, 16)}</span>
+                    {/* 揀咗嘅走法唔使再標；其他走法先標出嚟 */}
+                    {other && v?.name && (
+                      <span className={`badge${v.special ? ' special' : ''}`} title={v.reason}>
+                        {v.special ? shortName({ name: v.name }) : '正常路線'}
+                        {v.confidence === 'likely' ? '（推斷）' : ''}
+                      </span>
+                    )}
+                    {where && <span className="where">{where}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
     </li>

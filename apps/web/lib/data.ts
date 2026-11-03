@@ -88,6 +88,19 @@ export async function getCtbIndex(): Promise<RouteIndex> {
   return (await load<RouteIndex>('ctb/index.json')) ?? { generatedAt: '', routes: [] };
 }
 
+/** 站點索引（附近車站用）：每個站經過嘅路線、方向、往邊度（唔包終點站） */
+export interface StopIndexEntry {
+  id: string;
+  n: string;
+  lat: number;
+  lng: number;
+  r: [route: string, dir: 'O' | 'I', destTc: string][];
+}
+
+export async function getCtbStops(): Promise<StopIndexEntry[]> {
+  return (await load<{ stops: StopIndexEntry[] }>('ctb/stops.json'))?.stops ?? [];
+}
+
 export async function getCalendar(): Promise<Calendar> {
   return (await load<Calendar>('calendar.json')) ?? {};
 }

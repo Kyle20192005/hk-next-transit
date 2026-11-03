@@ -21,7 +21,8 @@ import RouteMap, { type MapLine, type MapStop } from '@/components/RouteMapLazy'
 
 type Props = {
   params: Promise<{ route: string }>;
-  searchParams: Promise<{ dir?: string; v?: string }>;
+  /** dir：方向；v：走法；stop：打開時自動打開嘅站（由「附近」撳入嚟） */
+  searchParams: Promise<{ dir?: string; v?: string; stop?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -38,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * 路線頁：上面（標題、方向、走法、地圖）固定，只有站點列表捲動。
  */
 export default async function RoutePage({ params, searchParams }: Props) {
-  const [{ route }, { dir: dirParam, v: vParam }] = await Promise.all([params, searchParams]);
+  const [{ route }, { dir: dirParam, v: vParam, stop: stopParam }] = await Promise.all([params, searchParams]);
   const [data, calendar] = await Promise.all([getCtbRoute(route), getCalendar()]);
   if (!data) notFound();
 
@@ -48,7 +49,9 @@ export default async function RoutePage({ params, searchParams }: Props) {
 
   // 走法：現正服務嘅排先；預設揀第一個，用戶可以用 ?v= 揀其他
   const sorted = sortVariants(variantsForDir(data, dir), calendar, now);
-  const selected = sorted.find((x) => x.variant.id === vParam)?.variant ?? sorted[0]?.variant;
+  // 指定咗站（由「附近」撳入嚟）但冇指定走法：揀第一個經過呢個站嘅走法
+  const withStop = stopParam ? sorted.find((x) => `${dir}:${stopParam}` in x.variant.expSeq)?.variant : undefined;
+  const selected = sorted.find((x) => x.variant.id === vParam)?.variant ?? withStop ?? sorted[0]?.variant;
 
   const items: VariantItem[] = sorted.map(({ variant: v, status }) => {
     const w = serviceWindow(v, calendar, now);
@@ -72,6 +75,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
   // 平均行車時間：攞到即時數據之前先用
   const segSeconds = selected?.segSeconds ?? null;
   const other = dirs.find((d) => d !== dir);
+  const initialOpen = stopParam ? stops.findIndex((s) => s.stopId === stopParam) : -1;
 
   const mapStops: MapStop[] = stops.flatMap((s, i) => {
     const info = data.stops[s.stopId];
@@ -100,11 +104,18 @@ export default async function RoutePage({ params, searchParams }: Props) {
   return (
     <main className="route-page">
       <div className="route-top">
-        <div className="route-head">
+        <header className="route-bar">
+          <Link href="/" className="back" aria-label="返回路線列表">
+            ‹
+          </Link>
           <h1>
-            <span className="route-op">城巴</span> {data.route}
+            <small>城巴</small>
+            {data.route}
           </h1>
-          <span className="route-dest">往 {dest}</span>
+          <span className="route-dest">
+            <small>往</small>
+            {dest}
+          </span>
           {other && (
             <Link
               className="swap"
@@ -116,7 +127,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
               ⇅
             </Link>
           )}
-        </div>
+        </header>
 
         <VariantPicker key={dir} items={items} selectedId={selected?.id ?? null} />
 
@@ -124,7 +135,16 @@ export default async function RoutePage({ params, searchParams }: Props) {
       </div>
 
       <div className="route-stops card">
-        <StopList key={`${dir}-${selected?.id}`} route={data.route} stops={stops} selectedVariantId={selected?.id ?? null} segSeconds={segSeconds} cumMetres={cumMetres} />
+        <StopList
+          key={`${dir}-${selected?.id}`}
+          route={data.route}
+          stops={stops}
+          selectedVariantId={selected?.id ?? null}
+          special={selected?.special ?? false}
+          segSeconds={segSeconds}
+          cumMetres={cumMetres}
+          initialOpen={initialOpen >= 0 ? initialOpen : null}
+        />
         <p className="muted source">
           資料來源：運輸署、城巴（DATA.GOV.HK）。行車時間：
           <a href="https://github.com/HK-Bus-ETA/hk-bus-time-between-stops" target="_blank" rel="noopener">hk-bus-time-between-stops</a>（實驗性質，僅供參考）

@@ -1,23 +1,14 @@
 // 唔喺 build 時預先生成：build 時讀唔到數據會將「0 條路線」固定落頁面。
-// 數據 fetch 本身已經 cache 一個鐘（lib/data.ts），所以唔會每次都 call GitHub。
+// 數據 fetch 本身已經有 cache（lib/data.ts），所以唔會每次都 call GitHub。
 export const dynamic = 'force-dynamic';
 
 import { getCtbIndex } from '@/lib/data';
-import RouteSearch from '@/components/RouteSearch';
+import Home from '@/components/home/Home';
 
-export default async function Home() {
+export default async function Page() {
   const index = await getCtbIndex();
-  return (
-    <main>
-      <h1>城巴路線</h1>
-      <p className="muted">
-        共 {index.routes.length} 條路線
-        {index.generatedAt
-          ? `・數據更新：${new Date(index.generatedAt).toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong', dateStyle: 'medium', timeStyle: 'short' })}`
-          : '・未讀到數據'}
-      </p>
-      <RouteSearch routes={index.routes} />
-      <p className="muted source">資料來源：運輸署、城巴（DATA.GOV.HK）</p>
-    </main>
-  );
+  const updated = index.generatedAt
+    ? new Date(index.generatedAt).toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong', dateStyle: 'medium', timeStyle: 'short' })
+    : null;
+  return <Home routes={index.routes} updated={updated} />;
 }

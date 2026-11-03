@@ -328,6 +328,18 @@ def main():
                   open(f'{OUT}/ctb/{rno}.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
         index.append({'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'], 'variants': 0, 'special': 0})
     index.sort(key=lambda r: (re.sub(r'\D', '', r['route']).zfill(4) if re.match(r'^\d', r['route']) else 'Z' + r['route'], r['route']))
+    # 站點索引（附近車站用）：每個城巴站有邊幾條路線、邊個方向、往邊度
+    by_stop = collections.defaultdict(list)
+    for (rno, d), l in clists.items():
+        dest = cstops[l[-1]]['nameTc'] if l else ''
+        for sid in dict.fromkeys(l[:-1]):  # 終點站唔使列（乘客唔會喺度上車）
+            by_stop[sid].append([rno, d, dest])
+    stops_index = [
+        {'id': sid, 'n': cstops[sid]['nameTc'], 'lat': cstops[sid]['lat'], 'lng': cstops[sid]['lng'],
+         'r': sorted(rs, key=lambda x: (re.sub(r'\D', '', x[0]).zfill(4), x[0], x[1]))}
+        for sid, rs in sorted(by_stop.items())
+    ]
+    json.dump({'stops': stops_index}, open(f'{OUT}/ctb/stops.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     json.dump({'generatedAt': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'), 'routes': index},
               open(f'{OUT}/ctb/index.json', 'w', encoding='utf-8'), ensure_ascii=False)
     json.dump(load_calendar(used_services), open(f'{OUT}/calendar.json', 'w'), separators=(',', ':'))

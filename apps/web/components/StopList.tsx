@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
-import { FOCUS_STOP_EVENT, OPEN_STOP_EVENT, publishBuses } from '@/lib/events';
-import StopRow from './StopRow';
+import { BusStabilizer, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
+import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
+import StopRow, { type RowBus } from './StopRow';
 
 type Props = {
   route: string;
@@ -12,6 +12,10 @@ type Props = {
   segSeconds: number[] | null;
   /** 每個站沿走線嘅累計距離（米） */
   cumMetres: number[];
+  /** 揀咗嘅走法係咪特別班（時間線用紅色） */
+  special: boolean;
+  /** 一開頁就打開嘅站（由「附近」撳入嚟） */
+  initialOpen: number | null;
 };
 
 const ETA_REFRESH_MS = 30_000;
@@ -23,7 +27,7 @@ const BUSES_REFRESH_MS = 20_000;
  * - 打開站時：攞到站時間、地圖放大過去；每班車標示「距離 N 個站／未開出」
  * - 後面嘅站顯示由打開咗嘅站出發要幾耐，同下一班車大概幾時到
  */
-export default function StopList({ route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres }: Props) {
+export default function StopList({ route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, special, initialOpen }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +40,7 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
     setEtas(null);
     setError(null);
     if (i === null) return;
-    window.dispatchEvent(new CustomEvent(FOCUS_STOP_EVENT, { detail: i }));
+    publishFocus(i);
     // 將打開咗嘅站嘅站名對齊列表頂部（只捲站點列表，唔郁成頁）
     requestAnimationFrame(() => {
       const row = rows.current[i];
@@ -46,6 +50,11 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
       box.scrollTo({ top: Math.max(0, top - 4), behavior: 'smooth' });
     });
   };
+
+  // 一開頁就打開指定嘅站
+  useEffect(() => {
+    if (initialOpen !== null) openStop(initialOpen);
+  }, [initialOpen]);
 
   useEffect(() => {
     const onOpen = (e: Event) => openStop((e as CustomEvent<number>).detail);
@@ -140,8 +149,31 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
     return t ?? null;
   }, [etas, selectedVariantId, now]);
 
+  // 時間線上嘅巴士：每 5 秒按時間推前；同地圖一樣只准向前
+  const [busNow, setBusNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setBusNow(Date.now()), 5_000);
+    return () => clearInterval(t);
+  }, []);
+  const stabilizer = useMemo(() => new BusStabilizer(), []);
+  const rowBuses = useMemo(() => {
+    const out = new Map<number, RowBus[]>();
+    if (!live) return out;
+    const last = stops.length - 1;
+    for (const { id, bus, progress } of stabilizer.update(live.buses, live.segSeconds, busNow)) {
+      const from = Math.min(Math.floor(progress), last - 1);
+      const f = Math.min(1, progress - from);
+      // 兩站之間：前半段畫喺上一個站嗰行嘅下半，後半段畫喺下一個站嗰行嘅上半
+      const [row, top] = f < 0.5 ? [from, 50 + f * 100] : [from + 1, (f - 0.5) * 100];
+      const mins = Math.max(0, Math.round((bus.nextEta - busNow) / 60000));
+      const label = mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`;
+      out.set(row, [...(out.get(row) ?? []), { key: id, top, label }]);
+    }
+    return out;
+  }, [live, busNow, stabilizer, stops]);
+
   return (
-    <ol className="stops">
+    <ol className="stops" style={{ ['--line-color' as string]: special ? 'var(--special)' : 'var(--brand)' }}>
       {stops.map((s, i) => {
         const tr = travel?.[i] ?? null;
         return (
@@ -152,6 +184,8 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
             }}
             index={i}
             name={s.name}
+            terminus={i === 0 || i === stops.length - 1}
+            buses={rowBuses.get(i) ?? []}
             open={openIndex === i}
             onToggle={() => openStop(openIndex === i ? null : i)}
             etas={openIndex === i ? etas : null}

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { BusStabilizer, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
-import { BUSES_EVENT, FOCUS_STOP_EVENT, OPEN_STOP_EVENT, latestBuses, type BusesDetail } from '@/lib/events';
+import { BUSES_EVENT, FOCUS_STOP_EVENT, OPEN_STOP_EVENT, latestBuses, latestFocus, type BusesDetail } from '@/lib/events';
 
 export interface MapStop {
   index: number;
@@ -123,6 +123,9 @@ export default function RouteMap({ lines, stops }: Props) {
       found.marker.openTooltip();
     };
     window.addEventListener(FOCUS_STOP_EVENT, onFocus);
+    // 地圖載入之前已經打開咗站：補返放大
+    const pending = latestFocus();
+    if (pending !== null) onFocus(new CustomEvent(FOCUS_STOP_EVENT, { detail: pending }));
 
     // ---------- 巴士位置：由打開咗嘅站嘅 ETA 倒推，喺走線上顯示 ----------
     // 揀咗嘅走線駁成一條連續折線，再搵每個站喺折線上嘅位置
