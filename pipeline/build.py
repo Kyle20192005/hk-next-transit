@@ -377,7 +377,10 @@ def main():
         route_stops = {s: dict(cstops[s]) for s in sorted(rstops)}   # 複製：聯營會加 kmb 欄位
         companies = ['CTB']
         if rno in joint_rnos:
-            for sid, kid in K.attach_joint(vs, rno, kmbdata).items():
+            c2k = K.attach_joint(vs, rno, kmbdata)
+            if c2k:   # 城巴獨有站（政府冇）都要配九巴站，否則九巴時段冇班次
+                c2k.update(K.fill_ctb_only(dirs, rno, c2k, cstops, kmbdata))
+            for sid, kid in c2k.items():
                 if sid in route_stops:
                     route_stops[sid]['kmb'] = kid
             if any('kmb' in v for v in vs):

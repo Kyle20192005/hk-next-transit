@@ -61,6 +61,41 @@ def attach_joint(vs, rno, kmb):
     return ctb_to_kmb
 
 
+def fill_ctb_only(dirs, rno, ctb_to_kmb, cstops, kmb, max_m=80):
+    """
+    城巴獨有站（政府冇，例如 107 嘅黃竹坑醫院）配唔到九巴站，九巴時段就會冇班次。
+    喺城巴列表入面搵佢前後兩個已配對嘅站，喺同一條九巴列表嗰兩個站之間，揀 max_m 米內最近嘅九巴站。
+    """
+    _, kstops, klists = kmb
+    used = set(ctb_to_kmb.values())
+    out = {}
+    for lst in dirs.values():
+        for i, sid in enumerate(lst):
+            if sid in ctb_to_kmb or sid in out:
+                continue
+            prev = next((ctb_to_kmb[x] for x in reversed(lst[:i]) if x in ctb_to_kmb), None)
+            nxt = next((ctb_to_kmb[x] for x in lst[i + 1:] if x in ctb_to_kmb), None)
+            pos = (cstops[sid]['lat'], cstops[sid]['lng'])
+            best = None
+            for k, kl in klists.items():
+                if k[0] != rno:
+                    continue
+                a = kl.index(prev) if prev in kl else -1
+                b = kl.index(nxt) if nxt in kl else len(kl)
+                if a < 0 and b == len(kl) or a >= b:
+                    continue
+                for kid in kl[a + 1:b]:
+                    if kid in used:
+                        continue
+                    d = B.dist(pos, (kstops[kid]['lat'], kstops[kid]['lng']))
+                    if d <= max_m and (not best or d < best[0]):
+                        best = (d, kid)
+            if best:
+                out[sid] = best[1]
+                used.add(best[1])
+    return out
+
+
 def same_ends(a, b):
     """兩對起訖點係咪一樣（次序唔理；一邊包含另一邊都算，例如「小西灣運動場」同「小西灣」）"""
     def eq(x, y):
