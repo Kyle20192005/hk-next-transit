@@ -20,12 +20,16 @@ pipeline/       Python 3 數據處理，只用標準庫
 pnpm install
 python3 pipeline/fetch.py --skip-existing   # 下載原始數據去 pipeline/cache/（已有就跳過）
 python3 pipeline/build.py                   # 生成 pipeline/out/，約 30 秒
+python3 pipeline/check.py --prev <目錄>      # 發佈前檢查：同上一版 stats.json 比較，大跌就 exit 1
 pnpm dev:web                                # http://localhost:3000
 pnpm dev:mobile                             # Expo
 pnpm --filter @hknt/core test               # vitest
 pnpm -r typecheck
 ```
 
+數據每日香港時間 04:17 由 GitHub Actions（`.github/workflows/data.yml`）自動更新：fetch → build → check → 推去 `data` 分支。
+`check.py` 同上一版比較每間公司嘅路線、走法、站、有時間表／走線／車費嘅走法，少咗超過 10%（而且最少 3 個）
+或者有結構錯誤就唔發佈，網站繼續用舊數據；真係大量路線取消就人手 Run workflow 剔「強制發佈」（`--force`）。
 網頁版本地開發讀 `pipeline/out/`，所以要先跑 pipeline。上線時用 `DATA_BASE_URL` 指去數據位置。
 私人 repo 再加 `DATA_TOKEN`：raw.githubusercontent 網址會自動改用 GitHub Contents API。
 數據讀唔到時開 `/api/health` 睇原因。

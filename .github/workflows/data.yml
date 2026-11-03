@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '17 20 * * *'   # 每日香港時間 04:17（UTC 20:17）
   workflow_dispatch:
+    inputs:
+      force:
+        description: '強制發佈（路線數量大跌都照發佈，例如真係有大量路線取消；結構錯誤照樣唔發佈）'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -25,6 +30,16 @@ jobs:
         run: python3 pipeline/fetch.py
       - name: 生成數據
         run: python3 pipeline/build.py
+      - name: 檢查數據（同上一版比較，大跌就唔發佈，網站繼續用舊數據）
+        env:
+          FORCE: ${{ inputs.force && '--force' || '' }}
+        run: |
+          mkdir -p /tmp/prev
+          if git fetch -q --depth 1 origin data; then
+            git show origin/data:stats.json > /tmp/prev/stats.json 2>/dev/null || rm -f /tmp/prev/stats.json
+            git show origin/data:index.json > /tmp/prev/index.json 2>/dev/null || rm -f /tmp/prev/index.json
+          fi
+          python3 pipeline/check.py --prev /tmp/prev $FORCE
       - name: 發佈到 data 分支
         # 用獨立分支，唔會令 main 嘅 git 歷史越嚟越大。
         # 網頁版設定 DATA_BASE_URL=https://raw.githubusercontent.com/<owner>/<repo>/data
