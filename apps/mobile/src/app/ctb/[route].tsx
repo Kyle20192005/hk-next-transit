@@ -5,6 +5,7 @@ import {
   fmtMinutes,
   lineArrows,
   serviceWindow,
+  BusStabilizer,
   busFraction,
   busDistanceTo,
   formatDistance,
@@ -216,7 +217,14 @@ export default function RouteScreen() {
       return l.kind === 'arriving' ? `即將到站${dist}` : `距離 ${l.stopsAway} 個站${dist}`;
     });
   })();
-  // 地圖上嘅巴士：沿住揀咗嘅走線放
+  // 地圖上嘅巴士：沿住揀咗嘅走線放；只准向前，ETA 推遲就停喺原位
+  // 換方向或者走法就用一個新嘅（等於重新開始記位置）
+  const stableKey = `${dir}-${selected?.id}`;
+  const stabilizer = useMemo(() => new BusStabilizer(), [stableKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const stable = useMemo(
+    () => (live ? stabilizer.update(live.buses, live.segSeconds, busNow) : []),
+    [stabilizer, live, busNow],
+  );
   const buses: MapBus[] = (() => {
     if (!live) return [];
     const sel = mapLines.find((l) => l.selected);
@@ -225,11 +233,14 @@ export default function RouteScreen() {
       : [];
     const idx = path.length ? stopPathIndices(path, mapStops.map((m) => [m.lat, m.lng] as LatLng)) : [];
     const at = (stopIndex: number) => mapStops.findIndex((m) => m.index === stopIndex);
-    return live.buses.flatMap((b, k): MapBus[] => {
-      const fraction = busFraction(b, live.segSeconds, busNow);
+    const lastStop = stops.length - 1;
+    return stable.flatMap(({ id, bus: b, progress }): MapBus[] => {
+      const from = Math.min(Math.floor(progress), lastStop - 1);
+      const fraction = Math.min(1, progress - from);
+      const k = id;
       const minutes = Math.max(0, Math.round((b.nextEta - busNow) / 60000));
-      const a = at(b.from);
-      const c = at(b.from + 1);
+      const a = at(from);
+      const c = at(from + 1);
       const pt = idx[a] !== undefined && idx[c] !== undefined ? pointOnPath(path, idx[a]!, idx[c]!, fraction) : null;
       if (pt) return [{ key: k, latitude: pt.lat, longitude: pt.lng, minutes }];
       const ma = mapStops[a];

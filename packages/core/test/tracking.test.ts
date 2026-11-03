@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { busDistanceTo, busFraction, hourlySlot, labelEtas, trackBuses, trackLine, type Calendar } from '../src';
+import { BusStabilizer, busDistanceTo, busFraction, hourlySlot, labelEtas, trackBuses, trackLine, type Calendar } from '../src';
 
 const now = Date.parse('2026-11-03T12:00:00+08:00');
 const m = (min: number) => now + min * 60_000;
@@ -62,5 +62,44 @@ describe('按時段行車時間', () => {
   });
   it('公眾假期當星期日', () => {
     expect(hourlySlot(new Date('2026-12-25T10:00:00+08:00'), cal).weekday).toBe(0);
+  });
+});
+
+describe('巴士只向前唔倒退', () => {
+  const seg = [120, 120, 120, 120];
+
+  it('ETA 推遲咗：停喺原位，唔會倒退', () => {
+    const st = new BusStabilizer();
+    const [a] = st.update([{ from: 1, nextEta: m(0.6) }], seg, now); // 行咗七成
+    expect(a!.progress).toBeCloseTo(1.7);
+    // 下一次更新：ETA 推遲到 1.8 分鐘後，計出嚟只行咗一成
+    const [b] = st.update([{ from: 1, nextEta: m(1.8) }], seg, now);
+    expect(b!.id).toBe(a!.id);
+    expect(b!.progress).toBeCloseTo(1.7);
+  });
+
+  it('正常向前：照郁', () => {
+    const st = new BusStabilizer();
+    st.update([{ from: 1, nextEta: m(1) }], seg, now);
+    const [b] = st.update([{ from: 2, nextEta: m(1.5) }], seg, now);
+    expect(b!.progress).toBeCloseTo(2.25);
+  });
+
+  it('兩架車各自配對，唔會配錯', () => {
+    const st = new BusStabilizer();
+    const first = st.update([{ from: 3, nextEta: m(1) }, { from: 0, nextEta: m(1) }], seg, now);
+    const second = st.update([{ from: 3, nextEta: m(1.9) }, { from: 0, nextEta: m(0.5) }], seg, now);
+    const id = (p: number) => second.find((x) => Math.floor(x.progress) === p)!.id;
+    expect(id(3)).toBe(first.find((x) => x.bus.from === 3)!.id);
+    expect(id(0)).toBe(first.find((x) => x.bus.from === 0)!.id);
+    expect(second.find((x) => Math.floor(x.progress) === 3)!.progress).toBeCloseTo(3.5); // 推遲咗，停喺原位
+  });
+
+  it('相差太遠就當係另一架車', () => {
+    const st = new BusStabilizer();
+    const [a] = st.update([{ from: 3, nextEta: m(1) }], seg, now);
+    const [b] = st.update([{ from: 0, nextEta: m(1) }], seg, now);
+    expect(b!.id).not.toBe(a!.id);
+    expect(b!.progress).toBeCloseTo(0.5);
   });
 });

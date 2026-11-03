@@ -123,3 +123,57 @@ export function busDistanceTo(bus: TrackedBus, fraction: number, stopIndex: numb
   if (a === undefined || b === undefined || target === undefined) return null;
   return Math.max(0, target - (a + (b - a) * fraction));
 }
+
+/** 地圖上顯示嘅巴士：progress = from + 段內位置（例如 3.4 = 第 3、4 站之間行咗四成） */
+export interface StableBus {
+  id: number;
+  progress: number;
+  bus: TrackedBus;
+}
+
+/**
+ * 令地圖上嘅巴士只會向前、唔會倒退。
+ *
+ * 位置係由 ETA 推算：ETA 推遲咗，計出嚟嘅位置就會後退。實際上巴士唔會倒車，
+ * 所以每架車記住上次顯示嘅位置，新位置比佢後就停喺原位（當係塞車），等時間追上先再郁。
+ * 新舊位置按次序配對（巴士通常唔會互相超越），太遠就當係另一架車。
+ */
+export class BusStabilizer {
+  private prev: StableBus[] = [];
+  private nextId = 1;
+
+  /** 新位置最多可以比舊位置後幾多段仲當係同一架車（ETA 推遲） */
+  static readonly MAX_BACK = 1.5;
+  /** 新位置最多可以比舊位置前幾多段仲當係同一架車 */
+  static readonly MAX_FORWARD = 2;
+
+  update(buses: TrackedBus[], segSeconds: number[], now: number): StableBus[] {
+    const computed = buses
+      .map((bus) => ({ bus, p: bus.from + busFraction(bus, segSeconds, now) }))
+      .sort((a, b) => b.p - a.p);
+    const prev = [...this.prev].sort((a, b) => b.progress - a.progress);
+    const used = new Set<number>();
+    let start = 0; // 按次序配對：前面配咗嘅舊車之前嘅唔再用
+    const out: StableBus[] = computed.map(({ bus, p }) => {
+      let match = -1;
+      for (let j = start; j < prev.length; j++) {
+        const d = p - prev[j]!.progress;
+        if (!used.has(j) && d >= -BusStabilizer.MAX_BACK && d <= BusStabilizer.MAX_FORWARD) {
+          match = j;
+          break;
+        }
+      }
+      if (match < 0) return { id: this.nextId++, progress: p, bus };
+      used.add(match);
+      start = match + 1;
+      const old = prev[match]!;
+      return { id: old.id, progress: Math.max(p, old.progress), bus };
+    });
+    this.prev = out;
+    return out;
+  }
+
+  reset() {
+    this.prev = [];
+  }
+}

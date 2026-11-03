@@ -77,6 +77,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 每段行車時間優先次序：同一架車喺相鄰兩站 ETA 嘅時間差（同 ETA 一致）→ 而家時段實測
   （`times_hourly/<星期 0-6，0=日/假期>/<HH>/<站 ID 頭兩位>.json`）→ 平均（`variant.segSeconds`）。
 - 打開一個站：上游嘅車由近到遠順序對應嗰個站嘅 ETA（`labelEtas`），對唔到嘅係「未開出」。
+- 地圖上嘅巴士只准向前（`BusStabilizer`）：ETA 推遲會令推算位置後退，所以記住每架車上次位置，後退就停喺原位。
+  新舊位置按次序配對（巴士唔會互相超越）。地圖右上角「?」解釋位置係推算、唔係 GPS。
 - 距離一律沿走線量（`stopCumMetres`、`busDistanceTo`），唔係直線；顯示用 `formatDistance`（< 1 公里用米），50 米內唔顯示。
 - `/api/buses` 每個站嘅城巴 ETA cache 10 秒；前端每 20 秒問一次，位置每 5 秒按時間推前。
 - 只用 hk-bus-time-between-stops 公開嘅數據，**唔好抄佢嘅程式碼**（GPL-3.0）。頁面要註明出處同「僅供參考」。

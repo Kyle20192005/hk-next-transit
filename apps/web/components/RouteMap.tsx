@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { busFraction, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
+import { BusStabilizer, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
 import { BUSES_EVENT, FOCUS_STOP_EVENT, OPEN_STOP_EVENT, latestBuses, type BusesDetail } from '@/lib/events';
 
 export interface MapStop {
@@ -149,7 +149,9 @@ export default function RouteMap({ lines, stops }: Props) {
       return a && b ? [a.lat + (b.lat - a.lat) * fraction, a.lng + (b.lng - a.lng) * fraction] : null;
     };
 
-    // 成條線嘅巴士（由 /api/buses 追蹤），每 5 秒按時間推前
+    // 成條線嘅巴士（由 /api/buses 追蹤），每 5 秒按時間推前；只准向前，ETA 推遲就停喺原位
+    const stabilizer = new BusStabilizer();
+    const lastStop = Math.max(...stops.map((x) => x.index));
     const drawBuses = () => {
       busLayer.clearLayers();
       if (!latest) return;
@@ -157,13 +159,14 @@ export default function RouteMap({ lines, stops }: Props) {
       const openIdx = latest.openIndex;
       const target = openIdx !== null ? byIndex.get(openIdx) : undefined;
       let nearest: L.LatLngExpression | null = null;
-      for (const b of latest.buses) {
-        const where = locate(b.from, busFraction(b, latest.segSeconds, now));
+      for (const { bus: b, progress } of stabilizer.update(latest.buses, latest.segSeconds, now)) {
+        const from = Math.min(Math.floor(progress), lastStop - 1);
+        const where = locate(from, Math.min(1, progress - from));
         if (!where) continue;
-        const next = byIndex.get(b.from + 1);
+        const next = byIndex.get(from + 1);
         const mins = Math.max(0, Math.round((b.nextEta - now) / 60000));
         // 打開咗站：最近嗰架上游車
-        if (openIdx !== null && b.from < openIdx && !nearest) nearest = where;
+        if (openIdx !== null && from < openIdx && !nearest) nearest = where;
         L.marker(where, {
           keyboard: false,
           zIndexOffset: 1000,
@@ -201,5 +204,26 @@ export default function RouteMap({ lines, stops }: Props) {
     };
   }, [lines, stops]);
 
-  return <div ref={el} className="route-map card" role="region" aria-label="路線地圖" />;
+  const [help, setHelp] = useState(false);
+  return (
+    <div className="route-map-wrap">
+      <div ref={el} className="route-map card" role="region" aria-label="路線地圖" />
+      <button className="map-help-btn" onClick={() => setHelp((h) => !h)} aria-expanded={help} aria-label="巴士位置點樣計？">
+        ?
+      </button>
+      {help && (
+        <div className="map-help card" role="dialog" aria-label="巴士位置點樣計">
+          <strong>巴士位置點樣計？</strong>
+          <p>地圖上嘅巴士位置係<b>推算</b>出嚟，唔係 GPS 實時定位：</p>
+          <ul>
+            <li>每 20 秒讀取城巴每個站嘅到站時間，睇邊架車已經過咗邊個站，推算佢喺邊兩個站之間。</li>
+            <li>兩站之間嘅位置按嗰段路嘅行車時間估算（城巴到站時間同實測平均）。</li>
+            <li>到站時間推遲（例如塞車）時，巴士會停喺原位，唔會倒退，等時間追上先再郁。</li>
+          </ul>
+          <p className="muted">僅供參考，以城巴到站時間為準。</p>
+          <button className="map-help-close" onClick={() => setHelp(false)}>知道</button>
+        </div>
+      )}
+    </div>
+  );
 }

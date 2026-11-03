@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { useTheme } from '@/lib/theme';
 
@@ -64,8 +64,33 @@ export function RouteMap({ lines, stops, arrows, buses, focusIndex, onStopPress 
   const ordered = [...lines].sort((a, b) => Number(a.selected) - Number(b.selected));
   const arrowColor = lines.find((l) => l.selected)?.special ? t.special : t.brand;
 
+  const [help, setHelp] = useState(false);
   return (
     <View style={{ height: 180, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: t.line }}>
+      <Pressable
+        onPress={() => setHelp((h) => !h)}
+        accessibilityRole="button"
+        accessibilityLabel="巴士位置點樣計？"
+        style={{
+          position: 'absolute', top: 8, right: 8, zIndex: 10, width: 30, height: 30, borderRadius: 15,
+          backgroundColor: t.card, borderWidth: 1, borderColor: t.line, alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <Text style={{ color: t.text, fontWeight: '700' }}>?</Text>
+      </Pressable>
+      {help && (
+        <Pressable
+          onPress={() => setHelp(false)}
+          accessibilityLabel="收埋說明"
+          style={{ position: 'absolute', top: 44, left: 8, right: 8, zIndex: 11, padding: 12, borderRadius: 12, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, gap: 4 }}
+        >
+          <Text style={{ color: t.text, fontWeight: '700' }}>巴士位置點樣計？</Text>
+          <Text style={{ color: t.text, fontSize: 13 }}>
+            位置係按城巴每個站嘅到站時間推算，唔係 GPS。到站時間推遲時巴士會停喺原位，唔會倒退。僅供參考，以城巴到站時間為準。
+          </Text>
+          <Text style={{ color: t.muted, fontSize: 12 }}>撳一下收埋</Text>
+        </Pressable>
+      )}
       <MapView ref={map} style={{ flex: 1 }} mapType="none" onMapReady={fit} rotateEnabled={false} pitchEnabled={false}>
         <UrlTile urlTemplate={`${LANDSD}/basemap/WGS84/{z}/{x}/{y}.png`} maximumZ={20} zIndex={-2} />
         <UrlTile urlTemplate={`${LANDSD}/label/hk/tc/WGS84/{z}/{x}/{y}.png`} maximumZ={20} zIndex={-1} />
