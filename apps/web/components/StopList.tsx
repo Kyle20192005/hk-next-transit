@@ -19,6 +19,8 @@ type Props = {
   cumMetres: number[];
   /** 路線主要公司（時間線同巴士用公司代表色） */
   company: string;
+  /** 每個站上車嘅車費（同 stops 對應）；joyYou = null 即係唔適用樂悠咭 */
+  fares: ({ adult: string; joyYou: string | null } | null)[];
   /** 一開頁就打開嘅站（由「附近」撳入嚟） */
   initialOpen: number | null;
 };
@@ -34,7 +36,7 @@ const BUSES_REFRESH_MS = 20_000;
  * - 打開站時：攞到站時間、地圖放大過去；每班車標示「距離 N 個站／未開出」
  * - 後面嘅站顯示由打開咗嘅站出發要幾耐，同下一班車大概幾時到
  */
-export default function StopList({ co, multiCompany, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, initialOpen }: Props) {
+export default function StopList({ co, multiCompany, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, fares, initialOpen }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -279,6 +281,7 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
             now={now}
             selectedVariantId={selectedVariantId}
             nearestMetres={nearest?.index === i ? nearest.metres : null}
+            fare={fares[i] ?? null}
             travelSeconds={openIndex !== null && i > openIndex ? tr : null}
             travelMetres={openIndex !== null && i > openIndex ? (cumMetres[i] ?? 0) - (cumMetres[openIndex] ?? 0) : null}
             nextArrival={openIndex !== null && i > openIndex && tr !== null && nextAtOpen !== null ? nextAtOpen + tr * 1000 : null}

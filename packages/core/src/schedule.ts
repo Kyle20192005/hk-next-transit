@@ -43,3 +43,32 @@ export function fmtMinutes(m: number): string {
   const h = Math.floor(m / 60) % 24;
   return `${String(h).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
 }
+
+export interface ServiceSummary {
+  /** 今日頭班、尾班（由午夜起計分鐘，可 >1440） */
+  first: number;
+  last: number;
+  /** 而家附近（前 30 分鐘至後 60 分鐘）嘅班次相隔（分鐘，中位數）；呢段時間冇車就 null */
+  headwayNow: number | null;
+  /** 今日班次相隔範圍（分鐘） */
+  headwayMin: number | null;
+  headwayMax: number | null;
+}
+
+/** 走法今日嘅服務時間同班次（由總站開出計） */
+export function serviceSummary(variant: Variant, calendar: Calendar, at: Date): ServiceSummary | null {
+  const today = activeServiceIds(calendar, at);
+  const deps = [...new Set(variant.schedules.filter((s) => today.has(s.serviceId)).flatMap((s) => s.departures))].sort((a, b) => a - b);
+  if (!deps.length) return null;
+  const gaps = deps.slice(1).map((d, i) => d - deps[i]!).filter((g) => g > 0);
+  const nowMin = hkParts(at).minutes;
+  const near = deps.map((d, i) => [d, i] as const).filter(([d, i]) => i > 0 && d >= nowMin - 30 && d <= nowMin + 60);
+  const nearGaps = near.map(([d, i]) => d - deps[i - 1]!).sort((a, b) => a - b);
+  return {
+    first: deps[0]!,
+    last: deps[deps.length - 1]!,
+    headwayNow: nearGaps.length ? nearGaps[Math.floor(nearGaps.length / 2)]! : null,
+    headwayMin: gaps.length ? Math.min(...gaps) : null,
+    headwayMax: gaps.length ? Math.max(...gaps) : null,
+  };
+}

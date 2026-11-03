@@ -149,6 +149,43 @@ def variant_schedule(trips, freq):
     return sched
 
 
+def load_fares():
+    """
+    GTFS 分段收費：{(route_id, 方向): {上車站序: 車費}}。
+    fare_id = <route_id>-<方向>-<上車站序>-<落車站序>；上車嘅車費 = 由呢個站去任何站嘅最高收費
+    （香港巴士上車時按全程收費，分段收費即係後面上車平啲）。
+    """
+    out = collections.defaultdict(dict)
+    for r in csv.DictReader(open(f'{G}/fare_attributes.txt', encoding='utf-8-sig')):
+        parts = r['fare_id'].split('-')
+        if len(parts) != 4:
+            continue
+        rid, d, o, _ = parts
+        price = float(r['price'])
+        cur = out[(rid, d)].get(int(o))
+        if cur is None or price > cur:
+            out[(rid, d)][int(o)] = price
+    return out
+
+
+def joyyou_ok(rno, orig='', dest=''):
+    """
+    樂悠咭（$2 計劃）適唔適用。運輸署（2026-04-03 起）：專營巴士不適用於
+    往返機場嘅 A、NA 線、馬場線、新增長途路線、指定旅遊路線同預約／包車路線。
+    政府數據冇呢個標記，所以按路線號碼同名稱判斷（「新增長途路線」冇清單，判斷唔到）。
+    """
+    r = rno.upper()
+    if r.startswith('A') or r.startswith('NA'):
+        return False                                   # 機場
+    if re.fullmatch(r'\d+[A-Z]?R', r) or '馬場' in (orig or '') + (dest or ''):
+        return False                                   # 馬場線（101R、1R…）
+    if re.fullmatch(r'H\d+[A-Z]?', r):
+        return False                                   # 城巴旅遊路線（H1、H2、H2K…）
+    if any(k in (orig or '') + (dest or '') for k in ('包車', '夜遊', '預約')):
+        return False                                   # 預約／包車
+    return True
+
+
 # ---------- 讀城巴 ----------
 def load_ctb():
     c = json.load(open(f'{CACHE}/ctb.json', encoding='utf-8'))
@@ -228,6 +265,10 @@ def main():
     # 站到站行車時間（第三方，可能冇）：{ 起點站: { 下一站: 秒 } }
     jt_path = f'{CACHE}/journey_times.json'
     journey = json.load(open(jt_path, encoding='utf-8')) if os.path.exists(jt_path) else {}
+    fares = load_fares()
+    full_fare = {}
+    for f in json.load(open(f'{CACHE}/td_bus.json', encoding='utf-8-sig'))['features']:
+        full_fare.setdefault(str(f['properties']['routeId']), f['properties'].get('fullFare'))
     import kmb as K   # 九巴（連龍運）；放喺呢度 import，避免循環 import
     kmbdata = K.load_kmb()
     # 聯營路線（政府 agency 同時有城巴同九巴／龍運）：放喺城巴路線檔，九巴唔再另外出
@@ -302,6 +343,9 @@ def main():
             'line': [simplify(s) for s in seg] if seg else None,
             'lineAligned': seg_ok,
             '_gs': gs, '_agency': groutes[rid]['agency_id'],   # 暫存：聯營配對九巴用，輸出前刪走
+            # 每個站上車嘅車費（城巴站 ID -> 港元）；分段收費冇資料就用全程車費
+            'fares': {s[1]: fares.get((rid, d), {}).get(g['seq'], full_fare.get(rid))
+                      for s, g in zip(stops, gs) if s and (fares.get((rid, d), {}).get(g['seq']) or full_fare.get(rid))},
         })
 
     # 城巴獨有站 + 每個走法預期嘅 ETA seq
@@ -344,6 +388,7 @@ def main():
             v.pop('_gs', None); v.pop('_agency', None)
         data = {
             'company': 'CTB', 'companies': companies, 'route': rno,
+            'joyYou': joyyou_ok(rno, info.get('orig_tc'), info.get('dest_tc')),
             'origTc': info.get('orig_tc'), 'destTc': info.get('dest_tc'),
             'origEn': info.get('orig_en'), 'destEn': info.get('dest_en'),
             'stops': route_stops,
@@ -359,7 +404,8 @@ def main():
         if rno in variants_by_route: continue
         dirs = {d: clists[(rno, d)] for d in ('O', 'I') if (rno, d) in clists}
         rstops = {s for l in dirs.values() for s in l}
-        json.dump({'company': 'CTB', 'companies': ['CTB'], 'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'],
+        json.dump({'company': 'CTB', 'companies': ['CTB'], 'route': rno, 'joyYou': joyyou_ok(rno, info['orig_tc'], info['dest_tc']),
+                   'origTc': info['orig_tc'], 'destTc': info['dest_tc'],
                    'origEn': info['orig_en'], 'destEn': info['dest_en'],
                    'stops': {s: cstops[s] for s in sorted(rstops)}, 'directions': dirs,
                    'ctbOnlyStops': [], 'variants': []},
@@ -371,7 +417,7 @@ def main():
     kmb_primary_done = set()
     kmb_index, kmb_by_stop, kstops = K.build_kmb({
         'kmb': kmbdata, 'special': special, 'lines': lines, 'journey': journey,
-        'used_services': used_services, 'joint': actual_joint,
+        'used_services': used_services, 'joint': actual_joint, 'fares': fares, 'full_fare': full_fare,
         # 認到係聯營但城巴冇政府走法資料：改用九巴做主幹，加城巴站
         'joint_kmb_primary': joint_rnos - actual_joint, 'ctb': (cstops, clists), 'kmb_primary_done': kmb_primary_done,
     })

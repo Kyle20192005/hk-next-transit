@@ -137,7 +137,7 @@ def build_kmb(ctx):
         score = B.match_score(m) / max(len(gs), len(klists[key]))
         if key not in gov_for or score > gov_for[key]['score']:
             gov_for[key] = {'rid': rid, 'd': d, 'score': score, 'agency': groutes[rid]['agency_id'],
-                            'name': groutes[rid]['route_long_name']}
+                            'name': groutes[rid]['route_long_name'], 'gs': gs, 'm': m}
 
     os.makedirs(f'{B.OUT}/kmb', exist_ok=True)
     index, by_stop = [], collections.defaultdict(list)
@@ -175,6 +175,14 @@ def build_kmb(ctx):
             for i, s in enumerate(stops):
                 v['expSeq'].setdefault(f'{bound}:{s}', i + 1)
             if gov:
+                # 每個站上車嘅車費（九巴站 ID -> 港元）：政府站序經配對對返九巴站
+                fsec = ctx['fares'].get((gov['rid'], gov['d']), {})
+                full = ctx['full_fare'].get(gov['rid'])
+                v['fares'] = {}
+                for gi, (kj, _, _) in gov['m'].items():
+                    price = fsec.get(gov['gs'][gi]['seq'], full)
+                    if price:
+                        v['fares'].setdefault(stops[kj], price)
                 sched = B.variant_schedule(gtrips[(gov['rid'], gov['d'])], freq)
                 ctx['used_services'].update(sched)
                 v['schedules'] = [{'serviceId': k, 'departures': sorted(x)} for k, x in sorted(sched.items())]
@@ -204,6 +212,7 @@ def build_kmb(ctx):
         co = sorted(companies)
         data = {
             'company': 'KMB', 'companies': co, 'route': rno,
+            'joyYou': B.joyyou_ok(rno, clean(main.get('orig_tc')), clean(main.get('dest_tc'))),
             'origTc': clean(main.get('orig_tc')), 'destTc': clean(main.get('dest_tc')),
             'origEn': main.get('orig_en', '').title(), 'destEn': main.get('dest_en', '').title(),
             'stops': route_stops,

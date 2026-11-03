@@ -43,6 +43,8 @@ type Props = {
   selectedVariantId: string | null;
   /** 由打開咗嘅站去呢個站要幾多秒（只有後面嘅站先有） */
   travelSeconds: number | null;
+  /** 呢個站上車嘅車費；joyYou = null 即係唔適用樂悠咭 */
+  fare: { adult: string; joyYou: string | null } | null;
   /** 呢個係用戶最近嘅站：同用戶相距幾多米 */
   nearestMetres: number | null;
   /** 由打開咗嘅站沿路線去呢個站有幾遠（米） */
@@ -58,7 +60,7 @@ const hhmm = (ms: number) =>
 
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, nearestMetres, travelSeconds, travelMetres, nextArrival, buses },
+  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, nearestMetres, travelSeconds, travelMetres, nextArrival, buses },
   ref,
 ) {
   const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null })) ?? null;
@@ -93,6 +95,12 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
             </span>
           )}
         </span>
+        {fare && (
+          <span className="fare" aria-label={`車費 ${fare.adult}${fare.joyYou ? `，樂悠咭 ${fare.joyYou}` : ''}`}>
+            <span className="fare-adult">{fare.adult}</span>
+            {fare.joyYou && <span className="fare-joy">樂悠 {fare.joyYou}</span>}
+          </span>
+        )}
       </button>
       {open && (
         <div className="etas" aria-live="polite">

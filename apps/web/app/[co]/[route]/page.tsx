@@ -4,6 +4,9 @@ import { notFound } from 'next/navigation';
 import {
   fmtMinutes,
   serviceWindow,
+  serviceSummary,
+  formatFare,
+  joyYouFare,
   smoothLine,
   stopCumMetres,
   type LatLng,
@@ -83,6 +86,30 @@ export default async function RoutePage({ params, searchParams }: Props) {
     lat: data.stops[s.stopId]?.lat,
     lng: data.stops[s.stopId]?.lng,
   }));
+  // 車費：每個站上車嘅成人車費；終點站唔使（唔會喺度上車）
+  const joyYou = data.joyYou !== false;
+  const fares = stops.map((s, i) => {
+    const adult = i < stops.length - 1 ? selected?.fares?.[s.stopId] : undefined;
+    return adult === undefined ? null : { adult: formatFare(adult), joyYou: joyYou ? formatFare(joyYouFare(adult)) : null };
+  });
+  // 服務時間同班次（揀咗嘅走法，今日）
+  const summary = selected ? serviceSummary(selected, calendar, now) : null;
+  const hw = summary?.headwayNow ?? null;
+  const serviceLine = summary
+    ? [
+        `${fmtMinutes(summary.first)}–${summary.last >= 1440 ? '翌日' : ''}${fmtMinutes(summary.last)}`,
+        hw !== null
+          ? `約 ${hw} 分鐘一班`
+          : summary.headwayMin !== null && summary.headwayMax !== null
+            ? summary.headwayMin === summary.headwayMax
+              ? `${summary.headwayMin} 分鐘一班`
+              : `${summary.headwayMin}–${summary.headwayMax} 分鐘一班`
+            : '每日一班',
+        ...(joyYou ? [] : ['不設樂悠咭優惠']),
+      ].join(' · ')
+    : joyYou
+      ? null
+      : '不設樂悠咭優惠';
   const dest = stops[stops.length - 1]?.name;
   // 平均行車時間：攞到即時數據之前先用
   const segSeconds = selected?.segSeconds ?? null;
@@ -125,8 +152,11 @@ export default async function RoutePage({ params, searchParams }: Props) {
             {data.route}
           </h1>
           <span className="route-dest">
-            <small>往</small>
-            {dest}
+            <span className="route-dest-to">
+              <small>往</small>
+              {dest}
+            </span>
+            {serviceLine && <span className="route-service">{serviceLine}</span>}
           </span>
           {other && (
             <Link
@@ -155,6 +185,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
           stops={stops}
           selectedVariantId={selected?.id ?? null}
           company={data.company}
+          fares={fares}
           segSeconds={segSeconds}
           cumMetres={cumMetres}
           initialOpen={initialOpen >= 0 ? initialOpen : null}

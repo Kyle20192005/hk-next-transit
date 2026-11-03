@@ -51,6 +51,8 @@ export interface Variant {
   kmb?: { bound: Dir; serviceType: string };
   /** 城巴 ETA 查詢方向（九巴做主幹嘅聯營線先有） */
   ctb?: { dir: Dir };
+  /** 每個站上車嘅成人車費（港元），key = 站 ID（分段收費：後面上車可能平啲） */
+  fares?: Record<string, number>;
 }
 
 export interface RouteData {
@@ -58,6 +60,8 @@ export interface RouteData {
   company: 'CTB' | 'KMB';
   /** 實際營辦嘅公司；聯營線係 ['CTB', 'KMB'] */
   companies?: Company[];
+  /** 樂悠咭（$2 計劃）適唔適用：機場 A／NA、馬場、旅遊、包車路線唔適用 */
+  joyYou?: boolean;
   route: string;
   origTc: string | null;
   destTc: string | null;
