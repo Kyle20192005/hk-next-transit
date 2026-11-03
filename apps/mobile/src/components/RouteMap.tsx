@@ -66,6 +66,8 @@ export function RouteMap({ lines, stops, arrows, focusIndex, onStopPress }: Prop
               coordinates={seg}
               strokeColor={l.selected ? (l.special ? t.special : t.brand) : t.muted}
               strokeWidth={l.selected ? 5 : 2}
+              lineJoin="round"
+              lineCap="round"
               lineDashPattern={l.selected ? undefined : [6, 6]}
               zIndex={l.selected ? 2 : 1}
             />

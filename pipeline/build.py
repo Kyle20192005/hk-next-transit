@@ -51,8 +51,9 @@ def same_name(gnames, cname):
     return any(g == c or g == c1 for g in gnames)
 
 
-def simplify(pts, tol=0.00003):
-    """Douglas-Peucker，tol 約 3 米；座標保留 5 位小數（約 1 米）"""
+def simplify(pts, tol=0.00001):
+    """Douglas-Peucker，tol 約 1 米；座標保留 5 位小數（約 1 米）。
+    唔好再調大：3 米會將迴旋處變成六角形、彎位變直角。"""
     if len(pts) < 3:
         return [[round(x, 5), round(y, 5)] for x, y in pts]
     (x1, y1), (x2, y2) = pts[0], pts[-1]

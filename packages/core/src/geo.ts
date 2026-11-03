@@ -55,3 +55,28 @@ function pointAt(seg: LatLng[], lens: number[], dist: number): Arrow | null {
   }
   return null;
 }
+
+/**
+ * 將折線轉角磨圓（Chaikin corner cutting）。頭尾兩點保持不變，所以每段仍然由站開始、喺站結束。
+ * 每次喺每個轉角前後各切一刀：切 1/4 線段長度，但最多 maxCut 米，
+ * 避免長直路喺路口轉彎時條線偏離馬路太多。
+ */
+export function smoothLine(points: LatLng[], iterations = 2, maxCut = 6): LatLng[] {
+  let pts = points;
+  for (let it = 0; it < iterations; it++) {
+    if (pts.length < 3) return pts;
+    const out: LatLng[] = [pts[0]!];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i]!;
+      const b = pts[i + 1]!;
+      const len = metres(a, b);
+      const f = len > 0 ? Math.min(0.25, maxCut / len) : 0;
+      // 第一段唔使切起點，最後一段唔使切終點（保持頭尾）
+      if (i > 0) out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+      if (i < pts.length - 2) out.push([b[0] + (a[0] - b[0]) * f, b[1] + (a[1] - b[1]) * f]);
+    }
+    out.push(pts[pts.length - 1]!);
+    pts = out;
+  }
+  return pts;
+}

@@ -51,7 +51,7 @@ export default function RouteMap({ lines, stops }: { lines: MapLine[]; stops: Ma
     // 其他走法：灰色虛線放底；揀咗嘅走法：實線放面
     for (const l of [...lines].sort((a, b) => Number(a.selected) - Number(b.selected))) {
       L.polyline(l.segments, l.selected
-        ? { color: l.special ? special : brand, weight: 6, opacity: 0.9 }
+        ? { color: l.special ? special : brand, weight: 6, opacity: 0.9, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round' }
         : { color: muted, weight: 3, opacity: 0.5, dashArray: '6 6' },
       ).addTo(map);
     }

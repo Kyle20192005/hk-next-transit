@@ -5,6 +5,7 @@ import {
   fmtMinutes,
   lineArrows,
   serviceWindow,
+  smoothLine,
   sortVariants,
   statusText,
   variantLabel,
@@ -89,7 +90,9 @@ export default function RouteScreen() {
           id: x.variant.id,
           selected: x.variant.id === selected?.id,
           special: x.variant.special,
-          segments: x.variant.line!.map((seg) => seg.map(([lng, lat]) => ({ latitude: lat, longitude: lng }))),
+          segments: x.variant.line!.map((seg) =>
+            smoothLine(seg.map(([lng, lat]) => [lat, lng] as [number, number])).map(([lat, lng]) => ({ latitude: lat, longitude: lng })),
+          ),
         })),
     [sorted, selected],
   );
