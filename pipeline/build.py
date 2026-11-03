@@ -255,6 +255,39 @@ def segment_times(v, cstops, journey):
     return secs, [bool(t and t > 0) for t in measured]
 
 
+def fill_lines_from_csdi(lines_by_no):
+    """
+    走法冇走線（配唔到政府走法，或者政府走法冇 CSDI 走線，例如 GTFS 未有嘅新路線）：
+    喺 CSDI 搵同號碼、同公司嘅走線，站按次序投影落去切段（others.fit_line，站要喺 100 米內）。
+    """
+    import others as O
+    paths = {k: [O.OsmPath([p for i, sg in enumerate(segs) for p in (sg if i == 0 else sg[1:])]) for segs in v if segs]
+             for k, v in lines_by_no.items()}
+    done = total = 0
+    for group in ('ctb', 'kmb', 'nlb'):
+        for fn in sorted(os.listdir(f'{OUT}/{group}')):
+            if fn in ('index.json', 'stops.json'):
+                continue
+            path = f'{OUT}/{group}/{fn}'
+            d = json.load(open(path, encoding='utf-8'))
+            cands = paths.get((group, fn[:-5]), [])
+            changed = False
+            for v in d['variants']:
+                if v['line']:
+                    continue
+                total += 1
+                order = variant_stop_order(v)
+                if not cands or len(order) < 2:
+                    continue
+                seg = O.fit_line([(d['stops'][x]['lat'], d['stops'][x]['lng']) for x in order], cands)
+                if seg:
+                    v['line'], v['lineAligned'], changed = seg, len(seg) == len(v['stops']) - 1, True
+                    done += 1
+            if changed:
+                json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+    print(f'冇政府走線嘅走法 {total}，用 CSDI 同號碼走線補到 {done}')
+
+
 def main():
     groutes, gtrips, first, gst, freq, gstops_all = load_gtfs()
     ctb_routes, cstops, clists = load_ctb()
@@ -278,11 +311,13 @@ def main():
     actual_joint = set()   # 真係配對到九巴嘅聯營線（九巴唔再另外出）
     csdi = json.load(open(f'{CACHE}/csdi_lines.json', encoding='utf-8'))['features']
     lines = {(str(f['properties']['ROUTE_ID']), str(f['properties']['ROUTE_SEQ'])): f['geometry']['coordinates'] for f in csdi}
-    # 路線號碼 -> 城巴走線（GTFS 未有嘅新路線，例如 770，CSDI 可能已經有）
-    ctb_lines_by_no = collections.defaultdict(list)
+    # (路線檔位置, 路線號碼) -> CSDI 走線：走法配唔到政府走線時用（GTFS 未有嘅新路線，例如 770，CSDI 可能已經有）
+    lines_by_no = collections.defaultdict(list)
     for f in csdi:
-        if 'CTB' in str(f['properties'].get('COMPANY_CODE', '')):
-            ctb_lines_by_no[str(f['properties']['ROUTE_NAMEE']).strip()].append(f['geometry']['coordinates'])
+        cc, rno_ = str(f['properties'].get('COMPANY_CODE', '')), str(f['properties']['ROUTE_NAMEE']).strip()
+        for group, codes in (('ctb', ('CTB',)), ('kmb', ('KMB', 'LWB')), ('nlb', ('NLB',))):
+            if any(c in cc for c in codes):
+                lines_by_no[(group, rno_)].append(f['geometry']['coordinates'])
     del csdi
 
     # 每條城巴路線嘅候選列表：O、I，循環線多一個 O+I
@@ -424,13 +459,6 @@ def main():
                  'stops': list(l), 'stopDirs': [d] * len(l), 'stopMatch': ['A'] * len(l),
                  'expSeq': {f'{d}:{x}': i + 1 for i, x in reversed(list(enumerate(l)))},
                  'schedules': [], 'line': None, 'lineAligned': False}
-            # 走線：CSDI 同號碼嘅城巴走線，站按次序投影落去再切開（同港鐵巴士用 OSM 一樣）
-            import others as O
-            seg = O.fit_line([(cstops[x]['lat'], cstops[x]['lng']) for x in l],
-                             [O.OsmPath([p for k, sg in enumerate(segs) for p in (sg if k == 0 else sg[1:])])
-                              for segs in ctb_lines_by_no.get(rno, []) if segs])
-            if seg:
-                v['line'], v['lineAligned'] = seg, True
             v['segSeconds'], v['segMeasured'] = segment_times(v, cstops, journey)
             v['offsets'] = [0]
             for x in v['segSeconds']:
@@ -492,6 +520,8 @@ def main():
     json.dump({'generatedAt': generated, 'routes': index},
               open(f'{OUT}/ctb/index.json', 'w', encoding='utf-8'), ensure_ascii=False)
     json.dump(load_calendar(used_services), open(f'{OUT}/calendar.json', 'w'), separators=(',', ':'))
+
+    fill_lines_from_csdi(lines_by_no)
 
     os.makedirs(f'{OUT}/report', exist_ok=True)
     with open(f'{OUT}/report/ctb_stop_map.csv', 'w', newline='', encoding='utf-8-sig') as f:
