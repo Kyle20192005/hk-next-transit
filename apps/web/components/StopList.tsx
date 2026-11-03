@@ -121,7 +121,7 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
   const whereLabels = useMemo(() => {
     if (!live || openIndex === null || !etas) return null;
     const mine = etas.filter(isMine);
-    const labels = labelEtas(live.buses, openIndex, mine.map((e) => Date.parse(e.eta!)));
+    const labels = labelEtas(live.buses, openIndex, mine.map((e) => Date.parse(e.eta!)), live.segSeconds, now);
     return etas.map((e) => {
       const k = mine.indexOf(e);
       if (k < 0) return null;

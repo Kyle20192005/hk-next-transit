@@ -34,7 +34,7 @@ describe('成條線追蹤巴士', () => {
   it('對應打開咗嘅站：近嘅車對第一班，其餘未開出', () => {
     const etas = [[m(9)], [m(0.5), m(11)], [m(2.5), m(13)], [m(4.5)], [m(1), m(6.5), m(15)]];
     const buses = trackBuses(etas, seg, now);
-    const labels = labelEtas(buses, 4, [m(1), m(6.5), m(15)]);
+    const labels = labelEtas(buses, 4, [m(1), m(6.5), m(15)], seg, now);
     expect(labels.map((l) => (l.kind === 'coming' ? `距離${l.stopsAway}` : l.kind))).toEqual(['arriving', '距離4', 'notDeparted']);
   });
 });
@@ -63,6 +63,21 @@ describe('按時段行車時間', () => {
   it('公眾假期當星期日', () => {
     expect(hourlySlot(new Date('2026-12-25T10:00:00+08:00'), cal).weekday).toBe(0);
   });
+});
+
+it('啱啱到終點站嘅車唔可以配去 14 分鐘後嗰班（之前嘅 bug）', () => {
+  // 一架車喺倒數第二站同終點站之間，30 秒後到；但終點站嘅 ETA 列表只剩 14 分鐘同 45 分鐘後兩班
+  const buses = [{ from: 12, nextEta: m(0.5) }];
+  const seg13 = Array(13).fill(120);
+  const labels = labelEtas(buses, 13, [m(14), m(45)], seg13, now);
+  expect(labels.map((l) => l.kind)).toEqual(['notDeparted', 'notDeparted']);
+});
+
+it('預計到站時間夾得埋先配對', () => {
+  // 一架車喺第 1、2 站之間，1 分鐘後到第 2 站；去第 5 站（index 4）要再行 3 段 × 2 分鐘 = 7 分鐘後到
+  const labels = labelEtas([{ from: 1, nextEta: m(1) }], 4, [m(7.5), m(30)], [120, 120, 120, 120], now);
+  expect(labels[0]).toMatchObject({ kind: 'coming', stopsAway: 3 });
+  expect(labels[1]!.kind).toBe('notDeparted');
 });
 
 describe('巴士只向前唔倒退', () => {

@@ -85,20 +85,49 @@ export function busFraction(bus: TrackedBus, segSeconds: number[], now: number):
 
 export type BusLabel = { kind: 'coming'; stopsAway: number; bus: TrackedBus } | { kind: 'arriving'; bus: TrackedBus } | { kind: 'notDeparted' };
 
+/** 架車預計幾時到第 stopIndex 個站：到下一站嘅 ETA + 之後每段行車時間 */
+export function predictArrival(bus: TrackedBus, stopIndex: number, segSeconds: number[]): number {
+  let t = bus.nextEta;
+  for (let i = bus.from + 1; i < stopIndex; i++) t += (segSeconds[i] ?? 60) * 1000;
+  return t;
+}
+
+/** 預計到站時間同 ETA 相差幾多都當係同一架車（毫秒）：最少 3 分鐘，或者行程時間嘅三成 */
+function labelTolerance(bus: TrackedBus, eta: number, now: number): number {
+  return Math.max(180_000, (eta - now) * 0.3);
+}
+
 /**
- * 將追蹤到嘅車對應返某個站嘅 ETA：上游嘅車由近到遠，順序對應 ETA（巴士通常唔會互相超越）；
- * 對應唔到嘅 ETA 即係仲未由總站開出。
+ * 將追蹤到嘅車對應返某個站嘅 ETA。上游嘅車由近到遠、ETA 由早到遲順序配對（巴士通常唔會互相超越），
+ * 但**預計到站時間要同 ETA 夾得埋**：例如一架啱啱到終點站嘅車，終點站嘅 ETA 列表已經冇咗佢，
+ * 就唔可以配咗去 14 分鐘後嗰班。對唔到嘅 ETA 即係仲未由總站開出。
  * @param etas 呢個站屬於呢個走法嘅 ETA（毫秒），按時間排
  */
-export function labelEtas(buses: TrackedBus[], stopIndex: number, etas: number[]): BusLabel[] {
+export function labelEtas(
+  buses: TrackedBus[],
+  stopIndex: number,
+  etas: number[],
+  segSeconds: number[],
+  now: number,
+): BusLabel[] {
   const upstream = buses
     .filter((b) => b.from < stopIndex)
-    .sort((a, b) => b.from - a.from || a.nextEta - b.nextEta);
-  return etas.map((_, i): BusLabel => {
-    const bus = upstream[i];
-    if (!bus) return { kind: 'notDeparted' };
-    if (bus.from === stopIndex - 1) return { kind: 'arriving', bus };
-    return { kind: 'coming', stopsAway: stopIndex - bus.from, bus };
+    .sort((a, b) => b.from - a.from || a.nextEta - b.nextEta)
+    .map((bus) => ({ bus, arrival: predictArrival(bus, stopIndex, segSeconds) }));
+  let next = 0;
+  return etas.map((eta): BusLabel => {
+    // 由上次配到嘅車之後搵：第一架預計到站時間夾得埋嘅
+    for (let j = next; j < upstream.length; j++) {
+      const { bus, arrival } = upstream[j]!;
+      if (Math.abs(arrival - eta) <= labelTolerance(bus, eta, now)) {
+        next = j + 1;
+        return bus.from === stopIndex - 1 ? { kind: 'arriving', bus } : { kind: 'coming', stopsAway: stopIndex - bus.from, bus };
+      }
+      // 呢架車預計早過呢個 ETA 好多：佢應該係對應一個已經唔喺列表嘅班次（例如啱啱到站），跳過
+      if (arrival < eta) continue;
+      break;
+    }
+    return { kind: 'notDeparted' };
   });
 }
 
