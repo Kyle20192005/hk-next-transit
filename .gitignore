@@ -9,3 +9,5 @@ dist/
 pipeline/cache/
 pipeline/out/
 __pycache__/
+# Next.js 自動生成，dev 同 build 會改
+apps/web/next-env.d.ts
