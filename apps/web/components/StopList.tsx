@@ -35,6 +35,7 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [live, setLive] = useState<{ buses: TrackedBus[]; segSeconds: number[] } | null>(null);
   const rows = useRef<(HTMLLIElement | null)[]>([]);
@@ -107,6 +108,7 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
         if (!res.ok) throw new Error(body.error ?? res.statusText);
         if (cancelled) return;
         setEtas((body.etas as Eta[]).filter((e) => e.dir === open.dir && e.eta));
+        setFailed((body.failed as string[] | undefined) ?? []);
         setError(null);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
@@ -197,6 +199,7 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
             etas={openIndex === i ? etas : null}
             whereLabels={openIndex === i ? whereLabels : null}
             error={openIndex === i ? error : null}
+            failed={openIndex === i ? failed : []}
             now={now}
             selectedVariantId={selectedVariantId}
             travelSeconds={openIndex !== null && i > openIndex ? tr : null}

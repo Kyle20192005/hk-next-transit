@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { etasAtStop, type RouteData } from '../src';
+import { etasAtStop, etasAtStopDetailed, type RouteData } from '../src';
 
 // 聯營線：城巴路線檔，站 S1 嘅九巴站 ID 係 K1；九巴嘅 bound 同城巴相反（城巴 O = 九巴 I）
 const route = {
@@ -107,5 +107,35 @@ describe('九巴唔同 service_type 回傳同一批車（例如 107）', () => {
     const etas = await etasAtStop(r107, 'S1', {}, f);
     expect(etas).toHaveLength(1);
     expect(etas[0]!.variant?.variantId).toBe('1491-1');
+  });
+});
+
+describe('營辦商 API 出錯', () => {
+  it('重試一次', async () => {
+    let calls = 0;
+    const f = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('citybus')) {
+        calls++;
+        if (calls === 1) return new Response('err', { status: 500 });
+        return json([{ co: 'CTB', route: '101', dir: 'O', seq: 1, stop: 'S1', dest_tc: '', dest_en: '', eta: '2026-11-03T10:05:00+08:00', rmk_tc: '', rmk_en: '' }]);
+      }
+      return json([]);
+    }) as typeof fetch;
+    const r = await etasAtStopDetailed(route, 'S1', {}, f);
+    expect(calls).toBe(2);
+    expect(r.failed).toEqual([]);
+    expect(r.etas.map((e) => e.company)).toEqual(['CTB']);
+  });
+
+  it('重試都唔得：記低邊間公司攞唔到，其他公司照出', async () => {
+    const f = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('citybus')) return new Response('err', { status: 500 });
+      return json([{ co: 'KMB', route: '101', dir: 'I', service_type: 1, seq: 5, dest_tc: '', dest_en: '', eta: '2026-11-03T10:02:00+08:00', rmk_tc: '', rmk_en: '' }]);
+    }) as typeof fetch;
+    const r = await etasAtStopDetailed(route, 'S1', {}, f);
+    expect(r.failed).toEqual(['CTB']);
+    expect(r.etas.map((e) => e.company)).toEqual(['KMB']);
   });
 });

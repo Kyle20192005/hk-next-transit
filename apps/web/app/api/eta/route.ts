@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { etasAtStop } from '@hknt/core';
+import { etasAtStopDetailed } from '@hknt/core';
 import { getCalendar, getRoute } from '@/lib/data';
 import { CORS } from '@/lib/cors';
 import { liveFetch } from '@/lib/live-fetch';
@@ -20,10 +20,17 @@ export async function GET(req: NextRequest) {
   const [data, calendar] = await Promise.all([getRoute(co, route), getCalendar()]);
   if (!data) return err(404, `搵唔到路線 ${route}`);
 
-  const etas = await etasAtStop(data, stop, calendar, liveFetch);
+  const { etas, failed } = await etasAtStopDetailed(data, stop, calendar, liveFetch);
   return NextResponse.json(
-    { route: data.route, stop, fetchedAt: new Date().toISOString(), etas },
-    { headers: { ...CORS, 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=10' } },
+    // failed：邊間公司攞唔到數據（介面會提示，唔好當佢冇車）
+    { route: data.route, stop, fetchedAt: new Date().toISOString(), etas, failed },
+    {
+      headers: {
+        ...CORS,
+        // 有公司攞唔到：唔好 cache 呢個唔完整嘅結果
+        'Cache-Control': failed.length ? 'no-store' : 'public, s-maxage=10, stale-while-revalidate=10',
+      },
+    },
   );
 }
 

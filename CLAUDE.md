@@ -46,6 +46,9 @@ Vercel（Hobby）只部署 commit 作者係項目擁有者嘅 commit：commit �
   - 每間公司嘅 ETA 只有自己嘅車，`etasAtStop`（core `eta.ts`）合併兩邊。**九巴同城巴嘅去程定義可以相反**
     （101：九巴 O = 觀塘→堅尼地城，城巴 O = 相反），所以九巴班次嘅 `dir` 會轉做呢個走法喺呢個站用嘅方向。
   - 城巴「九巴時段」、九巴「城巴時段」係冇時間嘅佔位，要過濾走。
+- 營辦商 API 間中會出錯：`etasAtStopDetailed` 重試一次，再唔得就回傳 `failed`（邊間公司），唔好靜靜雞當佢冇車；
+  `/api/eta` 有 `failed` 時唔 cache（no-store），介面顯示「XX資料暫時攞唔到，可能少咗班次」。
+- 營辦商實時 ETA 用 `lib/live-fetch.ts`（no-store），**唔好用 Next.js fetch cache**：過期後第一個請求會拎到舊數據。
 - 九巴「原定班次」= 時間表時間：`Eta.scheduled = true`，介面標「原定」，唔用嚟追蹤巴士位置或者標「距離 N 個站」。
 - 九巴站名後面有編號（例如「(WT916)」），pipeline 會拎走。
 - 九巴就算要求唔同 service_type，都可能回傳同一批車（例如 107 嘅 1 同 2），只係改咗 `service_type` 欄，

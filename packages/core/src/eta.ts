@@ -19,14 +19,31 @@ export async function etasAtStop(
   calendar: Calendar,
   fetcher: typeof fetch = fetch,
 ): Promise<Eta[]> {
+  return (await etasAtStopDetailed(route, stopId, calendar, fetcher)).etas;
+}
+
+/** 同 etasAtStop，另外回傳邊間公司攞唔到數據（出錯重試一次都唔得），等介面可以話畀用戶知 */
+export async function etasAtStopDetailed(
+  route: RouteData,
+  stopId: string,
+  calendar: Calendar,
+  fetcher: typeof fetch = fetch,
+): Promise<{ etas: Eta[]; failed: Company[] }> {
   const companies = route.companies ?? [route.company];
   const parts: Promise<Eta[]>[] = [];
+  const failed = new Set<Company>();
+  // 營辦商 API 間中會出錯：重試一次；再唔得就記低邊間公司，唔好靜靜雞當佢冇車
+  const retry = <T,>(f: () => Promise<T>) => f().catch(() => f());
+  const fail = (co: Company) => () => {
+    failed.add(co);
+    return [] as Eta[];
+  };
 
   if (route.company === 'CTB' && companies.includes('CTB')) {
     parts.push(
-      fetchCtbEta(stopId, route.route, fetcher)
+      retry(() => fetchCtbEta(stopId, route.route, fetcher))
         .then((etas) => inferAll(route, etas.filter((e) => e.eta), calendar))
-        .catch(() => []),
+        .catch(fail('CTB')),
     );
   }
 
@@ -40,7 +57,7 @@ export async function etasAtStop(
       if (key) byDir.set(v.ctb.dir, [...(byDir.get(v.ctb.dir) ?? []), { v, dir: key[0] as Eta['dir'] }]);
     }
     parts.push(
-      fetchCtbEta(ctbStop, route.route, fetcher)
+      retry(() => fetchCtbEta(ctbStop, route.route, fetcher))
         .then((etas) =>
           etas.flatMap((e): Eta[] => {
             const members = byDir.get(e.dir);
@@ -62,7 +79,7 @@ export async function etasAtStop(
             ];
           }),
         )
-        .catch(() => []),
+        .catch(fail('CTB')),
     );
   }
 
@@ -83,7 +100,7 @@ export async function etasAtStop(
       // 同一組有幾個政府走法（例如九巴冇分開嘅短途特別班）：當係正常嗰個，可信度降做 likely
       const main = members.find((m) => !m.v.special) ?? members[0]!;
       parts.push(
-        fetchKmbEta(kmbStop, route.route, st, fetcher, kmbCo)
+        retry(() => fetchKmbEta(kmbStop, route.route, st, fetcher, kmbCo))
           .then((etas) =>
             etas
               .filter((e) => e.dir === bound)
@@ -102,13 +119,13 @@ export async function etasAtStop(
                 }),
               ),
           )
-          .catch(() => []),
+          .catch(fail(kmbCo)),
       );
     }
   }
 
   const all = (await Promise.all(parts)).flat();
-  return dedupe(all).sort((a, b) => Date.parse(a.eta ?? '') - Date.parse(b.eta ?? ''));
+  return { etas: dedupe(all).sort((a, b) => Date.parse(a.eta ?? '') - Date.parse(b.eta ?? '')), failed: [...failed] };
 }
 
 /**

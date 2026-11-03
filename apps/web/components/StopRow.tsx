@@ -3,6 +3,7 @@ import { forwardRef } from 'react';
 import { formatDistance, shortName, type Eta } from '@hknt/core';
 import BusIcon from './BusIcon';
 import CompanyTag from './CompanyTag';
+import { COMPANIES } from '@/lib/company';
 
 /**
  * 時間線上嘅巴士。兩站之間嘅前半段畫喺上一個站嗰行（站點圓點以下），後半段畫喺下一個站嗰行（圓點以上）。
@@ -33,6 +34,8 @@ type Props = {
   /** 每班車而家喺邊（同 etas 對應），例如「距離 3 個站 · 1.2 公里」 */
   whereLabels: (string | null)[] | null;
   error: string | null;
+  /** 攞唔到數據嘅公司（例如城巴 API 出錯） */
+  failed: string[];
   now: number;
   selectedVariantId: string | null;
   /** 由打開咗嘅站去呢個站要幾多秒（只有後面嘅站先有） */
@@ -50,7 +53,7 @@ const hhmm = (ms: number) =>
 
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, now, selectedVariantId, travelSeconds, travelMetres, nextArrival, buses },
+  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, travelSeconds, travelMetres, nextArrival, buses },
   ref,
 ) {
   const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null })) ?? null;
@@ -87,7 +90,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
         <div className="etas" aria-live="polite">
           {error && <div className="muted">載入失敗：{error}</div>}
           {!error && list === null && <div className="muted">載入中…</div>}
-          {!error && list?.length === 0 && <div className="muted">暫時冇班次</div>}
+          {!error && list?.length === 0 && failed.length === 0 && <div className="muted">暫時冇班次</div>}
           {next && (
             <div className="eta-next">
               <span className="eta-big">
@@ -125,6 +128,11 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                 );
               })}
             </ul>
+          )}
+          {failed.length > 0 && (
+            <div className="eta-failed" role="status">
+              ⚠️ {failed.map((c) => COMPANIES[c as keyof typeof COMPANIES]?.name ?? c).join('、')}資料暫時攞唔到，可能少咗班次，稍後會自動再試
+            </div>
           )}
         </div>
       )}
