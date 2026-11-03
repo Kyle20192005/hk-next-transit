@@ -87,8 +87,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 走法名稱用 `variantLabel`：正常走法叫「正常路線」，括號係走法描述（經／繞／不）先加，目的地唔加。
 - 地圖底圖用地政總署 API（`mapapi.geodata.gov.hk`，免費唔使 key），要註明「© 地政總署」。
   網頁用 Leaflet（只喺瀏覽器載入），App 用 react-native-maps 加 `UrlTile`。
-- 路線頁版面要緊湊（手機 Safari 底部有浮動工具列）：方向用一行「往 X ⇅」，地圖高度 clamp(150px, 26dvh, 280px)，
-  站點列表底部留位。標題、方向、走法、地圖固定，只有站點列表捲動；走法選擇平時收埋，展開時蓋住地圖。
+- 路線頁版面要緊湊（手機 Safari 底部有浮動工具列）：方向用一行「往 X ⇅」，地圖高度 clamp(150px, 26dvh, 280px)。
+  打開站時將站名對齊列表頂部。標題、方向、走法、地圖固定，只有站點列表捲動；走法選擇平時收埋，展開時蓋住地圖。
   站點一次只開一個，打開時地圖放大去嗰個站；撳地圖嘅站會打開列表對應嘅站（web 用 `lib/events.ts` 嘅 window event）。
 - 地圖方向箭嘴用 core 嘅 `lineArrows`；web 每次縮放按 px 距離重新篩選，App 只喺 300 米以上嘅段放。
 - 新增營辦商：喺 `packages/core/src/` 加 adapter，輸出統一嘅 `Eta` 類型。

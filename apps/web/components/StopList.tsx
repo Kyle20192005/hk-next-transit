@@ -19,8 +19,14 @@ export default function StopList({ route, stops, selectedVariantId }: Props) {
     setOpenIndex(i);
     if (i === null) return;
     window.dispatchEvent(new CustomEvent(FOCUS_STOP_EVENT, { detail: i }));
-    // 等展開後先捲，等成個站（連到站時間）都睇到
-    requestAnimationFrame(() => rows.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+    // 將打開咗嘅站嘅站名對齊列表頂部（只捲站點列表，唔郁成頁）
+    requestAnimationFrame(() => {
+      const row = rows.current[i];
+      const box = row?.closest<HTMLElement>('.route-stops');
+      if (!row || !box) return;
+      const top = row.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+      box.scrollTo({ top: Math.max(0, top - 4), behavior: 'smooth' });
+    });
   };
 
   useEffect(() => {
