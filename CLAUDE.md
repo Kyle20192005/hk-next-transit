@@ -25,7 +25,11 @@ pnpm --filter @hknt/core test               # vitest
 pnpm -r typecheck
 ```
 
-網頁版本地開發讀 `pipeline/out/`，所以要先跑 pipeline。上線時用 `DATA_BASE_URL` 指去 CDN。
+網頁版本地開發讀 `pipeline/out/`，所以要先跑 pipeline。上線時用 `DATA_BASE_URL` 指去數據位置。
+私人 repo 再加 `DATA_TOKEN`：raw.githubusercontent 網址會自動改用 GitHub Contents API。
+數據讀唔到時開 `/api/health` 睇原因。
+
+Vercel（Hobby）只部署 commit 作者係項目擁有者嘅 commit：commit 要用 `kylecom2017@gmail.com`。
 
 完成任何改動前：跑 core 測試同 `pnpm -r typecheck`。改 UI 要開 dev server 實際睇過。
 

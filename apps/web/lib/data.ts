@@ -5,21 +5,47 @@ import type { Calendar, RouteData, RouteIndex } from '@hknt/core';
 
 /**
  * 讀 pipeline 輸出嘅數據。
- * 有 DATA_BASE_URL 就由 CDN 攞（每小時更新一次 cache），冇就讀本地 pipeline/out（開發用）。
+ * - 有 DATA_BASE_URL：由網上攞（每小時更新一次 cache）
+ * - 冇：讀本地 pipeline/out（開發用）
+ *
+ * 私人 GitHub repo：設定 DATA_TOKEN（fine-grained token，Contents 唯讀）。
+ * DATA_BASE_URL 係 raw.githubusercontent.com 網址時，會自動改用 GitHub Contents API，
+ * 因為 raw 網址唔一定接受 fine-grained token。
  */
-const BASE = process.env.DATA_BASE_URL;
-/** 私人 GitHub repo 用：只需 Contents 讀取權限嘅 fine-grained token */
+const BASE = process.env.DATA_BASE_URL?.replace(/\/+$/, '');
 const TOKEN = process.env.DATA_TOKEN;
 const LOCAL = path.resolve(process.cwd(), '../../pipeline/out');
 
+const RAW_GITHUB = /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/(.+)$/;
+
+/** 回傳實際要 call 嘅網址同 headers */
+function remote(file: string): { url: string; headers: Record<string, string>; via: 'github-api' | 'url' } {
+  const m = BASE!.match(RAW_GITHUB);
+  if (TOKEN && m) {
+    const [, owner, repo, ref] = m;
+    return {
+      url: `https://api.github.com/repos/${owner}/${repo}/contents/${file}?ref=${encodeURIComponent(ref!)}`,
+      headers: {
+        Accept: 'application/vnd.github.raw+json',
+        Authorization: `Bearer ${TOKEN}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      via: 'github-api',
+    };
+  }
+  return { url: `${BASE}/${file}`, headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}, via: 'url' };
+}
+
 async function load<T>(file: string): Promise<T | null> {
   if (BASE) {
-    const res = await fetch(`${BASE}/${file}`, {
-      headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : undefined,
-      next: { revalidate: 3600 },
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`讀取 ${file} 失敗：${res.status}`);
+    const { url, headers } = remote(file);
+    const res = await fetch(url, { headers, next: { revalidate: 3600 } });
+    if (res.status === 404) {
+      // 私人 repo 冇權限時 GitHub 都係回 404，所以要寫 log，唔好靜靜雞當冇數據
+      console.warn(`[data] ${file}：404（檔案唔存在，或者冇權限讀取）`);
+      return null;
+    }
+    if (!res.ok) throw new Error(`讀取 ${file} 失敗：HTTP ${res.status}`);
     return (await res.json()) as T;
   }
   try {
@@ -43,4 +69,40 @@ export async function getCtbIndex(): Promise<RouteIndex> {
 
 export async function getCalendar(): Promise<Calendar> {
   return (await load<Calendar>('calendar.json')) ?? {};
+}
+
+/** 診斷用：數據來源設定同讀取結果（唔會顯示 token） */
+export async function dataHealth() {
+  const source = !BASE ? 'local' : remote('ctb/index.json').via;
+  const out: Record<string, unknown> = {
+    source,
+    dataBaseUrl: BASE ?? null,
+    hasToken: Boolean(TOKEN),
+  };
+  if (!BASE) {
+    out.localDir = LOCAL;
+  } else {
+    const { url, headers } = remote('ctb/index.json');
+    try {
+      const res = await fetch(url, { headers, cache: 'no-store' });
+      out.indexStatus = res.status;
+      if (res.ok) {
+        const idx = (await res.json()) as RouteIndex;
+        out.routes = idx.routes.length;
+        out.generatedAt = idx.generatedAt;
+      } else {
+        out.hint =
+          res.status === 404
+            ? '404：檔案唔存在，或者 token 冇呢個 repo 嘅讀取權限'
+            : res.status === 401
+              ? '401：token 無效或者過期'
+              : res.status === 403
+                ? '403：token 權限唔夠（要 Contents: Read-only），或者超過 API 限額'
+                : undefined;
+      }
+    } catch (e) {
+      out.error = (e as Error).message;
+    }
+  }
+  return out;
 }
