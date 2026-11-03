@@ -106,9 +106,7 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
               <Link href={`/${co}/${r.route}`} className="route-item">
                 <span className="route-id">
                   <span className="route-num">{r.route}</span>
-                  {(r.companies ?? ['CTB']).map((c) => (
-                    <CompanyTag key={c} company={c} />
-                  ))}
+                  <CompanyTag companies={r.companies ?? ['CTB']} />
                 </span>
                 <RouteEnds r={r} />
               </Link>

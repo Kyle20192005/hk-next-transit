@@ -14,6 +14,8 @@ export interface RowBus {
   half: 'below' | 'above';
   t: number;
   label: string;
+  /** 聯營線：按公司上色 */
+  color?: string;
 }
 
 const busTop = (b: RowBus) =>
@@ -66,7 +68,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
   return (
     <li className={`stop${open ? ' open' : ''}${terminus ? ' terminus' : ''}`} ref={ref}>
       {buses.map((b) => (
-        <span key={b.key} className="tl-bus" style={{ top: busTop(b) }} title={b.label} aria-hidden="true">
+        <span key={b.key} className="tl-bus" style={{ top: busTop(b), ...(b.color ? { background: b.color } : {}) }} title={b.label} aria-hidden="true">
           <BusIcon />
         </span>
       ))}
@@ -115,15 +117,18 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                   <li key={i} className={other ? 'eta-row-other' : undefined}>
                     <span className="eta-min">{minsOf(e) === 0 ? '即將' : `${minsOf(e)} 分`}</span>
                     <span className="eta-time">{e.eta!.slice(11, 16)}</span>
-                    <EtaTags e={e} multiCompany={multiCompany} />
-                    {/* 揀咗嘅走法唔使再標；其他走法先標出嚟 */}
-                    {other && v?.name && (
-                      <span className={`badge${v.special ? ' special' : ''}`} title={v.reason}>
-                        {v.special ? shortName({ name: v.name }) : '正常路線'}
-                        {v.confidence === 'likely' ? '（推斷）' : ''}
-                      </span>
-                    )}
-                    {where && <span className="where">{where}</span>}
+                    {/* 第三欄：公司、原定、走法、位置包埋一格，太長喺格入面斷行，唔會走去分鐘下面 */}
+                    <span className="eta-meta">
+                      <EtaTags e={e} multiCompany={multiCompany} />
+                      {/* 揀咗嘅走法唔使再標；其他走法先標出嚟 */}
+                      {other && v?.name && (
+                        <span className={`badge${v.special ? ' special' : ''}`} title={v.reason}>
+                          {v.special ? shortName({ name: v.name }) : '正常路線'}
+                          {v.confidence === 'likely' ? '（推斷）' : ''}
+                        </span>
+                      )}
+                      {where && <span className="where">{where}</span>}
+                    </span>
                   </li>
                 );
               })}
@@ -146,7 +151,7 @@ export default StopRow;
 function EtaTags({ e, multiCompany }: { e: Eta; multiCompany: boolean }) {
   return (
     <>
-      {multiCompany && <CompanyTag company={e.company} />}
+      {multiCompany && <CompanyTag company={e.company} compact />}
       {e.scheduled && (
         <span className="scheduled" title="原定班次：時間表時間，唔係實時">
           原定

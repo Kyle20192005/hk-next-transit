@@ -123,9 +123,7 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
                 <Link href={`/${r.co}/${r.route}?dir=${r.dir}&stop=${stop.id}`} className="nearby-route">
                   <span className="route-id">
                     <span className="route-num sm">{r.route}</span>
-                    {r.companies.map((c) => (
-                      <CompanyTag key={c} company={c} />
-                    ))}
+                    <CompanyTag companies={r.companies} />
                   </span>
                   <span className="route-to">往 {r.dest}</span>
                   <span className="nearby-eta">

@@ -34,6 +34,8 @@ export async function GET(req: NextRequest) {
     return err(502, `營辦商 API 出錯：${(e as Error).message}`);
   }
   // 只留屬於呢個走法嘅班次：推斷到係呢個走法，或者推斷唔到但 seq 吻合
+  // 每個站：到站時間 -> 公司（追蹤完之後用嚟標明每架車屬邊間公司）
+  const companyAt = perStop.map((etas) => new Map(etas.filter((e) => e.eta).map((e) => [Date.parse(e.eta!), e.company])));
   const stopEtas = perStop.map((etas, i) => {
     const s = stops[i]!;
     return etas
@@ -54,7 +56,11 @@ export async function GET(req: NextRequest) {
       segSeconds,
       /** 有幾多段用咗而家時段嘅實測行車時間（其餘用平均） */
       hourlySegments: hourly,
-      buses: buses.map((b) => ({ from: b.from, nextEta: new Date(b.nextEta).toISOString() })),
+      buses: buses.map((b) => ({
+        from: b.from,
+        nextEta: new Date(b.nextEta).toISOString(),
+        company: companyAt[b.from + 1]?.get(b.nextEta) ?? data.company,
+      })),
       // ?debug=1：每個站屬於呢個走法嘅 ETA，方便檢查追蹤結果
       ...(q.get('debug') === '1' ? { stopEtas: stopEtas.map((l, i) => ({ stop: stops[i]!.stopId, etas: l.map((t) => new Date(t).toISOString()) })) } : {}),
     },

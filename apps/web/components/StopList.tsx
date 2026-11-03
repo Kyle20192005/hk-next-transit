@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BusStabilizer, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
+import { companyColor } from '@/lib/company';
 
 type Props = {
   /** 路線檔位置（ctb 包聯營線、kmb 包九巴同龍運） */
@@ -75,9 +76,9 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
       try {
         const res = await fetch(`/api/buses?co=${co}&route=${encodeURIComponent(route)}&v=${selectedVariantId}`);
         if (!res.ok) return;
-        const body = (await res.json()) as { buses: { from: number; nextEta: string }[]; segSeconds: number[] };
+        const body = (await res.json()) as { buses: { from: number; nextEta: string; company?: string }[]; segSeconds: number[] };
         if (cancelled) return;
-        setLive({ buses: body.buses.map((b) => ({ from: b.from, nextEta: Date.parse(b.nextEta) })), segSeconds: body.segSeconds });
+        setLive({ buses: body.buses.map((b) => ({ from: b.from, nextEta: Date.parse(b.nextEta), company: b.company })), segSeconds: body.segSeconds });
       } catch {
         /* 下次再試 */
       }
@@ -174,10 +175,10 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
       const [row, half, t] = f < 0.5 ? [from, 'below' as const, f * 2] : [from + 1, 'above' as const, (f - 0.5) * 2];
       const mins = Math.max(0, Math.round((bus.nextEta - busNow) / 60000));
       const label = mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`;
-      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label }]);
+      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label, color: multiCompany ? companyColor(bus.company) : undefined }]);
     }
     return out;
-  }, [live, busNow, stabilizer, stops]);
+  }, [live, busNow, stabilizer, stops, multiCompany]);
 
   return (
     <ol className="stops" style={{ ['--line-color' as string]: special ? 'var(--special)' : 'var(--route-line)' }}>

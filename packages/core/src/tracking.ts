@@ -15,6 +15,8 @@ export interface TrackedBus {
   from: number;
   /** 預計幾時到第 from+1 個站（毫秒） */
   nextEta: number;
+  /** 營辦公司（聯營線地圖用唔同顏色；由 API 根據下一站嘅 ETA 補返） */
+  company?: string;
 }
 
 /** 一架車喺上游站嘅 ETA 同預期差幾多都當係同一架（毫秒）：最少 2 分鐘，或者呢段行車時間嘅一半 */
