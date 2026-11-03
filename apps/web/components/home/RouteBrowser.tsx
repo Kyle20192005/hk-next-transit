@@ -55,6 +55,29 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
     return () => io.disconnect();
   }, [matches]);
 
+  // 實體鍵盤（電腦、iPad 鍵盤）：直接打路線號碼；打緊地點時唔理
+  useEffect(() => {
+    if (place !== null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key === 'Backspace') {
+        setCode((c) => c.slice(0, -1));
+        e.preventDefault();
+      } else if (e.key === 'Escape') {
+        setCode('');
+      } else if (/^[0-9a-zA-Z]$/.test(e.key)) {
+        const k = e.key.toUpperCase();
+        // 只接受可以接落去嘅字（同屏幕鍵盤一樣）
+        if (nextChars.has(k)) setCode((c) => c + k);
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [place, nextChars]);
+
   const usePlace = () => {
     setPlace('');
     setCode('');
@@ -66,7 +89,9 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
       <div className="search-bar">
         {place === null ? (
           <button className="search-field" onClick={usePlace} aria-label="搜尋路線">
-            <span className={code ? 'search-code' : 'search-placeholder'}>{code || '輸入路線號碼'}</span>
+            <span className={code ? 'search-code' : 'search-placeholder'}>
+              {code || '輸入路線號碼'}
+            </span>
             {code && (
               <span
                 className="search-clear"

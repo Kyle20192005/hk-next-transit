@@ -151,6 +151,9 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 詳細班次：標題列「🕒 班次」掣，撳開右邊 drawer（`components/TimetableDrawer.tsx`）。按服務日子分頁（`serviceDaysLabel`，預設今日），
   可以揀走法；時段由開車時間還原（`timetablePeriods`：最少三班相隔一樣先併做「每 N 分鐘」，零散班次逐班列），今日而家嘅時段標「而家」並捲到。
   標題列第二行只用嚟寫「不設樂悠咭優惠」。
+- 闊螢幕（≥ 768px，iPad、電腦）：路線頁兩欄（`.route-top` 用 `display: contents`，grid 左邊標題／走法／站點，右邊全高地圖）；
+  首頁路線列表兩欄（電腦三欄）。電腦（`hover: hover` + `pointer: fine` + ≥ 1024px）收埋屏幕鍵盤，直接用實體鍵盤打號碼
+  （`RouteBrowser` 嘅 keydown，只接受可以接落去嘅字）。手機版面唔變。
 - 新增營辦商：喺 `packages/core/src/` 加 adapter，輸出統一嘅 `Eta` 類型。
 
 ## 已知未做
