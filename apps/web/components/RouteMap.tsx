@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { BusStabilizer, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
@@ -227,19 +228,50 @@ export default function RouteMap({ lines, stops, multiCompany = false, company }
       <button className="map-help-btn" onClick={() => setHelp((h) => !h)} aria-expanded={help} aria-label="巴士位置點樣計？">
         ?
       </button>
-      {help && (
-        <div className="map-help card" role="dialog" aria-label="巴士位置點樣計">
-          <strong>巴士位置點樣計？</strong>
-          <p>地圖上嘅巴士位置係<b>推算</b>出嚟，唔係 GPS 實時定位：</p>
-          <ul>
-            <li>每 20 秒讀取城巴每個站嘅到站時間，睇邊架車已經過咗邊個站，推算佢喺邊兩個站之間。</li>
-            <li>兩站之間嘅位置按嗰段路嘅行車時間估算（城巴到站時間同實測平均）。</li>
-            <li>到站時間推遲（例如塞車）時，巴士會停喺原位，唔會倒退，等時間追上先再郁。</li>
-          </ul>
-          <p className="muted">僅供參考，以城巴到站時間為準。</p>
-          <button className="map-help-close" onClick={() => setHelp(false)}>知道</button>
-        </div>
-      )}
+      {help &&
+        createPortal(
+          <div className="map-help-backdrop" onClick={() => setHelp(false)}>
+            <div className="map-help card" role="dialog" aria-modal="true" aria-label="巴士位置點樣計" onClick={(e) => e.stopPropagation()}>
+              <MapHelpText company={company} multiCompany={multiCompany} />
+              <button className="map-help-close" onClick={() => setHelp(false)}>知道</button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
+  );
+}
+
+const CO_NAME: Record<string, string> = { CTB: '城巴', KMB: '九巴', NLB: '新大嶼山巴士', MTRB: '港鐵巴士' };
+
+/** 「?」說明：按公司講（港鐵巴士有真 GPS，其他係推算） */
+function MapHelpText({ company, multiCompany }: { company: string; multiCompany: boolean }) {
+  const src = multiCompany ? '城巴同九巴' : (CO_NAME[company] ?? '巴士公司');
+  const estimate = (
+    <>
+      <li>每 20 秒讀取{src}每個站嘅到站時間，睇邊架車已經過咗邊個站，推算佢喺邊兩個站之間。</li>
+      <li>兩站之間嘅位置按嗰段路嘅行車時間估算（到站時間同實測平均）。</li>
+      <li>到站時間推遲（例如塞車）時，巴士會停喺原位，唔會倒退，等時間追上先再郁。</li>
+    </>
+  );
+  if (company === 'MTRB') {
+    return (
+      <>
+        <strong>巴士位置點樣嚟？</strong>
+        <p>港鐵巴士行緊嘅車有 <b>GPS 位置</b>，地圖直接顯示，每 20 秒更新。</p>
+        <ul>
+          <li>未開出、或者冇 GPS 嘅車，位置按到站時間推算。</li>
+        </ul>
+        <p className="muted">僅供參考，以港鐵巴士到站時間為準。</p>
+      </>
+    );
+  }
+  return (
+    <>
+      <strong>巴士位置點樣計？</strong>
+      <p>地圖上嘅巴士位置係<b>推算</b>出嚟，唔係 GPS 實時定位：</p>
+      <ul>{estimate}</ul>
+      <p className="muted">僅供參考，以{src}到站時間為準。</p>
+    </>
   );
 }
