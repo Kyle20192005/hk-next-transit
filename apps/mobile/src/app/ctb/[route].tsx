@@ -5,8 +5,9 @@ import {
   fmtMinutes,
   lineArrows,
   serviceWindow,
-  busPositions,
-  cumulativeSeconds,
+  busFraction,
+  labelEtas,
+  type TrackedBus,
   pointOnPath,
   secondsFrom,
   stopPathIndices,
@@ -143,45 +144,76 @@ export default function RouteScreen() {
     };
   }, [data, openStopItem]);
 
-  const cum = useMemo(() => (selected ? cumulativeSeconds(selected) : null), [selected]);
+  // 成條線嘅巴士位置：每 20 秒問後端（用每個站嘅 ETA 追蹤）
+  const [live, setLive] = useState<{ buses: TrackedBus[]; segSeconds: number[] } | null>(null);
+  useEffect(() => {
+    if (!data || !selected) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const body = await api.buses(data.route, selected.id);
+        if (!cancelled) setLive({ buses: body.buses.map((b) => ({ from: b.from, nextEta: Date.parse(b.nextEta) })), segSeconds: body.segSeconds });
+      } catch {
+        /* 下次再試 */
+      }
+    };
+    void tick();
+    const id = setInterval(tick, 20_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [data, selected]);
+  // 每 5 秒按時間推前巴士位置
+  const [busNow, setBusNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setBusNow(Date.now()), 5_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const seg = live?.segSeconds ?? selected?.segSeconds ?? null;
+  const cum = useMemo(() => {
+    if (!seg) return null;
+    const out = [0];
+    for (const x of seg) out.push(out[out.length - 1]! + x);
+    return out;
+  }, [seg]);
   const isMine = (e: Eta) => !selected || !e.variant?.variantId || e.variant.variantId === selected.id;
   const travel = cum && openIndex !== null ? secondsFrom(cum, openIndex) : null;
   const nextAtOpen =
     etas?.filter(isMine).map((e) => Date.parse(e.eta!)).filter((x) => x >= etaNow - 60_000).sort((a, b) => a - b)[0] ?? null;
-  const whereLabels =
-    cum && openIndex !== null && etas
-      ? etas.map((e) => {
-          if (!isMine(e)) return null;
-          const [p] = busPositions(cum, openIndex, [e], new Date(etaNow));
-          if (!p) return null;
-          if (p.state === 'notDeparted') return '未開出';
-          if (p.state === 'at' || (p.state === 'between' && p.from === openIndex - 1 && p.fraction > 0.7)) return '即將到站';
-          return `距離 ${openIndex - p.from} 個站`;
-        })
-      : null;
+  // 每班車而家喺邊：用成條線追蹤到嘅巴士對應返呢個站嘅 ETA
+  const whereLabels = (() => {
+    if (!live || openIndex === null || !etas) return null;
+    const mine = etas.filter(isMine);
+    const labels = labelEtas(live.buses, openIndex, mine.map((e) => Date.parse(e.eta!)));
+    return etas.map((e) => {
+      const k = mine.indexOf(e);
+      if (k < 0) return null;
+      const l = labels[k]!;
+      return l.kind === 'notDeparted' ? '未開出' : l.kind === 'arriving' ? '即將到站' : `距離 ${l.stopsAway} 個站`;
+    });
+  })();
   // 地圖上嘅巴士：沿住揀咗嘅走線放
   const buses: MapBus[] = (() => {
-    if (!cum || openIndex === null || !etas) return [];
+    if (!live) return [];
     const sel = mapLines.find((l) => l.selected);
     const path: LatLng[] = sel
-      ? sel.segments.flatMap((seg, i) => (i === 0 ? seg : seg.slice(1))).map((p) => [p.latitude, p.longitude] as LatLng)
+      ? sel.segments.flatMap((sg, i) => (i === 0 ? sg : sg.slice(1))).map((p) => [p.latitude, p.longitude] as LatLng)
       : [];
     const idx = path.length ? stopPathIndices(path, mapStops.map((m) => [m.lat, m.lng] as LatLng)) : [];
     const at = (stopIndex: number) => mapStops.findIndex((m) => m.index === stopIndex);
-    return busPositions(cum, openIndex, etas.filter(isMine), new Date(etaNow)).flatMap((p, k): MapBus[] => {
-      if (p.state === 'notDeparted') return [];
-      if (p.state === 'at') {
-        const m = mapStops[at(p.stop)];
-        return m ? [{ key: k, latitude: m.lat, longitude: m.lng, minutes: 0 }] : [];
-      }
-      const a = at(p.from);
-      const b = at(p.from + 1);
-      const pt = idx[a] !== undefined && idx[b] !== undefined ? pointOnPath(path, idx[a]!, idx[b]!, p.fraction) : null;
-      if (pt) return [{ key: k, latitude: pt.lat, longitude: pt.lng, minutes: Math.round(p.secondsAway / 60) }];
+    return live.buses.flatMap((b, k): MapBus[] => {
+      const fraction = busFraction(b, live.segSeconds, busNow);
+      const minutes = Math.max(0, Math.round((b.nextEta - busNow) / 60000));
+      const a = at(b.from);
+      const c = at(b.from + 1);
+      const pt = idx[a] !== undefined && idx[c] !== undefined ? pointOnPath(path, idx[a]!, idx[c]!, fraction) : null;
+      if (pt) return [{ key: k, latitude: pt.lat, longitude: pt.lng, minutes }];
       const ma = mapStops[a];
-      const mb = mapStops[b];
-      return ma && mb
-        ? [{ key: k, latitude: ma.lat + (mb.lat - ma.lat) * p.fraction, longitude: ma.lng + (mb.lng - ma.lng) * p.fraction, minutes: Math.round(p.secondsAway / 60) }]
+      const mc = mapStops[c];
+      return ma && mc
+        ? [{ key: k, latitude: ma.lat + (mc.lat - ma.lat) * fraction, longitude: ma.lng + (mc.lng - ma.lng) * fraction, minutes }]
         : [];
     });
   })();

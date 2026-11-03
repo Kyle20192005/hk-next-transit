@@ -2,8 +2,8 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { busPositions, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
-import { BUS_ETAS_EVENT, FOCUS_STOP_EVENT, OPEN_STOP_EVENT, type BusEtasDetail } from '@/lib/events';
+import { busFraction, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
+import { BUSES_EVENT, FOCUS_STOP_EVENT, OPEN_STOP_EVENT, latestBuses, type BusesDetail } from '@/lib/events';
 
 export interface MapStop {
   index: number;
@@ -36,16 +36,14 @@ function cssVar(name: string, fallback: string): string {
 }
 
 /** 巴士位置每幾耐按時間推前一次 */
-const BUS_TICK_MS = 10_000;
+const BUS_TICK_MS = 5_000;
 
 type Props = {
   lines: MapLine[];
   stops: MapStop[];
-  /** 揀咗嘅走法嘅累計行車秒數（index 同 stops 嘅 index 一樣）；冇就唔畫巴士 */
-  cum: number[] | null;
 };
 
-export default function RouteMap({ lines, stops, cum }: Props) {
+export default function RouteMap({ lines, stops }: Props) {
   const el = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -134,7 +132,7 @@ export default function RouteMap({ lines, stops, cum }: Props) {
       ? new Map(stopPathIndices(path, stops.map((s) => [s.lat, s.lng] as LatLng)).map((p, k) => [stops[k]!.index, p]))
       : new Map<number, number>();
     const busLayer = L.layerGroup().addTo(map);
-    let latest: BusEtasDetail = { stopIndex: null, etas: [] };
+    let latest: BusesDetail | null = latestBuses();
     let fittedFor: number | null = null;
     const busColor = sel?.special ? special : brand;
 
@@ -151,17 +149,21 @@ export default function RouteMap({ lines, stops, cum }: Props) {
       return a && b ? [a.lat + (b.lat - a.lat) * fraction, a.lng + (b.lng - a.lng) * fraction] : null;
     };
 
+    // 成條線嘅巴士（由 /api/buses 追蹤），每 5 秒按時間推前
     const drawBuses = () => {
       busLayer.clearLayers();
-      if (!cum || latest.stopIndex === null) return;
-      const target = byIndex.get(latest.stopIndex);
-      const placed: L.LatLngExpression[] = [];
-      for (const p of busPositions(cum, latest.stopIndex, latest.etas, new Date())) {
-        if (p.state === 'notDeparted') continue;
-        const where = p.state === 'between' ? locate(p.from, p.fraction) : (() => { const s = byIndex.get(p.stop); return s ? ([s.lat, s.lng] as L.LatLngExpression) : null; })();
+      if (!latest) return;
+      const now = Date.now();
+      const openIdx = latest.openIndex;
+      const target = openIdx !== null ? byIndex.get(openIdx) : undefined;
+      let nearest: L.LatLngExpression | null = null;
+      for (const b of latest.buses) {
+        const where = locate(b.from, busFraction(b, latest.segSeconds, now));
         if (!where) continue;
-        placed.push(where);
-        const mins = Math.round(p.secondsAway / 60);
+        const next = byIndex.get(b.from + 1);
+        const mins = Math.max(0, Math.round((b.nextEta - now) / 60000));
+        // 打開咗站：最近嗰架上游車
+        if (openIdx !== null && b.from < openIdx && !nearest) nearest = where;
         L.marker(where, {
           keyboard: false,
           zIndexOffset: 1000,
@@ -172,31 +174,32 @@ export default function RouteMap({ lines, stops, cum }: Props) {
             html: `<span style="background:${busColor}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="#fff" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>`,
           }),
         })
-          .bindTooltip(mins <= 0 ? `即將到 ${target?.name ?? ''}` : `約 ${mins} 分鐘到 ${target?.name ?? ''}`, { direction: 'top', offset: [0, -12] })
+          .bindTooltip(mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`, { direction: 'top', offset: [0, -12] })
           .addTo(busLayer);
       }
-      // 第一次攞到位置：調整地圖，同時睇到個站同最近嗰架車
-      if (fittedFor !== latest.stopIndex && target && placed[0]) {
-        fittedFor = latest.stopIndex;
-        map.fitBounds(L.latLngBounds([[target.lat, target.lng], placed[0]]), { padding: [36, 36], maxZoom: 17 });
+      // 打開站後第一次：調整地圖，同時睇到個站同最近嗰架車
+      if (openIdx !== null && fittedFor !== openIdx && target && nearest) {
+        fittedFor = openIdx;
+        map.fitBounds(L.latLngBounds([[target.lat, target.lng], nearest]), { padding: [36, 36], maxZoom: 17 });
       }
+      if (openIdx === null) fittedFor = null;
     };
-    const onEtas = (e: Event) => {
-      latest = (e as CustomEvent<BusEtasDetail>).detail;
-      if (latest.stopIndex === null) fittedFor = null;
+    const onBuses = (e: Event) => {
+      latest = (e as CustomEvent<BusesDetail>).detail;
       drawBuses();
     };
-    window.addEventListener(BUS_ETAS_EVENT, onEtas);
+    window.addEventListener(BUSES_EVENT, onBuses);
     const tick = setInterval(drawBuses, BUS_TICK_MS);
+    drawBuses();
 
     return () => {
       window.removeEventListener(FOCUS_STOP_EVENT, onFocus);
-      window.removeEventListener(BUS_ETAS_EVENT, onEtas);
+      window.removeEventListener(BUSES_EVENT, onBuses);
       clearInterval(tick);
       map.off('zoomend', drawArrows);
       map.remove();
     };
-  }, [lines, stops, cum]);
+  }, [lines, stops]);
 
   return <div ref={el} className="route-map card" role="region" aria-label="路線地圖" />;
 }

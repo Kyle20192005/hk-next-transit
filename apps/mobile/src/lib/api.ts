@@ -14,6 +14,11 @@ export const api = {
   ctbIndex: () => get<RouteIndex>('/api/ctb'),
   calendar: () => get<Calendar>('/api/calendar'),
   ctbRoute: (route: string) => get<RouteData>(`/api/ctb/${encodeURIComponent(route)}`),
+  /** 成條線嘅巴士位置（後端用每個站嘅 ETA 追蹤）同同 ETA 一致嘅每段行車時間 */
+  buses: (route: string, variantId: string) =>
+    get<{ buses: { from: number; nextEta: string }[]; segSeconds: number[]; fetchedAt: string }>(
+      `/api/buses?company=ctb&route=${encodeURIComponent(route)}&v=${encodeURIComponent(variantId)}`,
+    ),
   eta: (route: string, stop: string) =>
     get<{ etas: Eta[]; fetchedAt: string }>(`/api/eta?company=ctb&route=${encodeURIComponent(route)}&stop=${stop}`),
 };

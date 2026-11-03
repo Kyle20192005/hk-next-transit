@@ -68,11 +68,17 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 2. 城巴 ETA 嘅 `seq` = 嗰班車**實際走法**入面嘅站序（唔係合併列表嘅站序），城巴獨有站都計。對 `variant.expSeq["<dir>:<stop>"]`，只吻合一個 → certain
 3. seq 分唔到（例如總站全部 seq 1）→ 到站時間減 `offsets` 倒推開車時間，對 GTFS 時間表 → likely
 
-**行車時間同巴士位置**（`packages/core/src/journey.ts`）：
+**行車時間同巴士位置**（`packages/core/src/tracking.ts`、`journey.ts`，後端 `/api/buses`）：
 
-- pipeline 將每個走法嘅站到站時間存做 `variant.segSeconds`（對應 `variantStops` 相鄰兩站），冇實測嘅段用距離估算（`segMeasured` = false）。
-- 打開一個站：後面各站顯示「+N 分 · 約 HH:MM」（`secondsFrom`）；用 ETA 減累計行車時間倒推每架車喺邊（`busPositions`），地圖畫巴士。
-- 只用佢公開嘅數據，**唔好抄佢嘅程式碼**（GPL-3.0，會令成個項目要跟 GPL）。頁面要註明出處同「僅供參考」。
+- 巴士位置用**成條線**每個站嘅 ETA 追蹤（`trackLine`）：由尾站向前，第 k 站嘅 ETA 喺第 k-1 站搵唔到同一架車
+  （時間差 ≈ 嗰段行車時間），而且「ETA - 嗰段時間」唔遲過而家，就係喺 k-1、k 之間。每個站最多 3 班 ETA，
+  所以要有後面嗰個條件，否則會將遠嘅車誤判。位置只用嗰一段嘅時間計，唔累積誤差。
+- 屬於邊個走法：推斷到係呢個走法，或者推斷唔到但 ETA `seq` 吻合。
+- 每段行車時間優先次序：同一架車喺相鄰兩站 ETA 嘅時間差（同 ETA 一致）→ 而家時段實測
+  （`times_hourly/<星期 0-6，0=日/假期>/<HH>/<站 ID 頭兩位>.json`）→ 平均（`variant.segSeconds`）。
+- 打開一個站：上游嘅車由近到遠順序對應嗰個站嘅 ETA（`labelEtas`），對唔到嘅係「未開出」。
+- `/api/buses` 每個站嘅城巴 ETA cache 10 秒；前端每 20 秒問一次，位置每 5 秒按時間推前。
+- 只用 hk-bus-time-between-stops 公開嘅數據，**唔好抄佢嘅程式碼**（GPL-3.0）。頁面要註明出處同「僅供參考」。
 
 ## 陷阱
 
