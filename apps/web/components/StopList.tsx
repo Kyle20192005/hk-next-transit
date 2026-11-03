@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BusStabilizer, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
-import { companyColor } from '@/lib/company';
+import { companyColor, companyInk } from '@/lib/company';
 
 type Props = {
   /** 路線檔位置（ctb 包聯營線、kmb 包九巴同龍運） */
@@ -17,8 +17,8 @@ type Props = {
   segSeconds: number[] | null;
   /** 每個站沿走線嘅累計距離（米） */
   cumMetres: number[];
-  /** 揀咗嘅走法係咪特別班（時間線用紅色） */
-  special: boolean;
+  /** 路線主要公司（時間線同巴士用公司代表色） */
+  company: string;
   /** 一開頁就打開嘅站（由「附近」撳入嚟） */
   initialOpen: number | null;
 };
@@ -32,7 +32,7 @@ const BUSES_REFRESH_MS = 20_000;
  * - 打開站時：攞到站時間、地圖放大過去；每班車標示「距離 N 個站／未開出」
  * - 後面嘅站顯示由打開咗嘅站出發要幾耐，同下一班車大概幾時到
  */
-export default function StopList({ co, multiCompany, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, special, initialOpen }: Props) {
+export default function StopList({ co, multiCompany, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, initialOpen }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -175,13 +175,13 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
       const [row, half, t] = f < 0.5 ? [from, 'below' as const, f * 2] : [from + 1, 'above' as const, (f - 0.5) * 2];
       const mins = Math.max(0, Math.round((bus.nextEta - busNow) / 60000));
       const label = mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`;
-      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label, color: multiCompany ? companyColor(bus.company) : undefined }]);
+      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label, color: companyColor(multiCompany ? (bus.company ?? company) : company), ink: companyInk(multiCompany ? (bus.company ?? company) : company) }]);
     }
     return out;
-  }, [live, busNow, stabilizer, stops, multiCompany]);
+  }, [live, busNow, stabilizer, stops, multiCompany, company]);
 
   return (
-    <ol className="stops" style={{ ['--line-color' as string]: special ? 'var(--special)' : 'var(--route-line)' }}>
+    <ol className="stops" style={{ ['--line-color' as string]: companyColor(company) ?? 'var(--route-line)' }}>
       {stops.map((s, i) => {
         const tr = travel?.[i] ?? null;
         return (

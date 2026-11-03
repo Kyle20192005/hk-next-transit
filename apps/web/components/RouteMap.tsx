@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { BusStabilizer, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
-import { companyColor } from '@/lib/company';
+import { companyColor, companyInk } from '@/lib/company';
 import { BUSES_EVENT, FOCUS_STOP_EVENT, OPEN_STOP_EVENT, latestBuses, latestFocus, type BusesDetail } from '@/lib/events';
 
 export interface MapStop {
@@ -44,9 +44,11 @@ type Props = {
   stops: MapStop[];
   /** 聯營線：巴士按公司上色 */
   multiCompany?: boolean;
+  /** 路線主要公司（走線、箭嘴、巴士預設顏色） */
+  company: string;
 };
 
-export default function RouteMap({ lines, stops, multiCompany = false }: Props) {
+export default function RouteMap({ lines, stops, multiCompany = false, company }: Props) {
   const el = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,14 +57,19 @@ export default function RouteMap({ lines, stops, multiCompany = false }: Props) 
     L.tileLayer(`${LANDSD}/basemap/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10, attribution: ATTRIBUTION }).addTo(map);
     L.tileLayer(`${LANDSD}/label/hk/tc/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10 }).addTo(map);
 
-    const brand = cssVar('--route-line', '#c26a00');
-    const special = cssVar('--special', '#b3261e');
+    // 走線用公司代表色；城巴黃色喺地圖黃色馬路上唔顯眼，所以底下加一條深色外框
+    const brand = companyColor(company) ?? cssVar('--route-line', '#c26a00');
+    const ink = companyInk(company);
+    const casing = '#3a2f00';
     const muted = cssVar('--muted', '#61676f');
 
     // 其他走法：灰色虛線放底；揀咗嘅走法：實線放面
     for (const l of [...lines].sort((a, b) => Number(a.selected) - Number(b.selected))) {
+      if (l.selected) {
+        L.polyline(l.segments, { color: casing, weight: 9, opacity: 0.55, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+      }
       L.polyline(l.segments, l.selected
-        ? { color: l.special ? special : brand, weight: 6, opacity: 0.9, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round' }
+        ? { color: brand, weight: 6, opacity: 1, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round' }
         : { color: muted, weight: 3, opacity: 0.5, dashArray: '6 6' },
       ).addTo(map);
     }
@@ -70,7 +77,7 @@ export default function RouteMap({ lines, stops, multiCompany = false }: Props) 
     const sel = lines.find((l) => l.selected);
     const arrowLayer = L.layerGroup().addTo(map);
     const candidates = sel ? lineArrows(sel.segments, 40, [0.2, 0.4, 0.6, 0.8]) : [];
-    const arrowColor = sel?.special ? special : brand;
+    const arrowColor = brand;
     const drawArrows = () => {
       arrowLayer.clearLayers();
       const stopPts = stops.map((s) => map.latLngToLayerPoint([s.lat, s.lng]));
@@ -87,7 +94,7 @@ export default function RouteMap({ lines, stops, multiCompany = false }: Props) 
             className: 'map-arrow',
             iconSize: [18, 18],
             iconAnchor: [9, 9],
-            html: `<svg viewBox="0 0 18 18" width="18" height="18" style="transform:rotate(${a.bearing}deg)" aria-hidden="true"><path d="M9 2 L15 14 L9 11 L3 14 Z" fill="${arrowColor}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+            html: `<svg viewBox="0 0 18 18" width="18" height="18" style="transform:rotate(${a.bearing}deg)" aria-hidden="true"><path d="M9 2 L15 14 L9 11 L3 14 Z" fill="${arrowColor}" stroke="${casing}" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
           }),
         }).addTo(arrowLayer);
       }
@@ -142,7 +149,7 @@ export default function RouteMap({ lines, stops, multiCompany = false }: Props) 
     const busLayer = L.layerGroup().addTo(map);
     let latest: BusesDetail | null = latestBuses();
     let fittedFor: number | null = null;
-    const busColor = sel?.special ? special : brand;
+    const busColor = brand;
 
     const locate = (from: number, fraction: number): L.LatLngExpression | null => {
       const i0 = pathIdx.get(from);
@@ -182,7 +189,7 @@ export default function RouteMap({ lines, stops, multiCompany = false }: Props) 
             className: 'map-bus',
             iconSize: [28, 28],
             iconAnchor: [14, 14],
-            html: `<span style="background:${(multiCompany && companyColor(b.company)) || busColor}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="#fff" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>`,
+            html: `<span style="background:${(multiCompany && companyColor(b.company)) || busColor}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="${multiCompany && b.company ? companyInk(b.company) : ink}" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>`,
           }),
         })
           .bindTooltip(mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`, { direction: 'top', offset: [0, -12] })
@@ -210,7 +217,7 @@ export default function RouteMap({ lines, stops, multiCompany = false }: Props) 
       map.off('zoomend', drawArrows);
       map.remove();
     };
-  }, [lines, stops, multiCompany]);
+  }, [lines, stops, multiCompany, company]);
 
   const [help, setHelp] = useState(false);
   return (

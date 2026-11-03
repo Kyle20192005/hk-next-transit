@@ -102,14 +102,12 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
         {matches.slice(0, shown).map((r) => {
           const co = r.co ?? 'ctb';
           return (
-            <li key={`${co}-${r.route}`}>
-              <Link href={`/${co}/${r.route}`} className="route-item">
-                <span className="route-id">
-                  <span className="route-num">{r.route}</span>
-                  <CompanyTag companies={r.companies ?? ['CTB']} />
-                </span>
-                <RouteEnds r={r} />
+            <li key={`${co}-${r.route}`} className="route-item">
+              <Link href={`/${co}/${r.route}`} className="route-id" aria-label={`${r.route} 路線`}>
+                <span className="route-num">{r.route}</span>
+                <CompanyTag companies={r.companies ?? ['CTB']} />
               </Link>
+              <RouteDirs r={r} co={co} />
             </li>
           );
         })}
@@ -138,29 +136,37 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
 }
 
 /**
- * 起訖點：三種路線用同一個格式（一句，太長自然斷行），用箭嘴分方向：
- * - 雙向：「中環 (港澳碼頭) ⇄ 跑馬地 (上)」
- * - 單向：「黃泥涌道 (樂活道) → 中環」
- * - 循環線（起訖點一樣）：「中環 (天星碼頭) ↻ 循環線」
+ * 方向：雙向路線列出兩個目的地，各自撳入對應方向（唔使入咗頁先轉方向）；
+ * 單向路線一個；循環線顯示「X 循環線」。
+ * 方向 O = 由 origTc 往 destTc，I = 回程。
  */
-function RouteEnds({ r }: { r: Routes[number] }) {
+function RouteDirs({ r, co }: { r: Routes[number]; co: string }) {
   const dirs = r.dirs ?? ['O'];
-  let from = r.origTc;
-  let to = r.destTc;
-  let arrow = '⇄';
-  let label = `來往 ${from} 及 ${to}`;
+  const base = `/${co}/${r.route}`;
   if (r.origTc === r.destTc) {
-    to = '循環線';
-    arrow = '↻';
-    label = `${from} 循環線`;
-  } else if (!(dirs.includes('O') && dirs.includes('I'))) {
-    if (dirs.includes('I')) [from, to] = [r.destTc, r.origTc]; // 只有回程就倒轉
-    arrow = '→';
-    label = `由 ${from} 往 ${to}`;
+    return (
+      <span className="route-dirs">
+        <Link href={base} className="route-dir">
+          <span className="route-dir-to">{r.origTc}</span>
+          <span className="route-dir-sub">循環線</span>
+        </Link>
+      </span>
+    );
   }
+  const options = (['O', 'I'] as const)
+    .filter((d) => dirs.includes(d))
+    .map((d) => ({ d, to: d === 'O' ? r.destTc : r.origTc, from: d === 'O' ? r.origTc : r.destTc }));
   return (
-    <span className="route-text route-ends" aria-label={label}>
-      {from} <span className="route-arrow" aria-hidden="true">{arrow}</span> {to}
+    <span className="route-dirs">
+      {options.map((o) => (
+        <Link key={o.d} href={`${base}?dir=${o.d}`} className="route-dir" aria-label={`${r.route} 往 ${o.to}`}>
+          <span className="route-dir-to">
+            <small>往</small> {o.to}
+          </span>
+          {options.length === 1 && <span className="route-dir-sub">由 {o.from}</span>}
+          <span className="route-dir-go" aria-hidden="true">›</span>
+        </Link>
+      ))}
     </span>
   );
 }

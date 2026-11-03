@@ -13,7 +13,7 @@ import collections, json, os, re
 import build as B
 
 # 九巴站名後面嘅編號，例如「竹園邨總站 (WT916)」
-KMB_CODE = re.compile(r'\s*[(（][A-Z]{1,4}\d{1,4}[)）]\s*$')
+KMB_CODE = re.compile(r'\s*[(（][A-Z]{1,4}\d{1,4}[a-zA-Z]?[)）]\s*$')
 
 
 def clean(name):

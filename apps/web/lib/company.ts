@@ -1,16 +1,18 @@
 import type { Company } from '@hknt/core';
 
-/** 巴士公司：顯示名稱同代表色（標籤底色 bg、上面嘅字 ink） */
+/** 巴士公司：顯示名稱同代表色（bg 底色／線條色、ink 喺代表色上面嘅字同圖示色） */
 export const COMPANIES: Record<Company, { name: string; bg: string; ink: string }> = {
-  CTB: { name: '城巴', bg: '#ffd200', ink: '#1b1b1b' },
-  KMB: { name: '九巴', bg: '#e1251b', ink: '#ffffff' },
-  LWB: { name: '龍運', bg: '#f26b21', ink: '#ffffff' },
+  CTB: { name: '城巴', bg: '#FFD800', ink: '#1b1b1b' },
+  KMB: { name: '九巴', bg: '#D01A1E', ink: '#ffffff' },
+  LWB: { name: '龍運', bg: '#F26B21', ink: '#ffffff' },
 };
 
-/** 地圖／時間線上巴士圖示用嘅公司顏色（城巴黃色太淺，用深啲嘅金色等白色圖示睇得清） */
+/** 公司代表色（地圖走線、時間線、巴士圖示） */
 export function companyColor(company: string | undefined): string | undefined {
-  if (company === 'CTB') return '#d9a400';
-  if (company === 'KMB') return '#e1251b';
-  if (company === 'LWB') return '#f26b21';
-  return undefined;
+  return company && company in COMPANIES ? COMPANIES[company as Company].bg : undefined;
+}
+
+/** 喺公司代表色上面用嘅字／圖示色 */
+export function companyInk(company: string | undefined): string {
+  return company && company in COMPANIES ? COMPANIES[company as Company].ink : '#ffffff';
 }
