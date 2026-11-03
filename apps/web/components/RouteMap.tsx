@@ -52,7 +52,7 @@ export default function RouteMap({ lines, stops }: Props) {
     L.tileLayer(`${LANDSD}/basemap/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10, attribution: ATTRIBUTION }).addTo(map);
     L.tileLayer(`${LANDSD}/label/hk/tc/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10 }).addTo(map);
 
-    const brand = cssVar('--brand', '#0b57d0');
+    const brand = cssVar('--route-line', '#c26a00');
     const special = cssVar('--special', '#b3261e');
     const muted = cssVar('--muted', '#61676f');
 

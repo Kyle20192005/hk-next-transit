@@ -127,8 +127,28 @@ export function labelEtas(
       if (arrival < eta) continue;
       break;
     }
-    return { kind: 'notDeparted' };
+    return estimateFromSchedule(stopIndex, eta, segSeconds, now);
   });
+}
+
+/**
+ * 追蹤唔到嘅班次（例如上游站嘅 ETA 唔齊）：
+ * 到站時間長過由總站開到呢個站要嘅時間，先係「未開出」；
+ * 否則佢一定已經開出咗，用行車時間由呢個站向後退，估計佢喺邊兩個站之間。
+ */
+function estimateFromSchedule(stopIndex: number, eta: number, segSeconds: number[], now: number): BusLabel {
+  let left = (eta - now) / 1000;
+  const fromTerminus = segSeconds.slice(0, stopIndex).reduce((a, b) => a + b, 0);
+  if (left >= fromTerminus - 60) return { kind: 'notDeparted' };
+  for (let from = stopIndex - 1; from >= 0; from--) {
+    const seg = segSeconds[from] ?? 60;
+    if (left <= seg) {
+      const bus = { from, nextEta: now + left * 1000 };
+      return from === stopIndex - 1 ? { kind: 'arriving', bus } : { kind: 'coming', stopsAway: stopIndex - from, bus };
+    }
+    left -= seg;
+  }
+  return { kind: 'notDeparted' };
 }
 
 /**

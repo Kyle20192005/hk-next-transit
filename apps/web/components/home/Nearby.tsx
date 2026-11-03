@@ -119,7 +119,10 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
             return (
               <li key={`${r.route}-${r.dir}`}>
                 <Link href={`/ctb/${r.route}?dir=${r.dir}&stop=${stop.id}`} className="nearby-route">
-                  <span className="route-num sm">{r.route}</span>
+                  <span className="route-id">
+                    <span className="route-num sm">{r.route}</span>
+                    <span className="co">城巴</span>
+                  </span>
                   <span className="route-to">往 {r.dest}</span>
                   <span className="nearby-eta">
                     {list === null ? (

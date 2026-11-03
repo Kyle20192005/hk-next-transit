@@ -70,7 +70,21 @@ it('啱啱到終點站嘅車唔可以配去 14 分鐘後嗰班（之前嘅 bug�
   const buses = [{ from: 12, nextEta: m(0.5) }];
   const seg13 = Array(13).fill(120);
   const labels = labelEtas(buses, 13, [m(14), m(45)], seg13, now);
-  expect(labels.map((l) => l.kind)).toEqual(['notDeparted', 'notDeparted']);
+  // 唔可以配咗去嗰架啱啱到站嘅車（即係唔可以係「即將到站」）
+  expect(labels[0]!.kind).not.toBe('arriving');
+  expect(labels[0]!.kind === 'coming' && labels[0]!.bus).not.toBe(buses[0]);
+  // 14 分鐘 < 由總站開過嚟要嘅 26 分鐘：已經開出咗，估計喺路上；45 分鐘就未開出
+  expect(labels[0]).toMatchObject({ kind: 'coming', stopsAway: 7 });
+  expect(labels[1]!.kind).toBe('notDeparted');
+});
+
+it('追蹤唔到但到站時間好近：唔係「未開出」，用行車時間估計位置', () => {
+  // 冇追蹤到任何車；第 16 站（index 15），每段 2 分鐘，總站開到呢度要 30 分鐘；2 分鐘後到
+  const labels = labelEtas([], 15, [m(2), m(40)], Array(16).fill(120), now);
+  expect(labels[0]).toMatchObject({ kind: 'arriving' });
+  expect(labels[1]!.kind).toBe('notDeparted');
+  const far = labelEtas([], 15, [m(7)], Array(16).fill(120), now);
+  expect(far[0]).toMatchObject({ kind: 'coming', stopsAway: 4 });
 });
 
 it('預計到站時間夾得埋先配對', () => {

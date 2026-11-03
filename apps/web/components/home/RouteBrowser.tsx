@@ -101,12 +101,14 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
         {matches.slice(0, shown).map((r) => (
           <li key={r.route}>
             <Link href={`/ctb/${r.route}`} className="route-item">
-              <span className="route-num">{r.route}</span>
+              <span className="route-id">
+                <span className="route-num">{r.route}</span>
+                <span className="co">城巴</span>
+              </span>
               <span className="route-text">
                 <span className="route-to">往 {r.destTc}</span>
                 <span className="route-from">由 {r.origTc}</span>
               </span>
-              {r.special > 0 && <span className="badge special">特別班</span>}
             </Link>
           </li>
         ))}

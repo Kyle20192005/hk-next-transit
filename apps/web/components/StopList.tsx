@@ -173,7 +173,7 @@ export default function StopList({ route, stops, selectedVariantId, segSeconds: 
   }, [live, busNow, stabilizer, stops]);
 
   return (
-    <ol className="stops" style={{ ['--line-color' as string]: special ? 'var(--special)' : 'var(--brand)' }}>
+    <ol className="stops" style={{ ['--line-color' as string]: special ? 'var(--special)' : 'var(--route-line)' }}>
       {stops.map((s, i) => {
         const tr = travel?.[i] ?? null;
         return (
