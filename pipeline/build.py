@@ -407,14 +407,30 @@ def main():
         if rno in variants_by_route: continue
         dirs = {d: clists[(rno, d)] for d in ('O', 'I') if (rno, d) in clists}
         rstops = {s for l in dirs.values() for s in l}
+        # 政府未有（例如新路線 770）：每個方向用城巴站點列表做一個走法，冇時間表、車費同走線，
+        # 但有行車時間，巴士位置追蹤、站間時間照用得
+        vs = []
+        for d, l in dirs.items():
+            if len(l) < 2:
+                continue
+            v = {'id': f'ctb-{d}', 'govRouteId': None, 'govDir': None,
+                 'name': f"{cstops[l[0]]['nameTc']} - {cstops[l[-1]]['nameTc']}", 'special': False,
+                 'stops': list(l), 'stopDirs': [d] * len(l), 'stopMatch': ['A'] * len(l),
+                 'expSeq': {f'{d}:{x}': i + 1 for i, x in reversed(list(enumerate(l)))},
+                 'schedules': [], 'line': None, 'lineAligned': False}
+            v['segSeconds'], v['segMeasured'] = segment_times(v, cstops, journey)
+            v['offsets'] = [0]
+            for x in v['segSeconds']:
+                v['offsets'].append(v['offsets'][-1] + x)
+            vs.append(v)
         json.dump({'company': 'CTB', 'companies': ['CTB'], 'route': rno, 'joyYou': joyyou_ok(rno, info['orig_tc'], info['dest_tc']),
                    'origTc': info['orig_tc'], 'destTc': info['dest_tc'],
                    'origEn': info['orig_en'], 'destEn': info['dest_en'],
                    'stops': {s: cstops[s] for s in sorted(rstops)}, 'directions': dirs,
-                   'ctbOnlyStops': [], 'variants': []},
+                   'ctbOnlyStops': [], 'variants': vs},
                   open(f'{OUT}/ctb/{rno}.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
         index.append({'co': 'ctb', 'companies': ['CTB'], 'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'],
-                      'dirs': sorted(dirs, reverse=True), 'variants': 0, 'special': 0})
+                      'dirs': sorted(dirs, reverse=True), 'variants': len(vs), 'special': 0})
     route_key = lambda r: (re.sub(r'\D', '', r['route']).zfill(4) if re.match(r'^\d', r['route']) else 'Z' + r['route'], r['route'], r.get('co', ''))
     index.sort(key=route_key)
     kmb_primary_done = set()

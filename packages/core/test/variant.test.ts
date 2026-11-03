@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { variantLabel, sortVariants, statusText, variantStops, variantsForDir, shortName, type Calendar, type RouteData } from '../src';
+import { variantLabel, sortVariants, statusText, variantStatus, variantStops, variantsForDir, shortName, type Calendar, type RouteData } from '../src';
 import route38 from './fixtures/ctb-38.json';
 import calendar38 from './fixtures/calendar-38.json';
 
@@ -60,5 +60,14 @@ describe('走法站點', () => {
     expect(variantLabel(v('1000304-1'))).toBe('正常路線（經華富）');
     expect(variantLabel(v('1540-1'))).toBe('不經華富');
     expect(variantLabel({ name: '華貴 - 中環(交易廣場)', special: false })).toBe('正常路線');
+  });
+});
+
+describe('冇時間表嘅走法', () => {
+  it('狀態係 unknown，唔好話今日冇班次', () => {
+    const v = { schedules: [], offsets: [0] } as unknown as RouteData['variants'][number];
+    const s = variantStatus(v, {}, new Date());
+    expect(s).toEqual({ state: 'unknown' });
+    expect(statusText(s)).toBe('冇時間表資料');
   });
 });

@@ -63,9 +63,12 @@ export type VariantStatus =
   | { state: 'running'; /** 最接近而家嘅開車時間同而家差幾多分鐘，用嚟排序 */ distance: number }
   | { state: 'later'; nextDeparture: number }
   | { state: 'ended' }
-  | { state: 'none' };
+  | { state: 'none' }
+  /** 冇時間表資料（例如政府未有嘅新路線） */
+  | { state: 'unknown' };
 
 export function variantStatus(v: Variant, calendar: Calendar, now: Date): VariantStatus {
+  if (!v.schedules.length) return { state: 'unknown' };
   const deps = departuresAround(v, calendar, now);
   if (deps.length === 0) return { state: 'none' };
   const nowMin = hkParts(now).minutes;
@@ -88,6 +91,8 @@ export function statusText(s: VariantStatus, short = false): string {
       return short ? '今日已結束' : '今日服務已結束';
     case 'none':
       return short ? '今日冇班次' : '今日沒有班次';
+    case 'unknown':
+      return short ? '冇時間表' : '冇時間表資料';
   }
 }
 
@@ -96,7 +101,8 @@ export function statusText(s: VariantStatus, short = false): string {
  * 其餘按正常走法先、特別班後。
  */
 export function sortVariants(variants: Variant[], calendar: Calendar, now: Date): { variant: Variant; status: VariantStatus }[] {
-  const rank = (s: VariantStatus) => (s.state === 'running' ? 0 : s.state === 'later' ? 1 : s.state === 'ended' ? 2 : 3);
+  // 冇時間表嘅走法唔知有冇車，排喺「未來冇班次」同「已結束」之間
+  const rank = (s: VariantStatus) => ({ running: 0, later: 1, unknown: 2, ended: 3, none: 4 })[s.state];
   return variants
     .map((variant) => ({ variant, status: variantStatus(variant, calendar, now) }))
     .sort((a, b) => {

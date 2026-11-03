@@ -159,6 +159,7 @@ button.variant.variant-current { background: var(--card); border-radius: 14px; b
 .variant-status { font-size: 0.875rem; font-weight: 600; }
 .variant-status.running { color: var(--ok); }
 .variant-status.idle { color: var(--idle); }
+.variant-status.unknown { color: var(--muted); }
 .variant-line { display: flex; gap: 8px; align-items: baseline; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; }
 /* 名稱優先：最多佔六成闊，狀態太長就截斷 */
 .variant-line strong { flex: 0 0 auto; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }

@@ -8,6 +8,8 @@ export interface VariantItem {
   label: string;
   special: boolean;
   running: boolean;
+  /** 冇時間表資料：狀態用灰色，唔好似「冇班次」咁用紅色 */
+  unknown?: boolean;
   status: string;
   /** 收埋時用嘅簡短狀態 */
   statusShort: string;
@@ -84,7 +86,7 @@ function Row({ item, n, compact = false }: { item: VariantItem; n: number; compa
         <span className={`variant-no${item.running ? ' running' : ''}`}>{n}</span>
         <span className="variant-line">
           <strong className={item.special ? 'special' : undefined}>{item.label}</strong>
-          <span className={`variant-status ${item.running ? 'running' : 'idle'}`}>{item.statusShort}</span>
+          <span className={`variant-status ${item.running ? 'running' : item.unknown ? 'unknown' : 'idle'}`}>{item.statusShort}</span>
         </span>
       </>
     );
@@ -97,7 +99,7 @@ function Row({ item, n, compact = false }: { item: VariantItem; n: number; compa
           {item.special && <span className="badge special">特別班</span>}
           <strong>{item.label}</strong>
         </span>
-        <span className={`variant-status ${item.running ? 'running' : 'idle'}`}>{item.status}</span>
+        <span className={`variant-status ${item.running ? 'running' : item.unknown ? 'unknown' : 'idle'}`}>{item.status}</span>
         {item.window && <span className="muted">{item.window}</span>}
       </span>
     </>

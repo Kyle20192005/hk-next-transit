@@ -72,6 +72,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
       label: variantLabel(v),
       special: v.special,
       running: status.state === 'running',
+      unknown: status.state === 'unknown',
       status: statusText(status),
       statusShort: statusText(status, true),
       window: w ? `今日 ${fmtMinutes(w[0])}–${w[1] >= 1440 ? '翌日 ' : ''}${fmtMinutes(w[1])} 由總站開出` : null,
@@ -97,7 +98,10 @@ export default async function RoutePage({ params, searchParams }: Props) {
   // 標題列第二行：只喺唔適用樂悠咭時提示；詳細班次放喺右邊 drawer
   const serviceLine = joyYou ? null : '不設樂悠咭優惠';
   // 詳細班次 drawer：呢個方向所有走法嘅時間表，同埋用到嘅服務日曆
-  const drawerVariants = sorted.map(({ variant: x }) => ({ id: x.id, label: variantLabel(x), special: x.special, schedules: x.schedules }));
+  // 冇時間表嘅走法（例如政府未有嘅新路線）唔放入詳細班次；全部都冇就唔出「班次」掣
+  const drawerVariants = sorted
+    .filter(({ variant: x }) => x.schedules.length)
+    .map(({ variant: x }) => ({ id: x.id, label: variantLabel(x), special: x.special, schedules: x.schedules }));
   const usedServices = new Set(drawerVariants.flatMap((x) => x.schedules.map((sc) => sc.serviceId)));
   const drawerCalendar = Object.fromEntries(Object.entries(calendar).filter(([id]) => usedServices.has(id)));
   const todayServiceIds = [...activeServiceIds(drawerCalendar, now)];
