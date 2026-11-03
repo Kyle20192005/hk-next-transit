@@ -82,12 +82,16 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 
 - UI 文字用香港繁體中文（廣東話口語可以，例如「冇班次」）。
 - 特別班用紅色（`special`），正常走法用藍色（`brand`）。「只限 XX」標示：全部係特別班先用紅色。
-- 只喺「有走法行經呢段路但唔停」先標「只限 XX」（見 `passesThrough`）；起點唔同嘅短途特別班唔算。
+- 路線頁按走法顯示（同城巴 App 一致）：走法排序同狀態用 core 嘅 `sortVariants`、`statusText`；
+  「現正服務」= 未來 60 分鐘有班次由總站開出，或者有車行緊。站點用 `variantStops`（包埋城巴獨有站）。
+- 走法名稱用 `variantLabel`：正常走法叫「正常路線」，括號係走法描述（經／繞／不）先加，目的地唔加。
+- 地圖底圖用地政總署 API（`mapapi.geodata.gov.hk`，免費唔使 key），要註明「© 地政總署」。
+  網頁用 Leaflet（只喺瀏覽器載入），App 用 react-native-maps 加 `UrlTile`。
 - 新增營辦商：喺 `packages/core/src/` 加 adapter，輸出統一嘅 `Eta` 類型。
 
 ## 已知未做
 
 - 賽馬日改路等按事件嘅走法：政府數據冇。
 - ETA `seq` 規律只喺 38 號驗證過。
-- 地圖未畫；九巴只有 ETA 雛形；新大嶼山巴士、港鐵、小巴、電車、渡輪未做。
-- `shortName`、`passesThrough` 喺 web 同 mobile 各有一份，應該搬入 core。
+- 九巴只有 ETA 雛形；新大嶼山巴士、港鐵、小巴、電車、渡輪未做。
+- App 未喺實機或者模擬器測試過（只確認到 bundle 到）。
