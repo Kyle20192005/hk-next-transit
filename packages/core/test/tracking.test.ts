@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BusStabilizer, busDistanceTo, busFraction, hourlySlot, labelEtas, trackBuses, trackLine, type Calendar } from '../src';
+import { BusStabilizer, busDistanceTo, busFraction, hourlySlot, labelEtas, scheduleBuses, trackBuses, trackLine, type Calendar, type Variant } from '../src';
 
 const now = Date.parse('2026-11-03T12:00:00+08:00');
 const m = (min: number) => now + min * 60_000;
@@ -130,5 +130,19 @@ describe('巴士只向前唔倒退', () => {
     const [b] = st.update([{ from: 0, nextEta: m(1) }], seg, now);
     expect(b!.id).not.toBe(a!.id);
     expect(b!.progress).toBeCloseTo(0.5);
+  });
+});
+
+describe('scheduleBuses', () => {
+  const cal = { S: { days: [true, true, true, true, true, true, true], start: '20000101', end: '20991231', add: [], remove: [] } };
+  // 兩段，各 5 分鐘；10:00、10:04、10:30 開出
+  const v = { schedules: [{ serviceId: 'S', departures: [600, 604, 630] }] } as unknown as Variant;
+  it('只計開出咗又未到終點嘅班次，按行車時間計位置', () => {
+    const now = new Date('2026-11-03T02:07:00Z'); // 香港 10:07
+    const buses = scheduleBuses(v, cal, [300, 300], now);
+    expect(buses).toEqual([
+      { from: 1, nextEta: Date.parse('2026-11-03T02:10:00Z') }, // 10:00 開，10:05 過第一站
+      { from: 0, nextEta: Date.parse('2026-11-03T02:09:00Z') }, // 10:04 開
+    ]);
   });
 });

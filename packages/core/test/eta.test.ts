@@ -147,14 +147,16 @@ describe('新大嶼山巴士、港鐵巴士', () => {
   const v = (id: string, extra: object) => ({ id, govRouteId: null, govDir: null, name: id, special: false, stops: ['S1'], stopDirs: ['O'],
     stopMatch: ['A'], offsets: [0], schedules: [], line: null, lineAligned: false, expSeq: { 'O:S1': 1 }, ...extra });
 
-  it('NLB：用 routeId 查，冇 GPS 當原定，香港時間轉 ISO', async () => {
+  it('NLB：用 routeId 查，未開出當原定、開出咗當實時（就算冇 GPS），香港時間轉 ISO', async () => {
     const f = (async (input: RequestInfo | URL) => {
       expect(String(input)).toContain('routeId=7&stopId=S1');
       return new Response(JSON.stringify({ estimatedArrivals: [
         { estimatedArrivalTime: '2026-11-03 19:33:47', routeVariantName: '經: 北大嶼山醫院', departed: 0, noGPS: 1 },
+        { estimatedArrivalTime: '2026-11-03 19:20:00', routeVariantName: '', departed: 1, noGPS: 1 },
       ] }));
     }) as typeof fetch;
-    const [e] = await etasAtStop(mk('NLB', [v('7', { nlb: { routeId: '7' } })]), 'S1', {}, f);
+    const [d, e] = await etasAtStop(mk('NLB', [v('7', { nlb: { routeId: '7' } })]), 'S1', {}, f);
+    expect(d).toMatchObject({ eta: '2026-11-03T19:20:00+08:00', scheduled: false });
     expect(e).toMatchObject({ company: 'NLB', eta: '2026-11-03T19:33:47+08:00', scheduled: true, remarkTc: '經: 北大嶼山醫院' });
     expect(e!.variant?.variantId).toBe('7');
   });

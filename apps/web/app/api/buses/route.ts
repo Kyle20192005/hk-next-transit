@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { etasAtStop, trackLine, variantStops } from '@hknt/core';
+import { etasAtStop, scheduleBuses, trackLine, variantStops } from '@hknt/core';
 import { getCalendar, getRoute } from '@/lib/data';
 import { coParam, SAFE_ROUTE } from '@/lib/params';
 import { segmentsNow } from '@/lib/journey';
@@ -26,6 +26,25 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
   const stops = variantStops(v);
+
+  // 新大嶼山巴士：大部分車冇 GPS，到站時間係時間表時間（相鄰站之間仲會自相矛盾），追蹤唔到；
+  // 改用政府時間表推算位置
+  if (data.company === 'NLB') {
+    // 時間表本身係平均，用平均行車時間（而家時段實測樣本少，個別段會好離譜）
+    const segSeconds = v.segSeconds ?? (await segmentsNow(v, stops, calendar, now)).segSeconds;
+    return NextResponse.json(
+      {
+        route: data.route,
+        variant: v.id,
+        fetchedAt: now.toISOString(),
+        segSeconds,
+        hourlySegments: 0,
+        source: 'schedule',
+        buses: scheduleBuses(v, calendar, segSeconds, now).map((b) => ({ from: b.from, nextEta: new Date(b.nextEta).toISOString(), company: 'NLB' })),
+      },
+      { headers: { ...CORS, 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=10' } },
+    );
+  }
 
   let perStop;
   try {

@@ -7,8 +7,9 @@ interface NlbEtaRaw {
   estimatedArrivalTime: string;
   /** 例如「經: 北大嶼山醫院」 */
   routeVariantName: string;
+  /** 1 = 已經由總站開出 */
   departed: number;
-  /** 1 = 冇 GPS，即係按時間表計（好似九巴「原定班次」） */
+  /** 1 = 冇 GPS。新巴大部分車都係 1，開出咗嘅車時間仍然按實際開車計，可以用嚟推算位置 */
   noGPS: number;
 }
 
@@ -38,6 +39,7 @@ export async function fetchNlbEta(
       destEn: '',
       remarkTc: r.routeVariantName ?? '',
       remarkEn: '',
-      scheduled: r.noGPS === 1,
+      // 未開出 = 時間表時間（介面標「原定」，唔用嚟推算位置）；開出咗就當實時
+      scheduled: r.departed !== 1,
     }));
 }

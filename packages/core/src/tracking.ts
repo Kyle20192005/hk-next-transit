@@ -1,5 +1,6 @@
-import type { Calendar } from './types';
+import type { Calendar, Variant } from './types';
 import { hkParts } from './time';
+import { departuresAround } from './schedule';
 
 /**
  * 用成條線每個站嘅 ETA 追蹤巴士位置。
@@ -229,4 +230,26 @@ export class BusStabilizer {
   reset() {
     this.prev = [];
   }
+}
+
+/**
+ * 按時間表推算巴士位置（營辦商 ETA 唔係實時、又冇 GPS 嘅時候用，例如新大嶼山巴士）。
+ * 今日（連琴晚過咗午夜）由總站開出咗、又未行完全程嘅班次，按開車時間加每段行車時間計佢去到邊。
+ */
+export function scheduleBuses(variant: Variant, calendar: Calendar, segSeconds: number[], now: Date): TrackedBus[] {
+  const t = now.getTime();
+  const midnight = t - hkParts(now).minutes * 60_000;
+  const cum = [0];
+  for (const s of segSeconds) cum.push(cum[cum.length - 1]! + s * 1000);
+  const total = cum[cum.length - 1]!;
+  const out: TrackedBus[] = [];
+  for (const m of departuresAround(variant, calendar, now)) {
+    const elapsed = t - (midnight + m * 60_000);
+    if (elapsed < 0 || elapsed >= total) continue;
+    let k = 0;
+    while (k < segSeconds.length - 1 && cum[k + 1]! <= elapsed) k++;
+    out.push({ from: k, nextEta: t - elapsed + cum[k + 1]! });
+  }
+  // 同 trackLine 一樣：由最前（最遠）嘅車排到最後
+  return out.sort((a, b) => b.from - a.from || a.nextEta - b.nextEta);
 }

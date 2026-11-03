@@ -65,7 +65,10 @@ Vercel（Hobby）只部署 commit 作者係項目擁有者嘅 commit：commit �
   （id `<routeId>-<政府 route_id>`，`nlb: {routeId, via}`）。站點一樣嘅政府走法（例如上課日／非上課日）併埋。
   名用 NLB 自己嘅（方向啱）再加政府括號。車費喺 NLB 站點列表。
 - NLB ETA：每個 routeId 只 call 一次，用備註「經: …」（`routeVariantName`）對走法（`pickNlbVariant`），
-  對唔到當正常路線（likely）。`noGPS = 1` = 按時間表（`scheduled`）。時間係香港時間，冇時區。
+  對唔到當正常路線（likely）。時間係香港時間，冇時區。
+- NLB 幾乎全部車都係 `noGPS = 1`，到站時間係時間表時間，相鄰站之間會自相矛盾（下游早過上游），所以**唔用 ETA 追蹤位置**：
+  `/api/buses` 對 NLB 用 core `scheduleBuses`（政府時間表 + 平均 `segSeconds`，今日開出咗又未到終點嘅班次）。
+  `departed = 0`（未開出）先標「原定」（`scheduled`），開出咗嘅當實時。地圖「?」解釋係按時間表推算。
 - MTRB：`getSchedule`（POST，`routeName`）一次攞晒成條線，用 `lineRef` 分方向（O = LINE_UP、I = LINE_DOWN）。
   秒數 ≥ 100000（例如 108000）= 冇數據。行緊嘅車有真 GPS（`Eta.gps`），地圖直接用，唔使推算。
   車費、樂悠咭（`FARE_OCTO_JOYU`）用港鐵 CSV。

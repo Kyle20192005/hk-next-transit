@@ -272,6 +272,20 @@ function MapHelpText({ company, multiCompany }: { company: string; multiCompany:
       </>
     );
   }
+  if (company === 'NLB') {
+    return (
+      <>
+        <strong>巴士位置點樣計？</strong>
+        <p>新大嶼山巴士大部分車都冇 GPS，到站時間係按時間表計，所以地圖上嘅巴士位置係<b>按時間表推算</b>：</p>
+        <ul>
+          <li>由政府時間表搵出已經由總站開出、未到終點嘅班次。</li>
+          <li>按開車時間同每段路嘅行車時間（實測平均）估計去到邊。</li>
+          <li>實際班次可能提早、延誤或者取消。</li>
+        </ul>
+        <p className="muted">僅供參考，以新大嶼山巴士到站時間為準。</p>
+      </>
+    );
+  }
   return (
     <>
       <strong>巴士位置點樣計？</strong>
