@@ -298,9 +298,10 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .seq { flex: none; width: 34px; text-align: right; font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 /* 時間線：豎線畫喺成個站（li）嘅範圍，連打開咗嘅到站時間部分都有線，行與行之間唔會斷 */
 .stop { --tl-x: 52px; --tl-dot-y: 33px; }
-.stop::before { content: ""; position: absolute; left: calc(var(--tl-x) - 3px); top: 0; bottom: 0; width: 6px; border-radius: 3px; background: var(--line-color, var(--route-line)); }
-.stop:first-child::before { top: var(--tl-dot-y); }
-.stop:last-child::before { bottom: auto; height: var(--tl-dot-y); }
+/* 每個站一段，上下駁埋成條線：中間唔好圓角（會喺站與站之間凹一個位，好似斷開），只喺頭尾圓 */
+.stop::before { content: ""; position: absolute; left: calc(var(--tl-x) - 3px); top: 0; bottom: 0; width: 6px; background: var(--line-color, var(--route-line)); }
+.stop:first-child::before { top: var(--tl-dot-y); border-radius: 3px 3px 0 0; }
+.stop:last-child::before { bottom: auto; height: var(--tl-dot-y); border-radius: 0 0 3px 3px; }
 .tl { position: relative; flex: none; align-self: stretch; width: 36px; }
 .tl-dot { position: absolute; left: 50%; top: calc(var(--tl-dot-y) - 6px); width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--card); border: 3px solid var(--line-color, var(--route-line)); box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.18); z-index: 1; }
 .stop.terminus .tl-dot { width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 5px solid var(--text); box-shadow: none; }

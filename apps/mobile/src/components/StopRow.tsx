@@ -66,7 +66,11 @@ export const StopRow = memo(function StopRow(p: Props) {
           position: 'absolute',
           left: TL_X - 3,
           width: 6,
-          borderRadius: 3,
+          // 中間唔好圓角（站與站之間會凹一個位），只喺頭尾圓
+          borderTopLeftRadius: p.first ? 3 : 0,
+          borderTopRightRadius: p.first ? 3 : 0,
+          borderBottomLeftRadius: p.last ? 3 : 0,
+          borderBottomRightRadius: p.last ? 3 : 0,
           backgroundColor: p.lineColor,
           top: p.first ? DOT_Y : 0,
           ...(p.last ? { height: DOT_Y } : { bottom: 0 }),
