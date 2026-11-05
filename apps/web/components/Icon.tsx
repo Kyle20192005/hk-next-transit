@@ -1,0 +1,115 @@
+/**
+ * 統一嘅線條圖示（24×24，用 currentColor）。唔用 emoji 或者文字符號（⇅、⌫、🕒），
+ * 因為唔同系統畫出嚟大細、粗幼都唔同。
+ */
+export type IconName =
+  | 'back'
+  | 'chevron-right'
+  | 'chevron-down'
+  | 'swap'
+  | 'clock'
+  | 'pin'
+  | 'locate'
+  | 'star'
+  | 'star-fill'
+  | 'search'
+  | 'backspace'
+  | 'close'
+  | 'info'
+  | 'route'
+  | 'bus'
+  | 'warning';
+
+const PATHS: Record<IconName, React.ReactNode> = {
+  back: <path d="M15 18l-6-6 6-6" />,
+  'chevron-right': <path d="M9 6l6 6-6 6" />,
+  'chevron-down': <path d="M6 9l6 6 6-6" />,
+  swap: (
+    <>
+      <path d="M7 4v16M7 4L3.5 7.5M7 4l3.5 3.5" />
+      <path d="M17 20V4M17 20l-3.5-3.5M17 20l3.5-3.5" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" />
+      <circle cx="12" cy="10" r="2.3" />
+    </>
+  ),
+  locate: (
+    <>
+      <circle cx="12" cy="12" r="6.5" />
+      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+    </>
+  ),
+  star: <path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.6Z" />,
+  'star-fill': <path fill="currentColor" d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.6Z" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
+    </>
+  ),
+  backspace: (
+    <>
+      <path d="M9 5h10.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H9l-6-7 6-7Z" />
+      <path d="M12.5 9.5l5 5M17.5 9.5l-5 5" />
+    </>
+  ),
+  close: <path d="M6 6l12 12M18 6L6 18" />,
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5" />
+      <circle cx="12" cy="8" r="0.6" fill="currentColor" />
+    </>
+  ),
+  route: (
+    <>
+      <circle cx="6" cy="18" r="2.2" />
+      <circle cx="18" cy="6" r="2.2" />
+      <path d="M8.2 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.8" />
+    </>
+  ),
+  bus: (
+    <>
+      <rect x="5" y="3.5" width="14" height="14" rx="3" />
+      <path d="M5 11h14M8 17.5V20M16 17.5V20" />
+      <circle cx="8.5" cy="14.3" r="0.9" fill="currentColor" />
+      <circle cx="15.5" cy="14.3" r="0.9" fill="currentColor" />
+    </>
+  ),
+  warning: (
+    <>
+      <path d="M12 4l9 16H3l9-16Z" />
+      <path d="M12 10v4.5" />
+      <circle cx="12" cy="17.3" r="0.6" fill="currentColor" />
+    </>
+  ),
+};
+
+export default function Icon({ name, size = 22, className }: { name: IconName; size?: number; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {PATHS[name]}
+    </svg>
+  );
+}

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Icon from './Icon';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { BusStabilizer, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
@@ -232,7 +233,7 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
     <div className="route-map-wrap">
       <div ref={el} className="route-map card" role="region" aria-label="路線地圖" />
       <button className="map-help-btn" onClick={() => setHelp((h) => !h)} aria-expanded={help} aria-label="巴士位置點樣計？">
-        ?
+        <Icon name="info" size={20} />
       </button>
       {help &&
         createPortal(

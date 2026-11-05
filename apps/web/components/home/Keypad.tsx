@@ -1,4 +1,5 @@
 'use client';
+import Icon from '@/components/Icon';
 
 type Props = {
   /** 可以接落去嘅字（數字同字母） */
@@ -23,13 +24,14 @@ export default function Keypad({ nextChars, onKey, onBack, onPlace, canBack }: P
           </button>
         ))}
         <button className="key-fn" onClick={onPlace} aria-label="用地點搜尋">
-          地點
+          <Icon name="search" size={18} />
+          <span>地點</span>
         </button>
         <button onClick={() => onKey('0')} disabled={!nextChars.has('0')}>
           0
         </button>
         <button className="key-fn" onClick={onBack} disabled={!canBack} aria-label="刪除">
-          ⌫
+          <Icon name="backspace" size={24} />
         </button>
       </div>
       <div className="keypad-letters" aria-label="字母">

@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import Link from 'next/link';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -13,9 +12,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-HK">
       <body>
-        <header className="top">
-          <Link href="/">香港交通到站時間</Link>
-        </header>
         {children}
       </body>
     </html>

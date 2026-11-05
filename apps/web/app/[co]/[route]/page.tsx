@@ -22,6 +22,8 @@ import { getCalendar, getRoute, isCo, type Co } from '@/lib/data';
 import { COMPANIES } from '@/lib/company';
 import StopList from '@/components/StopList';
 import TimetableDrawer from '@/components/TimetableDrawer';
+import FavButton from '@/components/FavButton';
+import Icon from '@/components/Icon';
 import VariantPicker, { type VariantItem } from '@/components/VariantPicker';
 import RouteMap, { type MapLine, type MapStop } from '@/components/RouteMapLazy';
 
@@ -141,7 +143,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
       <div className="route-top">
         <header className="route-bar">
           <Link href="/" className="back" aria-label="返回路線列表">
-            ‹
+            <Icon name="back" size={26} />
           </Link>
           <h1>
             <small>{companyNames(companies)}</small>
@@ -154,6 +156,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
             </span>
             {serviceLine && <span className="route-service">{serviceLine}</span>}
           </span>
+          <FavButton target={{ co, route: data.route, dir, dest: dest ?? '', companies }} />
           <TimetableDrawer
             key={`${dir}-${selected?.id}`}
             variants={drawerVariants}
@@ -170,7 +173,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
               scroll={false}
               aria-label={`轉方向：往 ${data.stops[data.directions[other]!.at(-1)!]?.nameTc}`}
             >
-              ⇅
+              <Icon name="swap" />
             </Link>
           )}
         </header>
@@ -180,10 +183,11 @@ export default async function RoutePage({ params, searchParams }: Props) {
         {mapStops.length > 0 && <RouteMap key={`${dir}-${selected?.id}`} lines={mapLines} stops={mapStops} multiCompany={companies.length > 1} company={data.company} osm={sorted.some((x) => x.variant.lineSource === 'osm')} />}
       </div>
 
-      <div className="route-stops card">
+      <div className="route-stops">
         <StopList
           co={co}
           multiCompany={companies.length > 1}
+          companies={companies}
           key={`${dir}-${selected?.id}`}
           route={data.route}
           stops={stops}

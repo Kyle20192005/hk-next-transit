@@ -4,6 +4,9 @@ import { formatDistance, shortName, type Eta } from '@hknt/core';
 import BusIcon from './BusIcon';
 import CompanyTag from './CompanyTag';
 import { COMPANIES } from '@/lib/company';
+import FavButton from './FavButton';
+import Icon from './Icon';
+import type { Favorite } from '@/lib/favorites';
 
 /**
  * 時間線上嘅巴士。兩站之間嘅前半段畫喺上一個站嗰行（站點圓點以下），後半段畫喺下一個站嗰行（圓點以上）。
@@ -55,6 +58,8 @@ type Props = {
   nextArrival: number | null;
   /** 喺呢行時間線上顯示嘅巴士 */
   buses: RowBus[];
+  /** 收藏呢個站用（終點站冇） */
+  fav: Omit<Favorite, 'at'> | null;
 };
 
 const hhmm = (ms: number) =>
@@ -62,7 +67,7 @@ const hhmm = (ms: number) =>
 
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, nearestMetres, travelSeconds, travelMetres, nextArrival, buses },
+  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav },
   ref,
 ) {
   const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null })) ?? null;
@@ -87,7 +92,11 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
         <span className="stop-name">
           <span>
             {name}
-            {nearestMetres !== null && <span className="nearest-tag">📍 最近 · {formatDistance(nearestMetres)}</span>}
+            {nearestMetres !== null && (
+              <span className="nearest-tag">
+                <Icon name="pin" size={12} /> 最近 · {formatDistance(nearestMetres)}
+              </span>
+            )}
           </span>
           {travelSeconds !== null && travelSeconds > 0 && (
             <span className="travel" title="由打開咗嘅站出發（行車時間係實測平均，僅供參考）">
@@ -106,6 +115,11 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
       </button>
       {open && (
         <div className="etas" aria-live="polite">
+          {fav && (
+            <div className="etas-actions">
+              <FavButton target={fav} variant="inline" />
+            </div>
+          )}
           {error && <div className="muted">載入失敗：{error}</div>}
           {!error && list === null && <div className="muted">載入中…</div>}
           {!error && list?.length === 0 && failed.length === 0 && <div className="muted">暫時冇班次</div>}
@@ -153,7 +167,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
           )}
           {failed.length > 0 && (
             <div className="eta-failed" role="status">
-              ⚠️ {failed.map((c) => COMPANIES[c as keyof typeof COMPANIES]?.name ?? c).join('、')}資料暫時攞唔到，可能少咗班次，稍後會自動再試
+              <Icon name="warning" size={16} /> {failed.map((c) => COMPANIES[c as keyof typeof COMPANIES]?.name ?? c).join('、')}資料暫時攞唔到，可能少咗班次，稍後會自動再試
             </div>
           )}
         </div>

@@ -4,6 +4,7 @@ import CompanyTag from '@/components/CompanyTag';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RouteIndex } from '@hknt/core';
 import Keypad from './Keypad';
+import Icon from '@/components/Icon';
 
 type Routes = RouteIndex['routes'];
 const PAGE = 40;
@@ -86,12 +87,15 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
 
   return (
     <>
-      <div className="search-bar">
+      <header className="app-bar">
+        <div className="app-title">
+          <h1>香港巴士到站</h1>
+          <span className="app-sub">{routes.length} 條路線</span>
+        </div>
         {place === null ? (
           <button className="search-field" onClick={usePlace} aria-label="搜尋路線">
-            <span className={code ? 'search-code' : 'search-placeholder'}>
-              {code || '輸入路線號碼'}
-            </span>
+            <Icon name="search" size={20} className="search-icon" />
+            <span className={code ? 'search-code' : 'search-placeholder'}>{code || '輸入路線號碼'}</span>
             {code && (
               <span
                 className="search-clear"
@@ -102,12 +106,13 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
                   setCode('');
                 }}
               >
-                ✕
+                <Icon name="close" size={18} />
               </span>
             )}
           </button>
         ) : (
           <div className="search-field">
+            <Icon name="search" size={20} className="search-icon" />
             <input
               ref={placeInput}
               value={place}
@@ -116,12 +121,12 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
               aria-label="搜尋地點"
               enterKeyHint="search"
             />
-            <button className="search-clear" onClick={() => setPlace(null)} aria-label="轉返號碼鍵盤">
+            <button className="search-clear text" onClick={() => setPlace(null)} aria-label="轉返號碼鍵盤">
               123
             </button>
           </div>
         )}
-      </div>
+      </header>
 
       <ul className="route-list" ref={listRef}>
         {matches.slice(0, shown).map((r) => {
@@ -189,7 +194,7 @@ function RouteDirs({ r, co }: { r: Routes[number]; co: string }) {
             <small>往</small> {o.to}
           </span>
           {options.length === 1 && <span className="route-dir-sub">由 {o.from}</span>}
-          <span className="route-dir-go" aria-hidden="true">›</span>
+          <Icon name="chevron-right" size={18} className="route-dir-go" />
         </Link>
       ))}
     </span>

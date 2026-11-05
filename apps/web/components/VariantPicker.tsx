@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import Icon from './Icon';
 
 export interface VariantItem {
   id: string;
@@ -51,9 +52,7 @@ export default function VariantPicker({ items, selectedId }: { items: VariantIte
       >
         <Row item={selected} n={selectedIndex + 1} compact />
         {items.length > 1 && (
-          <span className="variant-chevron" aria-hidden="true">
-            {open ? '▲' : '▼'}
-          </span>
+          <Icon name="chevron-down" size={20} className={`variant-chevron${open ? ' open' : ''}`} />
         )}
       </button>
       {open && (

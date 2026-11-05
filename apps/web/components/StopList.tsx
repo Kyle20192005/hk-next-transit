@@ -5,12 +5,16 @@ import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
 import { companyColor, companyInk } from '@/lib/company';
 import type { Co } from '@/lib/data';
+import type { Company } from '@hknt/core';
+import Icon from './Icon';
 
 type Props = {
   /** 路線檔位置（ctb 包聯營線、kmb 包九巴同龍運） */
   co: Co;
   /** 多過一間公司營辦（聯營線）：每班車標明公司 */
   multiCompany: boolean;
+  /** 營辦公司（收藏用） */
+  companies: Company[];
   route: string;
   stops: { dir: Dir; stopId: string; name: string; lat?: number; lng?: number }[];
   selectedVariantId: string | null;
@@ -38,7 +42,7 @@ const BUSES_REFRESH_MS = 20_000;
  * - 打開站時：攞到站時間、地圖放大過去；每班車標示「距離 N 個站／未開出」
  * - 後面嘅站顯示由打開咗嘅站出發要幾耐，同下一班車大概幾時到
  */
-export default function StopList({ co, multiCompany, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, fares, initialOpen }: Props) {
+export default function StopList({ co, multiCompany, companies, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, fares, initialOpen }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -242,8 +246,8 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
   return (
     <>
     <div className="nearest-bar" role="status">
+      <Icon name="pin" size={18} className="nearest-icon" />
       <span className="nearest-text">
-        📍{' '}
         {locating === 'busy' && '搵緊最近嘅站…'}
         {locating === 'denied' && '開咗定位就會自動打開最近嘅站'}
         {locating === 'far' && '附近 500 米內冇呢條線嘅站'}
@@ -284,6 +288,7 @@ export default function StopList({ co, multiCompany, route, stops, selectedVaria
             now={now}
             selectedVariantId={selectedVariantId}
             nearestMetres={nearest?.index === i ? nearest.metres : null}
+            fav={i < stops.length - 1 ? { co, route, dir: s.dir, dest: stops[stops.length - 1]?.name ?? '', companies, stopId: s.stopId, stopName: s.name } : null}
             fare={fares[i] ?? null}
             travelSeconds={openIndex !== null && i > openIndex ? tr : null}
             travelMetres={openIndex !== null && i > openIndex ? (cumMetres[i] ?? 0) - (cumMetres[openIndex] ?? 0) : null}

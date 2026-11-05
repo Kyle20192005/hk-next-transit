@@ -1,4 +1,5 @@
 'use client';
+import Icon from './Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fmtMinutes, serviceDaysLabel, timetablePeriods, type Calendar } from '@hknt/core';
 
@@ -82,9 +83,8 @@ export default function TimetableDrawer({ variants, selectedId, calendar, todayS
   if (!variants.length) return null;
   return (
     <>
-      <button className="timetable-btn" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label="詳細班次">
-        <span aria-hidden="true">🕒</span>
-        <small>班次</small>
+      <button className="bar-btn" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label="詳細班次">
+        <Icon name="clock" />
       </button>
       {open && (
         <div className="drawer-backdrop" onClick={() => setOpen(false)}>
@@ -92,7 +92,7 @@ export default function TimetableDrawer({ variants, selectedId, calendar, todayS
             <header className="drawer-head">
               <strong>詳細班次</strong>
               <button className="drawer-close" onClick={() => setOpen(false)} aria-label="關閉">
-                ✕
+                <Icon name="close" size={20} />
               </button>
             </header>
 

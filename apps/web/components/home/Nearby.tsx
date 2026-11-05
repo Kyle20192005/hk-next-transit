@@ -4,6 +4,7 @@ import CompanyTag from '@/components/CompanyTag';
 import type { Co } from '@/lib/data';
 import { useCallback, useEffect, useState } from 'react';
 import { formatDistance, type Company } from '@hknt/core';
+import Icon from '@/components/Icon';
 
 interface NearStop {
   id: string;
@@ -52,32 +53,50 @@ export default function Nearby() {
     );
   }, []);
 
+  const head = (
+    <header className="app-bar">
+      <div className="app-title">
+        <h1>附近車站</h1>
+        {state.kind === 'ok' && <span className="app-sub">{state.stops.length ? `600 米內 ${state.stops.length} 個車站` : '600 米內冇車站'}</span>}
+      </div>
+      {state.kind === 'ok' && (
+        <button className="bar-btn" onClick={locate} aria-label="重新定位">
+          <Icon name="locate" />
+        </button>
+      )}
+    </header>
+  );
+
   if (state.kind !== 'ok') {
     return (
-      <div className="nearby-empty">
-        <p>搵你附近 600 米內嘅城巴站，同埋每條路線下一班車。</p>
-        {state.kind === 'error' && <p className="error">{state.message}</p>}
-        <button className="primary-btn" onClick={locate} disabled={state.kind === 'locating'}>
-          {state.kind === 'locating' ? '定位中…' : '📍 搵附近車站'}
-        </button>
-      </div>
+      <>
+        {head}
+        <div className="empty-state">
+          <span className="empty-icon">
+            <Icon name="pin" size={32} />
+          </span>
+          <p>搵你附近 600 米內嘅巴士站，同埋每條路線下一班車。</p>
+          {state.kind === 'error' && <p className="error">{state.message}</p>}
+          <button className="primary-btn" onClick={locate} disabled={state.kind === 'locating'}>
+            <Icon name="locate" size={20} />
+            {state.kind === 'locating' ? '定位中…' : '搵附近車站'}
+          </button>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="nearby">
-      <div className="nearby-head">
-        <span className="muted">{state.stops.length ? `附近 ${state.stops.length} 個車站` : '600 米內冇城巴站'}</span>
-        <button className="link-btn" onClick={locate}>
-          重新定位
-        </button>
+    <>
+      {head}
+      <div className="nearby">
+        <ul className="nearby-list">
+          {state.stops.map((s, i) => (
+            <NearbyStop key={`${s.co}-${s.id}`} stop={s} autoLoad={i < AUTO_LOAD} />
+          ))}
+        </ul>
       </div>
-      <ul className="nearby-list">
-        {state.stops.map((s, i) => (
-          <NearbyStop key={`${s.co}-${s.id}`} stop={s} autoLoad={i < AUTO_LOAD} />
-        ))}
-      </ul>
-    </div>
+    </>
   );
 }
 
@@ -111,8 +130,12 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
   return (
     <li className="nearby-stop card">
       <button className="nearby-stop-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span className="nearby-stop-name">{stop.name}</span>
-        <span className="muted">{formatDistance(stop.distance)}</span>
+        <span className="nearby-stop-name">
+          <Icon name="pin" size={18} />
+          {stop.name}
+        </span>
+        <span className="distance-chip">{formatDistance(stop.distance)}</span>
+        <Icon name="chevron-down" size={18} className={`nearby-chevron${open ? ' open' : ''}`} />
       </button>
       {open && (
         <ul className="nearby-routes">
