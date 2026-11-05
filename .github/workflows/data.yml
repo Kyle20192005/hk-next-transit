@@ -1,8 +1,15 @@
 name: 更新交通數據
 
+# 唔用任何外部 action（actions/checkout 等）：repo 嘅 Actions 權限設定可能唔准用，
+# 會令 workflow 啟動前就失敗（startup_failure）。runner 本身有 git 同 Python 3。
 on:
   schedule:
     - cron: '17 20 * * *'   # 每日香港時間 04:17（UTC 20:17）
+  push:
+    branches: [main]
+    paths:   # 改咗 pipeline 或者呢個 workflow 就即刻用新程式生成數據
+      - 'pipeline/**'
+      - '.github/workflows/data.yml'
   workflow_dispatch:
     inputs:
       force:
@@ -21,11 +28,13 @@ jobs:
   build-data:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: '3.13'
+      - name: 取得程式碼
+        run: |
+          git clone -q --depth 1 --branch "${{ github.ref_name }}" "$REPO_URL" .
+          python3 --version
       - name: 下載原始數據
         run: python3 pipeline/fetch.py
       - name: 生成數據
@@ -36,8 +45,8 @@ jobs:
         run: |
           mkdir -p /tmp/prev
           if git fetch -q --depth 1 origin data; then
-            git show origin/data:stats.json > /tmp/prev/stats.json 2>/dev/null || rm -f /tmp/prev/stats.json
-            git show origin/data:index.json > /tmp/prev/index.json 2>/dev/null || rm -f /tmp/prev/index.json
+            git show FETCH_HEAD:stats.json > /tmp/prev/stats.json 2>/dev/null || rm -f /tmp/prev/stats.json
+            git show FETCH_HEAD:index.json > /tmp/prev/index.json 2>/dev/null || rm -f /tmp/prev/index.json
           fi
           python3 pipeline/check.py --prev /tmp/prev $FORCE
       - name: 發佈到 data 分支
@@ -50,4 +59,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -q -m "數據更新 $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
+          git push -q -f "$REPO_URL" data

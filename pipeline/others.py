@@ -375,7 +375,7 @@ def build_mtrb(ctx):
             'directions': directions, 'ctbOnlyStops': [], 'variants': variants,
         }
         write_route('mtrb', rno, data, index, by_stop, stops_info)
-    print(f'港鐵巴士路線 {len(index)}，走法 {sum(r["variants"] for r in index)}，'
-          f'配到政府走法 {sum(1 for r in index for v in json.load(open(f"{B.OUT}/mtrb/{r["route"]}.json"))["variants"] if v["govRouteId"])}，'
-          f'OSM 走線 {sum(1 for r in index for v in json.load(open(f"{B.OUT}/mtrb/{r["route"]}.json"))["variants"] if v.get("lineSource") == "osm")}')
+    all_v = [v for r in index for v in json.load(open(os.path.join(B.OUT, 'mtrb', r['route'] + '.json')))['variants']]
+    print(f'港鐵巴士路線 {len(index)}，走法 {len(all_v)}，配到政府走法 {sum(1 for v in all_v if v["govRouteId"])}，'
+          f'OSM 走線 {sum(1 for v in all_v if v.get("lineSource") == "osm")}')
     return index, by_stop, stops_info
