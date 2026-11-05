@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 香港公共交通實時到站 App。目前做城巴、九巴（連龍運）、聯營線、新大嶼山巴士同港鐵巴士，網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
-App 暫時只更新到城巴（用舊嘅 `/api/ctb`），未有九巴同新版介面。
+App 同網頁版功能一致（四間公司、分頁、收藏、走法、地圖、時間線、巴士位置、班次表）。舊 App 用嘅 `/api/ctb` 保留。
 
 ## 結構
 
@@ -196,6 +196,13 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   首頁路線列表兩欄（電腦三欄）。電腦（`hover: hover` + `pointer: fine` + ≥ 1024px）收埋屏幕鍵盤，直接用實體鍵盤打號碼
   （`RouteBrowser` 嘅 keydown，只接受可以接落去嘅字）。手機版面唔變。
 - 新增營辦商：喺 `packages/core/src/` 加 adapter，輸出統一嘅 `Eta` 類型。
+- App（`apps/mobile`）：結構 `src/app/(tabs)/`（index 路線、nearby、favorites）+ `src/app/[co]/[route].tsx`，邏輯同網頁
+  `app/[co]/[route]/page.tsx` + `StopList.tsx` 一致，改一邊要改埋另一邊。設計變數 `src/lib/theme.ts` 同網頁 `globals.css` 一致；
+  公司名同代表色喺 core `company.ts` 共用。圖示用 react-native-svg（`components/Icon.tsx`，同網頁同一套路徑）。
+  收藏用 AsyncStorage（同網頁一樣格式）。定位用 expo-location。
+- App 唔好用 `Link asChild` 包 Pressable 做列表行：改用 `Pressable` + `router.push`。
+- App 預覽：`EXPO_PUBLIC_API_BASE=http://localhost:3000 npx expo start --web`（`RouteMap.web.tsx` 係地圖佔位，react-native-maps 冇 web）。
+  改完 code 截圖前要殺咗 server 再用 `--clear` 重開：Metro web 延遲載入嘅 chunk 會繼續送舊 code。
 
 ## 已知未做
 
@@ -209,4 +216,5 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - ETA `seq` 規律只喺 38 號驗證過。
 - 港鐵、輕鐵、小巴、電車、渡輪未做。
 - 「附近」：聯營線只列喺城巴站下面（避免同一條線喺相鄰嘅九巴站同城巴站出兩次）。
-- App 未喺實機或者模擬器測試過（只確認到 bundle 到）。
+- App 未喺實機或者模擬器測試過：確認到 iOS／Android bundle 到（`npx expo export --platform ios --platform android`），
+  介面用 Expo web 預覽截圖驗證過（地圖除外）。
