@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BusStabilizer,
@@ -82,15 +82,84 @@ export default function RouteScreen() {
     void fetchAll();
   };
 
-  if (error)
+  // 載入中同出錯都即刻畫標題列（返回掣、路線號碼），唔好得一個轉圈
+  if (error || !data)
     return (
-      <Pressable onPress={load} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <Text style={{ color: t.special }}>載入失敗：{error}</Text>
-        <Text style={{ color: t.accent, marginTop: 6, fontWeight: '600' }}>撳一下再試</Text>
-      </Pressable>
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <RouteBar route={params.route} />
+        {error ? (
+          <Pressable onPress={load} style={{ alignItems: 'center', padding: 32 }}>
+            <Text style={{ color: t.special, textAlign: 'center' }}>載入失敗：{error}</Text>
+            <Text style={{ color: t.accent, marginTop: 6, fontWeight: '600' }}>撳一下再試</Text>
+          </Pressable>
+        ) : (
+          <RouteSkeleton />
+        )}
+      </View>
     );
-  if (!data) return <ActivityIndicator style={{ marginTop: 64 }} />;
   return <RouteView key={`${co}-${data.route}`} co={co} data={data} calendar={calendar} initialDir={params.dir} initialVariant={params.v} initialStop={params.stop} />;
+}
+
+/** 黃色標題列：‹　38　往 北角碼頭　（右邊按鈕由 children 傳入） */
+function RouteBar({ route, companiesLabel, dest, note, children }: { route: string; companiesLabel?: string; dest?: string; note?: string | null; children?: React.ReactNode }) {
+  const t = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: insets.top + 8, paddingBottom: 10, paddingLeft: 4, paddingRight: 10, minHeight: insets.top + 68, backgroundColor: t.brand, borderBottomLeftRadius: radius.bar, borderBottomRightRadius: radius.bar }}>
+      <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel="返回" hitSlop={6} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="back" size={26} color={t.onBrand} />
+      </Pressable>
+      <View>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: t.onBrand, opacity: 0.7 }}>{companiesLabel ?? ' '}</Text>
+        <Text style={{ fontSize: 32, fontWeight: '800', color: t.onBrand, letterSpacing: -0.6, lineHeight: 34, ...tabular }}>{route}</Text>
+      </View>
+      <View style={{ flex: 1, marginLeft: 6 }}>
+        {dest !== undefined && (
+          <Text numberOfLines={1} style={{ fontSize: 17, fontWeight: '700', color: t.onBrand }}>
+            <Text style={{ fontWeight: '500', opacity: 0.75 }}>往 </Text>
+            {dest}
+          </Text>
+        )}
+        {note && <Text style={{ fontSize: 12, fontWeight: '600', color: t.onBrand, opacity: 0.75 }}>{note}</Text>}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/** 載入中：走法、地圖、站點列表嘅灰色骨架（輕輕閃），等數據返嚟 */
+function RouteSkeleton() {
+  const t = useTheme();
+  const { height: winH } = useWindowDimensions();
+  const [pulse] = useState(() => new Animated.Value(0.55));
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.55, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  const bar = (w: `${number}%`, h = 14) => <View style={{ width: w, height: h, borderRadius: 7, backgroundColor: t.line }} />;
+  return (
+    <Animated.View style={{ flex: 1, opacity: pulse }} accessibilityLabel="載入中">
+      <View style={{ padding: 12, gap: 10 }}>
+        <View style={{ height: 46, borderRadius: radius.m, backgroundColor: t.card, justifyContent: 'center', paddingHorizontal: 14 }}>{bar('45%')}</View>
+        <View style={{ height: Math.max(150, Math.min(280, winH * 0.26)), borderRadius: radius.l, backgroundColor: t.line }} />
+      </View>
+      <View style={{ flex: 1, marginHorizontal: 12, borderTopLeftRadius: radius.l, borderTopRightRadius: radius.l, backgroundColor: t.card, paddingTop: 14, gap: 26 }}>
+        {[60, 72, 50, 66, 58, 70].map((w, i) => (
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 46, paddingRight: 16 }}>
+            <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 3, borderColor: t.line }} />
+            <View style={{ flex: 1 }}>{bar(`${w}%`)}</View>
+            {bar('12%')}
+          </View>
+        ))}
+      </View>
+    </Animated.View>
+  );
 }
 
 function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop }: { co: Co; data: RouteData; calendar: Calendar; initialDir?: string; initialVariant?: string; initialStop?: string }) {
@@ -379,26 +448,11 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      {/* 黃色標題列：‹　38　往 北角碼頭　★ 🕒 ⇅ */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: insets.top + 8, paddingBottom: 10, paddingLeft: 4, paddingRight: 10, backgroundColor: t.brand, borderBottomLeftRadius: radius.bar, borderBottomRightRadius: radius.bar }}>
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel="返回" hitSlop={6} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="back" size={26} color={t.onBrand} />
-        </Pressable>
-        <View>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: t.onBrand, opacity: 0.7 }}>{companyNames(companies)}</Text>
-          <Text style={{ fontSize: 32, fontWeight: '800', color: t.onBrand, letterSpacing: -0.6, lineHeight: 34, ...tabular }}>{data.route}</Text>
-        </View>
-        <View style={{ flex: 1, marginLeft: 6 }}>
-          <Text numberOfLines={1} style={{ fontSize: 17, fontWeight: '700', color: t.onBrand }}>
-            <Text style={{ fontWeight: '500', opacity: 0.75 }}>往 </Text>
-            {dest}
-          </Text>
-          {!joyYou && <Text style={{ fontSize: 12, fontWeight: '600', color: t.onBrand, opacity: 0.75 }}>不設樂悠咭優惠</Text>}
-        </View>
+      <RouteBar route={data.route} companiesLabel={companyNames(companies)} dest={dest} note={joyYou ? null : '不設樂悠咭優惠'}>
         <BarButton icon={fav ? 'star-fill' : 'star'} on={fav} onPress={toggleFav} label={fav ? '取消收藏路線' : '收藏路線'} />
         {hasTimetable && <BarButton icon="clock" onPress={() => setTimetable(true)} label="詳細班次" />}
         {other && <BarButton icon="swap" onPress={() => changeDir(other)} label={`轉方向：往 ${data.stops[data.directions[other]!.at(-1)!]?.nameTc}`} />}
-      </View>
+      </RouteBar>
 
       <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, gap: 10, zIndex: 10 }}>
         <VariantPicker

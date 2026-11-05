@@ -117,10 +117,16 @@ export const StopRow = memo(function StopRow(p: Props) {
           />
         </View>
         <View style={{ flex: 1, paddingLeft: 6 }}>
-          <Text style={{ fontSize: 16, color: t.text, fontWeight: p.open ? '700' : '400' }}>
-            {p.name}
-            {p.nearestMetres !== null && <Text style={{ fontSize: 12, fontWeight: '700', color: t.onBrand, backgroundColor: t.brand }}> 最近 · {formatDistance(p.nearestMetres)} </Text>}
-          </Text>
+          {/* 「最近」係獨立膠囊：放唔落就成粒落下一行，唔會好似一段字咁斷開兩截 */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 3 }}>
+            <Text style={{ fontSize: 16, color: t.text, fontWeight: p.open ? '700' : '400' }}>{p.name}</Text>
+            {p.nearestMetres !== null && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingLeft: 6, paddingRight: 8, paddingVertical: 1, borderRadius: 999, backgroundColor: t.brand }}>
+                <Icon name="pin" size={12} color={t.onBrand} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: t.onBrand, ...tabular }}>最近 · {formatDistance(p.nearestMetres)}</Text>
+              </View>
+            )}
+          </View>
           {p.travelSeconds !== null && p.travelSeconds > 0 && (
             <Text style={{ fontSize: 13, fontWeight: '600', color: t.accent, ...tabular }}>
               +{Math.max(1, Math.round(p.travelSeconds / 60))} 分
