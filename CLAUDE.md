@@ -30,6 +30,8 @@ pnpm -r typecheck
 數據每日香港時間 04:17 由 GitHub Actions（`.github/workflows/data.yml`）自動更新：fetch → build → check → 推去 `data` 分支。
 `check.py` 同上一版比較每間公司嘅路線、走法、站、有時間表／走線／車費嘅走法，少咗超過 10%（而且最少 3 個）
 或者有結構錯誤就唔發佈，網站繼續用舊數據；真係大量路線取消就人手 Run workflow 剔「強制發佈」（`--force`）。
+`data` 分支要有 `apps/web/vercel.json`（`{"ignoreCommand": "exit 0"}`）：Vercel 會將 data 分支當預覽部署，
+冇 `apps/web` 目錄就報 Build Failed。人手發佈數據都要加。
 網頁版本地開發讀 `pipeline/out/`，所以要先跑 pipeline。上線時用 `DATA_BASE_URL` 指去數據位置。
 私人 repo 再加 `DATA_TOKEN`：raw.githubusercontent 網址會自動改用 GitHub Contents API。
 數據讀唔到時開 `/api/health` 睇原因。

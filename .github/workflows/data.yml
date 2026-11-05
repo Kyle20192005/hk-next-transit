@@ -54,6 +54,9 @@ jobs:
         # 網頁版設定 DATA_BASE_URL=https://raw.githubusercontent.com/<owner>/<repo>/data
         run: |
           cd pipeline/out
+          # Vercel 會想 build data 分支做預覽（Root Directory = apps/web），冇呢個目錄就報 Build Failed；
+          # 放一個叫佢略過嘅 vercel.json
+          mkdir -p apps/web && echo '{"ignoreCommand": "exit 0"}' > apps/web/vercel.json
           git init -q -b data
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
