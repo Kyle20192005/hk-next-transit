@@ -121,7 +121,7 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
                 onPress={() => router.push({ pathname: '/[co]/[route]', params: { co: r.co, route: r.route, dir: r.dir, stop: stop.id } })}
                 accessibilityRole="link"
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: t.line }}>
-                <View style={{ width: 76, gap: 3 }}>
+                <View style={{ width: 96, gap: 3 }}>
                   <Text style={{ fontSize: 19, fontWeight: '800', color: t.text, ...tabular }}>{r.route}</Text>
                   <CompanyTag companies={r.companies} />
                 </View>

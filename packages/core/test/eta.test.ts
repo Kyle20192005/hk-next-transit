@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { etasAtStop, etasAtStopDetailed, pickNlbVariant, type RouteData, type Variant } from '../src';
+import { etasAtStop, etasAtStopDetailed, fixCtbDir, pickNlbVariant, type RouteData, type Variant } from '../src';
 
 // 聯營線：城巴路線檔，站 S1 嘅九巴站 ID 係 K1；九巴嘅 bound 同城巴相反（城巴 O = 九巴 I）
 const route = {
@@ -190,4 +190,13 @@ describe('pickNlbVariant', () => {
   it('經: xx 對走法', () => expect(pickNlbVariant(vs, '經: 北大嶼山醫院').hit.id).toBe('a'));
   it('完全一樣優先', () => expect(pickNlbVariant(vs, '經: 沙咀懲教所').hit.id).toBe('b'));
   it('對唔到 = 正常路線（唔肯定）', () => expect(pickNlbVariant(vs, '經: 某地')).toEqual({ hit: vs[0], sure: false }));
+});
+
+describe('fixCtbDir', () => {
+  // 78：站點列表 O 有華貴邨（S2），I 冇；到站時間卻標 I
+  const route = { directions: { O: ['S1', 'S2'], I: ['S3', 'S1'] } } as unknown as RouteData;
+  const e = (stopId: string, dir: 'O' | 'I') => ({ stopId, dir }) as unknown as Parameters<typeof fixCtbDir>[1];
+  it('班次方向嘅列表冇呢個站、另一個方向有：改方向', () => expect(fixCtbDir(route, e('S2', 'I')).dir).toBe('O'));
+  it('兩個方向都有（例如總站）：唔改', () => expect(fixCtbDir(route, e('S1', 'I')).dir).toBe('I'));
+  it('方向啱：唔改', () => expect(fixCtbDir(route, e('S3', 'I')).dir).toBe('I'));
 });

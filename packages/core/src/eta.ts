@@ -1,4 +1,4 @@
-import type { Calendar, Company, Eta, RouteData, Variant } from './types';
+import type { Calendar, Company, Dir, Eta, RouteData, Variant } from './types';
 import { fetchCtbEta } from './ctb';
 import { fetchKmbEta } from './kmb';
 import { inferAll } from './infer';
@@ -91,7 +91,7 @@ export async function etasAtStopDetailed(
   if (route.company === 'CTB' && companies.includes('CTB')) {
     parts.push(
       retry(() => fetchCtbEta(stopId, route.route, fetcher))
-        .then((etas) => inferAll(route, etas.filter((e) => e.eta), calendar))
+        .then((etas) => inferAll(route, etas.filter((e) => e.eta).map((e) => fixCtbDir(route, e)), calendar))
         .catch(fail('CTB')),
     );
   }
@@ -205,4 +205,16 @@ export function pickNlbVariant(vs: Variant[], remark: string): { hit: Variant; s
   if (exact) return { hit: exact, sure: true };
   const part = vs.find((v) => v.nlb?.via && (viaKey(v.nlb.via).includes(via) || via.includes(viaKey(v.nlb.via))));
   return { hit: part ?? normal, sure: false };
+}
+
+/**
+ * 城巴循環線嘅站點列表同到站時間方向唔一致（例如 78：站點列表話華貴邨至田灣商場屬去程 O，
+ * 到站時間就標回程 I，站序照計落去）。班次方向嘅站點列表冇呢個站、另一個方向有，就改做另一個方向，
+ * 唔係介面按方向過濾會將班次全部篩走。
+ */
+export function fixCtbDir(route: RouteData, e: Eta): Eta {
+  const own = route.directions[e.dir];
+  const other: Dir = e.dir === 'O' ? 'I' : 'O';
+  if (own?.includes(e.stopId) || !route.directions[other]?.includes(e.stopId)) return e;
+  return { ...e, dir: other };
 }

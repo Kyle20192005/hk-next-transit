@@ -39,7 +39,7 @@ function FavItem({ f }: { f: Favorite }) {
           onPress={() => router.push({ pathname: '/[co]/[route]', params: { co: f.co, route: f.route, dir: f.dir, ...(f.stopId ? { stop: f.stopId } : {}) } })}
           accessibilityRole="link"
           style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 4 }}>
-          <View style={{ width: 88, paddingVertical: 12, paddingLeft: 16, gap: 4 }}>
+          <View style={{ width: 108, paddingVertical: 12, paddingLeft: 16, gap: 4 }}>
             <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, ...tabular }}>{f.route}</Text>
             <CompanyTag companies={f.companies} />
           </View>

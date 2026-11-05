@@ -37,7 +37,7 @@ export function MapHelpButton({ company, multiCompany }: { company: string; mult
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={h.title}
-        style={{ position: 'absolute', top: 10, right: 10, zIndex: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', ...shadow }}
+        style={{ position: 'absolute', bottom: 10, left: 10, zIndex: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', ...shadow }}
       >
         <Icon name="info" size={20} color={t.text} />
       </Pressable>

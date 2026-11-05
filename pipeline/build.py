@@ -327,9 +327,16 @@ def main():
     cand_lists = {}
     for (rno, d), l in clists.items():
         cand_lists[(rno, d)] = [(d, s) for s in l]
+    # 循環線：城巴 O 列表尾同 I 列表頭可以重疊（例如 78 嘅華貴邨至田灣商場兩邊都有）。
+    # 城巴到站時間將重疊段當 I，站序就接住 O 繼續數（78：華貴邨 I seq 11），
+    # 所以駁埋時重疊段用 I 嗰份；走法嘅 I 站預期 seq 要加 len(O) - 重疊數（見下面 expSeq）
+    loop_overlap = {}
     for rno in {k[0] for k in clists}:
         if (rno, 'O') in clists and (rno, 'I') in clists:
-            cand_lists[(rno, 'O+I')] = cand_lists[(rno, 'O')] + cand_lists[(rno, 'I')]
+            o, i_ = clists[(rno, 'O')], clists[(rno, 'I')]
+            k = max([k for k in range(1, min(len(o), len(i_))) if o[-k:] == i_[:k]] or [0])
+            loop_overlap[rno] = k
+            cand_lists[(rno, 'O+I')] = cand_lists[(rno, 'O')][:len(o) - k] + cand_lists[(rno, 'I')]
 
     report, unmatched_routes = [], []
     variants_by_route = collections.defaultdict(list)
@@ -410,6 +417,9 @@ def main():
                         pos.setdefault(s, l.index(s))
                 if not pos: continue
                 lo, hi, n = min(pos.values()), max(pos.values()), 0
+                # 有重疊嘅循環線：I 段嘅 seq 接住 O 數落去
+                if d == 'I' and 'O' in v['stopDirs'] and loop_overlap.get(rno) and 'O' in dirs:
+                    n = len(dirs['O']) - loop_overlap[rno]
                 mine = set(pos)
                 for s in l[lo:hi + 1]:
                     if s in mine or (d, s) in orphan:
