@@ -26,6 +26,19 @@ export interface NearStop {
   routes: { co: Co; route: string; dir: 'O' | 'I'; dest: string; companies: Company[] }[];
 }
 
+/** 「喺度搭得」一行：呢個位置（40 米內所有公司嘅站）可以搭嘅一條線 */
+export interface HereRoute {
+  co: Co;
+  route: string;
+  dir: 'O' | 'I';
+  dest: string;
+  companies: Company[];
+  stopId: string;
+  stopName: string;
+  distance: number;
+  etas: { eta: string; company: Company; scheduled: boolean }[];
+}
+
 export interface LiveBus {
   from: number;
   nextEta: string;
@@ -47,6 +60,8 @@ export const api = {
   /** 某站到站時間；failed = 攞唔到數據嘅公司（唔好當佢冇車） */
   eta: (co: Co, route: string, stop: string) =>
     get<{ etas: Eta[]; failed?: Company[]; fetchedAt: string }>(`/api/eta?co=${co}&route=${q(route)}&stop=${q(stop)}`),
+  /** 喺度搭得：呢個位置可以搭嘅所有路線同下一兩班 */
+  here: (lat: number, lng: number) => get<{ routes: HereRoute[]; radius: number }>(`/api/here?lat=${lat}&lng=${lng}`),
   nearby: (lat: number, lng: number) => get<{ stops: NearStop[] }>(`/api/nearby?lat=${lat}&lng=${lng}`),
   /** 一個站所有路線嘅下一班 */
   stopEtas: (co: Co, stop: string) =>

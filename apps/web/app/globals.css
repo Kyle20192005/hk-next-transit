@@ -317,10 +317,23 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 
 /* 打開咗嘅站：下一班大字，其餘細字 */
 .etas { position: relative; padding: 0 16px 16px 74px; }
-/* 收藏掣放右上角，同大字到站時間並排，唔使多佔一行 */
-.etas-actions { position: absolute; top: 4px; right: 16px; z-index: 1; }
-.etas:has(.etas-actions) .eta-next { padding-right: 112px; }
-.etas:has(.etas-actions) .eta-next .where { margin-right: -112px; }
+/* 動作列（喺度搭得、收藏呢個站）：喺到站時間下面一行 */
+.etas-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.pill-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border: 0; border-radius: 999px; background: var(--brand); color: var(--on-brand); font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
+.pill-btn:active { transform: scale(0.97); }
+/* 喺度搭得（drawer 內容） */
+/* 喺度搭得內容多過詳細班次：手機差唔多全闊 */
+.drawer.wide { width: min(96vw, 440px); }
+.here-title { display: flex; flex-direction: column; min-width: 0; }
+.here-title small { font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.here-list { flex: 1; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 0 0 16px; border-top: 1px solid var(--line); }
+.here-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: var(--text); border-bottom: 1px solid var(--line); }
+.here-row:active, .here-row:hover { background: var(--surface-2); }
+.here-row.current { background: var(--brand-soft); }
+.here-row .route-id { width: 96px; padding: 0; }
+.here-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.here-text .route-to small { font-weight: 500; color: var(--muted); }
+.here-sub { font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fav-inline { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 999px; background: var(--card); color: var(--accent); font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
 .fav-inline.on { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .eta-next { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }

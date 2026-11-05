@@ -5,6 +5,7 @@ import { tabular, useTheme } from '@/lib/theme';
 import { useFavorite, type Favorite } from '@/lib/favorites';
 import { BusGlyph, Icon } from './Icon';
 import { CompanyTag, Pill, ScheduledTag } from './ui';
+import { HereButton, type HereTarget } from './HereSheet';
 
 /** 時間線上嘅巴士：half = below 由圓點去到呢行底，above 由呢行頂去到圓點（同網頁版一樣） */
 export interface RowBus {
@@ -39,6 +40,8 @@ type Props = {
   nextArrival: number | null;
   buses: RowBus[];
   fav: Omit<Favorite, 'at'> | null;
+  /** 「喺度搭得」：呢個站嘅位置同而家睇緊嘅路線 */
+  here: HereTarget | null;
 };
 
 const SEQ_W = 34;
@@ -147,16 +150,11 @@ export const StopRow = memo(function StopRow(p: Props) {
 
       {p.open && (
         <View style={{ paddingLeft: SEQ_W + TL_W + 6, paddingRight: 16, paddingBottom: 16 }}>
-          {p.fav && (
-            <View style={{ position: 'absolute', top: 2, right: 16, zIndex: 1 }}>
-              <FavStop target={p.fav} />
-            </View>
-          )}
           {p.error && <Text style={{ color: t.muted }}>載入失敗：{p.error}</Text>}
           {!p.error && list === null && <Text style={{ color: t.muted }}>載入中…</Text>}
           {!p.error && list?.length === 0 && p.failed.length === 0 && <Text style={{ color: t.muted }}>暫時冇班次</Text>}
           {next && (
-            <View style={{ paddingRight: p.fav ? 112 : 0 }}>
+            <View>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
                 <Text style={{ color: t.accent, ...tabular }}>
                   {minsOf(next.e) === 0 ? (
@@ -203,6 +201,13 @@ export const StopRow = memo(function StopRow(p: Props) {
               <Text style={{ flex: 1, color: t.special, fontSize: 13 }}>
                 {p.failed.map((c) => COMPANIES[c as Company]?.name ?? c).join('、')}資料暫時攞唔到，可能少咗班次，稍後會自動再試
               </Text>
+            </View>
+          )}
+          {/* 動作列：喺到站時間下面（同網頁一樣） */}
+          {(p.here || p.fav) && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+              {p.here && <HereButton target={p.here} />}
+              {p.fav && <FavStop target={p.fav} />}
             </View>
           )}
         </View>

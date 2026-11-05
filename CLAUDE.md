@@ -195,6 +195,10 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 公司標籤（`components/CompanyTag.tsx`、`lib/company.ts`）：巴士圖示 + 公司名，用公司代表色（城巴黃、九巴紅）。
 - 路線頁開頁自動定位（第一次瀏覽器會問一次），搵呢個走法 500 米內最近嘅站（唔計終點站），打開佢同標「最近 · N 米」；
   列表頂固定一行顯示結果同「重新定位」（喺捲動區 `.stops-scroll` 外面；唔好用 sticky，iPhone 頂部拉落會跟住彈）。用戶拒絕過（permission denied）就唔再問。由「附近」撳入嚟（`?stop=`）就照開指定嘅站。
+- 「喺度搭得」：打開站之後到站時間下面嘅動作列（同「收藏呢個站」一齊），撳開右邊 drawer（網頁 `components/HereDrawer.tsx`）／
+  下面彈上嘅面板（App `components/HereSheet.tsx`）。`/api/here?lat&lng` 搵 40 米內**所有公司**嘅站（城巴、九巴同一個站頭
+  通常係兩個站 ID），合併路線同下一兩班（同一條線同方向只留最近嘅站），按下一班排；而家睇緊嘅線固定排第一。
+  撳一行入嗰條線並打開同一個站（`?stop=`）。邏輯同 `/api/stop-etas` 共用 `lib/stop-routes.ts`。
 - 時間線豎線畫喺 `li.stop::before`（成個站嘅高度），唔好畫喺按鈕入面，否則行與行之間同打開咗嘅到站時間部分會斷線。
 - 車費：GTFS `fare_attributes` 分段收費（fare_id = route-方向-上車站序-落車站序），上車車費 = 由嗰個站去任何站嘅最高收費；
   pipeline 存做 `variant.fares[站ID]`（冇分段就用 JSON_BUS 嘅 `fullFare`）。站點列表右邊顯示，終點站唔顯示。

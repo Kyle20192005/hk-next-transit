@@ -5,6 +5,8 @@ import BusIcon from './BusIcon';
 import CompanyTag from './CompanyTag';
 import { COMPANIES } from '@/lib/company';
 import FavButton from './FavButton';
+import HereDrawer from './HereDrawer';
+import type { Co } from '@/lib/data';
 import Icon from './Icon';
 import type { Favorite } from '@/lib/favorites';
 
@@ -60,6 +62,8 @@ type Props = {
   buses: RowBus[];
   /** 收藏呢個站用（終點站冇） */
   fav: Omit<Favorite, 'at'> | null;
+  /** 「喺度搭得」：呢個站嘅位置同而家睇緊嘅路線 */
+  here: { lat: number; lng: number; name: string; current: { co: Co; route: string; dir: 'O' | 'I' } } | null;
 };
 
 const hhmm = (ms: number) =>
@@ -67,7 +71,7 @@ const hhmm = (ms: number) =>
 
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav },
+  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav, here },
   ref,
 ) {
   const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null })) ?? null;
@@ -115,11 +119,6 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
       </button>
       {open && (
         <div className="etas" aria-live="polite">
-          {fav && (
-            <div className="etas-actions">
-              <FavButton target={fav} variant="inline" />
-            </div>
-          )}
           {error && <div className="muted">載入失敗：{error}</div>}
           {!error && list === null && <div className="muted">載入中…</div>}
           {!error && list?.length === 0 && failed.length === 0 && <div className="muted">暫時冇班次</div>}
@@ -168,6 +167,13 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
           {failed.length > 0 && (
             <div className="eta-failed" role="status">
               <Icon name="warning" size={16} /> {failed.map((c) => COMPANIES[c as keyof typeof COMPANIES]?.name ?? c).join('、')}資料暫時攞唔到，可能少咗班次，稍後會自動再試
+            </div>
+          )}
+          {/* 動作列：喺到站時間下面，唔好同大字搶位 */}
+          {(fav || here) && (
+            <div className="etas-actions">
+              {here && <HereDrawer lat={here.lat} lng={here.lng} name={here.name} current={here.current} />}
+              {fav && <FavButton target={fav} variant="inline" />}
             </div>
           )}
         </div>

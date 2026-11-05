@@ -545,6 +545,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
                 travelMetres={after ? (cumMetres[i] ?? 0) - (cumMetres[openIndex!] ?? 0) : null}
                 nextArrival={after && tr !== null && nextAtOpen !== null ? nextAtOpen + tr * 1000 : null}
                 buses={rowBuses.get(i) ?? []}
+                here={s.lat !== undefined && s.lng !== undefined ? { lat: s.lat, lng: s.lng, name: s.name, current: { co, route: data.route, dir: s.dir } } : null}
                 fav={i < stops.length - 1 ? { co, route: data.route, dir: s.dir, dest, companies, stopId: s.stopId, stopName: s.name } : null}
               />
             );

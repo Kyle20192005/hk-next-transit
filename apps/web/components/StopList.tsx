@@ -291,6 +291,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
             now={now}
             selectedVariantId={selectedVariantId}
             nearestMetres={nearest?.index === i ? nearest.metres : null}
+            here={s.lat !== undefined && s.lng !== undefined ? { lat: s.lat, lng: s.lng, name: s.name, current: { co, route, dir: s.dir } } : null}
             fav={i < stops.length - 1 ? { co, route, dir: s.dir, dest: stops[stops.length - 1]?.name ?? '', companies, stopId: s.stopId, stopName: s.name } : null}
             fare={fares[i] ?? null}
             travelSeconds={openIndex !== null && i > openIndex ? tr : null}
