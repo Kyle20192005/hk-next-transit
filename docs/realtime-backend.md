@@ -11,6 +11,7 @@
 - **伺服器放香港**：巴士公司 API 全部喺香港，減少跨太平洋來回。
 - **後端有記憶**：記住每架車過去幾分鐘嘅 ETA，用實際車速同過站時間計位置，唔再每次由零開始。
 - **自己量行車時間**：由過站紀錄計每段路實際行車時間，取代第三方 hk-bus-time-between-stops（實驗性質、有異常值）。
+- **預先 fetch**：用戶搜尋、撳落路線嗰陣已經開始準備數據，入到路線頁差唔多即刻有巴士位置（見第 4.7 節）。
 - **順帶**：每日數據更新改喺自己伺服器排程跑，唔再靠 GitHub Actions（而家因為 GitHub 收費問題行唔到）。
 
 唔係目標：將網頁搬離 Vercel（網頁可以繼續用 Vercel 香港機房 hkg1 同 CDN）。
@@ -49,7 +50,7 @@
               is*hosting 香港 VPS（Dokploy 管理）
  ┌───────────────────────────────────────────────────────┐
  │ tracker（Node 22 + TypeScript，用 @hknt/core）          │
- │   ├ Presence 知道邊條線有人睇 → 只 poll 呢啲線          │
+ │   ├ Presence 同預熱訊號 → 只 poll 有人睇／就嚟睇嘅線    │
  │   ├ 每條線每 10–15 秒 poll 一次（按公司 API 特性）     │
  │   ├ 每架車維持狀態（歷史 ETA、上次位置、實測車速）     │
  │   ├ 計位置 → Supabase Realtime Broadcast              │──► 網頁 / App 訂閱
@@ -59,6 +60,7 @@
  │   └ 路線、站、走法、時間表 → Postgres（同時照出 JSON）  │
  │ aggregator（SQL／排程）                                │
  │   └ stop_passages → segment_times（按星期、時段）       │
+ │ Redis（或 Valkey）：上游 cache、限流、預熱、快照、車輛狀態 │
  │ Supabase 自架（Postgres + PostGIS + Realtime + Kong）   │
  └───────────────────────────────────────────────────────┘
  Vercel（網頁，hkg1）──讀 Postgres（或者暫時照讀 GitHub JSON）
@@ -90,6 +92,26 @@
   - **過站偵測**：一架車喺某站嘅 ETA 消失（而下一個站仍然有佢）＝ 已經過咗呢個站，記錄過站時間。
   - 位置只准向前（`BusStabilizer` 搬去後端做），前端唔使再做。
 - **推送內容**：只喺有新數據時推（約每 15 秒），唔使每秒推；前端自己每秒沿路線推前，畫面順滑。
+
+### 4.1a Redis（或 Valkey）
+
+用 Dokploy 喺同一部 VPS 架，只聽內網（唔對外開放），設密碼。Redis 7.4 起改咗授權，
+如果介意可以用 Linux 基金會嘅開源分支 **Valkey**（指令相容，客戶端照用 `ioredis`）。
+
+| 用途 | key（例子） | TTL | 說明 |
+|---|---|---|---|
+| 上游回應 cache | `up:ctb:eta:{stop}:{route}`、`up:kmb:route-eta:{route}:{st}` | 10–15 秒 | tracker、網頁 `/api/eta`、預熱共用；跟來源更新節奏 |
+| 合併同時請求 | `lock:up:{同上}` | 5 秒 | `SET NX`：拎到鎖先 call 上游，其他人等 cache（避免同一個站同時 call 兩次） |
+| 全局限流 | `rl:datagov`（token bucket，Lua script） | — | 所有 poller 共用，例如每秒最多 30 個請求；超出就排隊 |
+| 預熱訊號 | `warm:{co}:{route}:{dir}` | 60 秒 | 見第 4.7 節；tracker 定期掃 |
+| 最新快照 | `snap:{co}:{route}:{variantId}` | 2 分鐘 | 最後一次推送嘅 `buses` 內容；新訂閱即刻有第一份、`/snapshot` 讀呢度 |
+| 車輛狀態 | `veh:{co}:{route}:{variantId}`（hash） | 10 分鐘 | 虛擬車輛 ID、歷史 ETA、實測車速；tracker 重啟唔會失憶 |
+| 退避狀態 | `backoff:{co}` | 按退避時間 | 某間公司連續出錯就暫停 |
+
+原則：
+- Redis 只放**短命**數據，唔做長期儲存（長期嘅放 Postgres）。Redis 冇咗只會慢少少，唔會壞。
+- 網頁 `/api/eta`、`/api/buses`（Vercel hkg1）**暫時唔連 Redis**：Vercel 連 VPS 要經公網，仲要另外處理 TLS 同密碼。
+  等 tracker 穩定之後，網頁 API 可以改為轉發去 tracker（tracker 讀 Redis），或者直接由前端訂閱推送。
 
 ### 4.2 Realtime 頻道格式
 
@@ -180,6 +202,33 @@ create table segment_times (
 - 前端唔再做 `BusStabilizer`（後端做咗），只按 `nextEta` 同 `segSeconds` 每秒沿走線推前。
 - App 去咗背景會斷線：返到前台即刻重新訂閱，同時 call 一次 `/snapshot` 補返最新狀態。
 
+### 4.7 預先 fetch（預測用戶會撳邊條線）
+
+用戶由「列表剩幾條候選」到入到路線頁，通常有 1–2 秒空檔，可以用嚟預先準備數據。
+但估錯就係浪費巴士公司 API 請求，所以**只喺好有把握時做，同埋有上限**。
+
+| 時機 | 準確度 | 做咩 | 上游請求 |
+|---|---|---|---|
+| 手指撳落路線（`pointerdown`／`onPressIn`，未放手） | 非常高 | 預熱嗰條線嗰個方向：送預熱訊號（或者而家架構直接 call `/api/buses`） | 有 |
+| 打完號碼停咗 0.4 秒，候選 ≤ 3 條 | 中 | 只預載**路線資料**（靜態、約 10KB），唔 call 巴士公司 | 冇 |
+| 開 App／首頁 | 高（用戶習慣） | 收藏嘅站同線、最近睇過嘅 3 條線送預熱訊號 | 有 |
+| 「附近」列表出咗 | 高 | 已經會攞到站時間（`/api/stop-etas`），共用上游 cache | 有 |
+| 每打一個字就預熱所有候選 | 低 | ❌ 唔做（打「1」已經 100 幾條候選） | — |
+
+預熱訊號：
+- 前端 `POST /warm`（tracker HTTP）`{ co, route, dir }`，或者用 Realtime Broadcast 送去 `warm` 頻道。
+- tracker 寫 `warm:{co}:{route}:{dir}`（TTL 60 秒），即刻開始 poll 嗰條線嘅預設走法（`sortVariants` 第一個；
+  城巴逐站 ETA 本身已經包兩個方向，所以其實係預熱成條線）。
+- 60 秒內冇人真正訂閱就停。
+- 上限：每個客戶端同時最多 3 條；全局預熱線數上限（例如 200）；照計全局限流。預熱嘅優先級低過有人睇緊嘅線。
+- 熱門線（收藏最多、繁忙時段）可以長期保持熱身（之後由數據決定）。
+
+過渡期（未有 tracker）：網頁同 App 喺 `pointerdown`／`onPressIn` 時背景 call 一次 `/api/buses`，
+令 Vercel 每站 10 秒 cache 先熱起嚟；候選 ≤ 3 條時預載路線資料（App 寫入 `cachedRoute`，網頁用 Next.js 預載）。
+
+效果預期：路線資料本身已經好快（App 有快取），最慢係第一次攞巴士位置同到站時間（城巴長線要逐站問）。
+預熱可以將呢段時間收埋喺用戶揀路線嘅空檔入面。
+
 ### 4.6 每日數據更新
 
 - Dokploy 排程（每日 04:17）跑：`fetch.py` → `build.py` → `check.py` → 寫入 Postgres（新 `version`）→ 照推 GitHub `data` 分支（過渡期網頁仲讀緊）。
@@ -194,8 +243,16 @@ create table segment_times (
 - [ ] Supabase 自架（Postgres + PostGIS + Realtime + Kong），Studio 唔對外
 - [ ] 備份：Postgres 每日備份去 VPS 以外（例如 S3 相容儲存）
 
+### 階段 0.5：預先 fetch（而家架構就做得，唔使等後端）
+- [ ] 網頁、App：撳落路線（未放手）背景 call `/api/buses`
+- [ ] 候選 ≤ 3 條、停咗 0.4 秒：預載路線資料
+- 驗收：由撳路線到見到第一架巴士嘅時間，比冇預載快
+
 ### 階段 1：tracker + 推送（只做巴士位置）
+- [ ] Redis（或 Valkey）：Dokploy 部署，只聽內網
 - [ ] `apps/tracker`：Node + TypeScript，用 `@hknt/core`；Dockerfile；Dokploy 部署
+- [ ] 上游 cache、合併同時請求、全局限流全部經 Redis
+- [ ] 預熱訊號（`/warm`）同上限；快照（`snap:*`）
 - [ ] Presence 驅動嘅 lazy poll、全局限流、退避
 - [ ] 計位置（先沿用 `trackLine` + `BusStabilizer` + `mergeScheduleBuses`，未有記憶）
 - [ ] Broadcast `buses` 事件；`/health`、`/snapshot`
@@ -231,6 +288,8 @@ create table segment_times (
 | 自架 Supabase 記憶體唔夠 | 階段 0 先確認規格；Realtime 頻道數同 Presence 數有監察 |
 | App 背景斷線 | 返前台重新訂閱 + `/snapshot` |
 | 數據庫越嚟越大 | 唔存原始 ETA；`stop_passages` 90 日分區；只長期保留統計 |
+| 預熱估錯浪費上游請求 | 只喺撳落／候選 ≤ 3 先做；每客戶端 3 條、全局上限；60 秒冇人訂閱就停；優先級低過真正有人睇嘅線 |
+| Redis 冇咗 | 只放短命數據；tracker 自動退返記憶體 cache，只係慢少少 |
 | 一個 VPS 單點故障 | 網頁照放 Vercel、靜態數據過渡期照放 GitHub；實時部分有輪詢後備 |
 
 ## 7. 未決定 / 要問
@@ -240,3 +299,4 @@ create table segment_times (
 - 網址：tracker、Supabase 用咩子網域
 - 網頁最終留 Vercel 定搬上 Dokploy（建議留 Vercel）
 - 預熱名單：要唔要常駐 poll 熱門線，幾多條
+- 用 Redis 定 Valkey（功能一樣；Valkey 係完全開源授權）
