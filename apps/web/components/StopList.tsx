@@ -28,6 +28,8 @@ type Props = {
   fares: ({ adult: string; joyYou: string | null } | null)[];
   /** 一開頁就打開嘅站（由「附近」撳入嚟） */
   initialOpen: number | null;
+  /** 捲動區最底（資料來源） */
+  children?: React.ReactNode;
 };
 
 const ETA_REFRESH_MS = 30_000;
@@ -42,7 +44,7 @@ const BUSES_REFRESH_MS = 20_000;
  * - 打開站時：攞到站時間、地圖放大過去；每班車標示「距離 N 個站／未開出」
  * - 後面嘅站顯示由打開咗嘅站出發要幾耐，同下一班車大概幾時到
  */
-export default function StopList({ co, multiCompany, companies, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, fares, initialOpen }: Props) {
+export default function StopList({ co, multiCompany, companies, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, fares, initialOpen, children }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +62,10 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
     // 將打開咗嘅站嘅站名對齊列表頂部（只捲站點列表，唔郁成頁）
     requestAnimationFrame(() => {
       const row = rows.current[i];
-      const box = row?.closest<HTMLElement>('.route-stops');
+      const box = row?.closest<HTMLElement>('.stops-scroll');
       if (!row || !box) return;
       const top = row.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
-      const bar = box.querySelector<HTMLElement>('.nearest-bar')?.offsetHeight ?? 0; // 頂部固定嘅「最近嘅站」
-      box.scrollTo({ top: Math.max(0, top - 4 - bar), behavior: 'smooth' });
+      box.scrollTo({ top: Math.max(0, top - 4), behavior: 'smooth' });
     });
   };
 
@@ -265,6 +266,8 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
         </button>
       )}
     </div>
+    {/* 「最近」嗰行喺捲動區外面：放喺入面用 sticky 嘅話，iPhone 喺頂部拉落去會跟住列表彈 */}
+    <div className="stops-scroll">
     <ol className="stops" style={{ ['--line-color' as string]: companyColor(company) ?? 'var(--route-line)' }}>
       {stops.map((s, i) => {
         const tr = travel?.[i] ?? null;
@@ -297,6 +300,8 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
         );
       })}
     </ol>
+    {children}
+    </div>
     </>
   );
 }

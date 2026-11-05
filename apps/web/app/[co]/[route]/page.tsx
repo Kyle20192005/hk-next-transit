@@ -197,11 +197,12 @@ export default async function RoutePage({ params, searchParams }: Props) {
           segSeconds={segSeconds}
           cumMetres={cumMetres}
           initialOpen={initialOpen >= 0 ? initialOpen : null}
-        />
-        <p className="muted source">
-          資料來源：運輸署、{companyNames(companies)}（DATA.GOV.HK）。行車時間：
-          <a href="https://github.com/HK-Bus-ETA/hk-bus-time-between-stops" target="_blank" rel="noopener">hk-bus-time-between-stops</a>（實驗性質，僅供參考）
-        </p>
+        >
+          <p className="muted source">
+            資料來源：運輸署、{companyNames(companies)}（DATA.GOV.HK）。行車時間：
+            <a href="https://github.com/HK-Bus-ETA/hk-bus-time-between-stops" target="_blank" rel="noopener">hk-bus-time-between-stops</a>（實驗性質，僅供參考）
+          </p>
+        </StopList>
       </div>
     </main>
   );
