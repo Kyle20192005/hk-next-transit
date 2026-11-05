@@ -89,8 +89,8 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
     <>
       <header className="app-bar">
         <div className="app-title">
-          <h1>香港巴士到站</h1>
-          <span className="app-sub">{routes.length} 條路線</span>
+          <h1>下一程</h1>
+          <span className="app-sub">NextLeg · {routes.length} 條路線</span>
         </div>
         {place === null ? (
           <button className="search-field" onClick={usePlace} aria-label="搜尋路線">
