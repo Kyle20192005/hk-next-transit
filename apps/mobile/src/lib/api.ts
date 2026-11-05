@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Calendar, Company, Eta, RouteData, RouteIndex } from '@hknt/core';
 
 /**
@@ -53,3 +54,42 @@ export const api = {
       `/api/stop-etas?co=${co}&stop=${q(stop)}`,
     ),
 };
+
+// ---------- 路線資料同日曆嘅快取：開過嘅即刻顯示，背景再更新 ----------
+
+const memRoute = new Map<string, RouteData>();
+let memCalendar: Promise<Calendar> | null = null;
+const routeKey = (co: Co, route: string) => `hknt.route.v1.${co}.${route.toUpperCase()}`;
+
+/** 手機入面上次嘅路線資料（冇就 null）；記憶體有就唔使讀儲存 */
+export async function cachedRoute(co: Co, route: string): Promise<RouteData | null> {
+  const k = routeKey(co, route);
+  const m = memRoute.get(k);
+  if (m) return m;
+  try {
+    const raw = await AsyncStorage.getItem(k);
+    return raw ? (JSON.parse(raw) as RouteData) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 由網上攞最新路線資料，順手存低 */
+export async function freshRoute(co: Co, route: string): Promise<RouteData> {
+  const data = await api.route(co, route);
+  const k = routeKey(co, route);
+  memRoute.set(k, data);
+  AsyncStorage.setItem(k, JSON.stringify(data)).catch(() => {
+    /* 存唔到都冇所謂 */
+  });
+  return data;
+}
+
+/** 假期日曆：成個 App 開住期間只攞一次 */
+export function calendarOnce(): Promise<Calendar> {
+  memCalendar ??= api.calendar().catch((e) => {
+    memCalendar = null; // 失敗咗下次再試
+    throw e;
+  });
+  return memCalendar;
+}

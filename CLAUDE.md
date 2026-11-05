@@ -37,6 +37,8 @@ pnpm -r typecheck
 數據讀唔到時開 `/api/health` 睇原因。
 
 Vercel（Hobby）只部署 commit 作者係項目擁有者嘅 commit：commit 要用 `kylecom2017@gmail.com`。
+Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）：營辦商 API 全部喺香港，放美國（預設 iad1）每次都要過太平洋，
+到站時間慢成一秒。App 嘅路線資料同日曆有快取（`lib/api.ts` 嘅 `cachedRoute`／`freshRoute`／`calendarOnce`），開過嘅路線即刻顯示，背景先更新。
 
 完成任何改動前：跑 core 測試同 `pnpm -r typecheck`。改 UI 要開 dev server 實際睇過。
 

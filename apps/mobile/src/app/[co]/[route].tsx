@@ -35,7 +35,7 @@ import {
   type RouteData,
   type TrackedBus,
 } from '@hknt/core';
-import { api, isCo, type Co } from '@/lib/api';
+import { api, cachedRoute, calendarOnce, freshRoute, isCo, type Co } from '@/lib/api';
 import { useFavorite } from '@/lib/favorites';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { Icon } from '@/components/Icon';
@@ -64,18 +64,26 @@ export default function RouteScreen() {
   const [calendar, setCalendar] = useState<Calendar>({});
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAll = useCallback(
-    () =>
-      Promise.all([api.route(co, params.route), api.calendar()])
-        .then(([r, c]) => {
-          setData(r);
-          setCalendar(c);
-        })
-        .catch((e: Error) => setError(e.message)),
-    [co, params.route],
-  );
+  // 開過嘅路線即刻用手機入面嘅資料顯示，同時喺背景攞最新（數據每日先更新一次）
+  const fetchAll = useCallback(async () => {
+    const cached = await cachedRoute(co, params.route);
+    const cal = calendarOnce();
+    if (cached) {
+      cal.then(setCalendar).catch(() => {});
+      setData(cached);
+    }
+    try {
+      const [r, c] = await Promise.all([freshRoute(co, params.route), cal]);
+      setCalendar(c);
+      // 冇變就唔使重新 render（同一日嘅數據）
+      if (!cached || JSON.stringify(cached) !== JSON.stringify(r)) setData(r);
+    } catch (e) {
+      if (!cached) setError((e as Error).message);
+    }
+  }, [co, params.route]);
   useEffect(() => {
-    void fetchAll();
+    const id = setTimeout(() => void fetchAll(), 0);
+    return () => clearTimeout(id);
   }, [fetchAll]);
   const load = () => {
     setError(null);
