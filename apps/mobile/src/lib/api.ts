@@ -1,7 +1,10 @@
 import type { Calendar, Company, Eta, RouteData, RouteIndex } from '@hknt/core';
 
-/** 後端 = apps/web 嘅 API。上線時設定 EXPO_PUBLIC_API_BASE 做正式網址（例如 https://eta.kyle05.dev） */
-export const API_BASE = (process.env.EXPO_PUBLIC_API_BASE ?? 'http://localhost:3000').replace(/\/+$/, '');
+/**
+ * 後端 = apps/web 嘅 API。預設用線上網站（手機連唔到電腦嘅 localhost）；
+ * 想用本地 server 就設定 EXPO_PUBLIC_API_BASE（例如 http://<電腦 IP>:3000）。
+ */
+export const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || 'https://eta.kyle05.dev').replace(/\/+$/, '');
 
 /** 路線檔位置：ctb（城巴同聯營線）、kmb（九巴、龍運）、nlb（新大嶼山巴士）、mtrb（港鐵巴士） */
 export type Co = 'ctb' | 'kmb' | 'nlb' | 'mtrb';
