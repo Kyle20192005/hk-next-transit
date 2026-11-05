@@ -7,6 +7,7 @@ import { favKey, removeFavorite, useFavorites, type Favorite } from '@/lib/favor
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { AppBar, CompanyTag, EmptyState, ScheduledTag } from '@/components/ui';
 import { Icon } from '@/components/Icon';
+import { warmRoute } from '@/lib/prefetch';
 
 const REFRESH_MS = 30_000;
 
@@ -36,6 +37,7 @@ function FavItem({ f }: { f: Favorite }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderRadius: radius.l, ...shadow }}>
         <Pressable
+          onPressIn={() => warmRoute(f.co, f.route, { dir: f.dir, stopId: f.stopId })}
           onPress={() => router.push({ pathname: '/[co]/[route]', params: { co: f.co, route: f.route, dir: f.dir, ...(f.stopId ? { stop: f.stopId } : {}) } })}
           accessibilityRole="link"
           style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 4 }}>

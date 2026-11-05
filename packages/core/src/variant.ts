@@ -118,3 +118,23 @@ export function sortVariants(variants: Variant[], calendar: Calendar, now: Date)
       return Number(a.variant.special) - Number(b.variant.special);
     });
 }
+
+/**
+ * 路線頁一開預設揀邊個走法（網頁、App 路線頁同預先 fetch 共用，要一致，否則預熱嘅 /api/buses 網址對唔上）：
+ * 指定咗走法就用佢；指定咗站（由「附近」等撳入嚟）就揀第一個經過呢個站嘅；否則排第一嘅（現正服務、最接近而家開出）。
+ */
+export function pickVariant(
+  sorted: { variant: Variant }[],
+  dir: Dir,
+  opts: { variantId?: string | null; stopId?: string | null } = {},
+): Variant | undefined {
+  const byId = opts.variantId ? sorted.find((x) => x.variant.id === opts.variantId)?.variant : undefined;
+  const byStop = opts.stopId ? sorted.find((x) => `${dir}:${opts.stopId}` in x.variant.expSeq)?.variant : undefined;
+  return byId ?? byStop ?? sorted[0]?.variant;
+}
+
+/** 路線頁冇指定方向時用邊個方向：第一個有站嘅（O 先） */
+export function defaultDir(route: RouteData, dir?: string | null): Dir {
+  const dirs = (['O', 'I'] as Dir[]).filter((d) => route.directions[d]?.length);
+  return dirs.includes(dir as Dir) ? (dir as Dir) : (dirs[0] ?? 'O');
+}

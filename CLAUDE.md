@@ -199,6 +199,9 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   下面彈上嘅面板（App `components/HereSheet.tsx`）。`/api/here?lat&lng` 搵 40 米內**所有公司**嘅站（城巴、九巴同一個站頭
   通常係兩個站 ID），合併路線同下一兩班（同一條線同方向只留最近嘅站），按下一班排；而家睇緊嘅線固定排第一。
   撳一行入嗰條線並打開同一個站（`?stop=`）。邏輯同 `/api/stop-etas` 共用 `lib/stop-routes.ts`。
+- 預先 fetch（網頁 `lib/prefetch.ts`、App `src/lib/prefetch.ts`）：撳落路線（未放手）`warmRoute` 預熱
+  `/api/buses`（伺服器 cache 10 秒），候選 ≤ 3 條停 0.4 秒 `preloadRoute` 只攞路線資料。預設方向同走法一律用 core
+  `defaultDir`／`pickVariant`（路線頁、預熱共用），否則預熱網址同路線頁唔同，cache 唔會命中。
 - 時間線豎線畫喺 `li.stop::before`（成個站嘅高度），唔好畫喺按鈕入面，否則行與行之間同打開咗嘅到站時間部分會斷線。
 - 車費：GTFS `fare_attributes` 分段收費（fare_id = route-方向-上車站序-落車站序），上車車費 = 由嗰個站去任何站嘅最高收費；
   pipeline 存做 `variant.fares[站ID]`（冇分段就用 JSON_BUS 嘅 `fullFare`）。站點列表右邊顯示，終點站唔顯示。

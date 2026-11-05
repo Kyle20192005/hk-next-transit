@@ -7,6 +7,7 @@ import { api, type Co, type HereRoute } from '@/lib/api';
 import { radius, shadowLg, tabular, useTheme } from '@/lib/theme';
 import { Icon } from './Icon';
 import { CompanyTag, ScheduledTag } from './ui';
+import { warmRoute } from '@/lib/prefetch';
 
 const REFRESH_MS = 30_000;
 
@@ -96,6 +97,7 @@ function HereSheet({ target, onClose }: { target: HereTarget; onClose: () => voi
               const mins = r.etas.map((e) => Math.max(0, Math.round((Date.parse(e.eta) - now) / 60000)));
               return (
                 <Pressable
+                  onPressIn={() => warmRoute(r.co, r.route, { dir: r.dir, stopId: r.stopId })}
                   onPress={() => {
                     onClose();
                     router.push({ pathname: '/[co]/[route]', params: { co: r.co, route: r.route, dir: r.dir, stop: r.stopId } });

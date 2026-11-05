@@ -5,6 +5,7 @@ import type { Co } from '@/lib/data';
 import { useCallback, useEffect, useState } from 'react';
 import { formatDistance, type Company } from '@hknt/core';
 import Icon from '@/components/Icon';
+import { warmRoute } from '@/lib/prefetch';
 
 interface NearStop {
   id: string;
@@ -144,7 +145,7 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
             const mins = list?.map((e) => Math.max(0, Math.round((Date.parse(e.eta) - now) / 60000)));
             return (
               <li key={`${r.co}-${r.route}-${r.dir}`}>
-                <Link href={`/${r.co}/${r.route}?dir=${r.dir}&stop=${stop.id}`} className="nearby-route">
+                <Link href={`/${r.co}/${r.route}?dir=${r.dir}&stop=${stop.id}`} className="nearby-route" onPointerDown={() => warmRoute(r.co, r.route, { dir: r.dir, stopId: stop.id })}>
                   <span className="route-id">
                     <span className="route-num sm">{r.route}</span>
                     <CompanyTag companies={r.companies} />

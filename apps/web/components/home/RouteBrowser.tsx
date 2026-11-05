@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RouteIndex } from '@hknt/core';
 import Keypad from './Keypad';
 import Icon from '@/components/Icon';
+import { preloadRoute, warmRoute } from '@/lib/prefetch';
 
 type Routes = RouteIndex['routes'];
 const PAGE = 40;
@@ -37,6 +38,14 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
     for (const r of routes) if (r.route.startsWith(code) && r.route.length > code.length) set.add(r.route[code.length]!);
     return set;
   }, [routes, code]);
+
+  // 預先 fetch：候選得 3 條或以下、停咗 0.4 秒，預載佢哋嘅路線資料（唔 call 巴士公司）
+  useEffect(() => {
+    if (!code && !place?.trim()) return;
+    if (matches.length === 0 || matches.length > 3) return;
+    const t = setTimeout(() => matches.forEach((r) => preloadRoute(r.co ?? 'ctb', r.route)), 400);
+    return () => clearTimeout(t);
+  }, [matches, code, place]);
 
   // 搜尋條件變咗：由頭顯示
   useEffect(() => {
@@ -133,7 +142,7 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
           const co = r.co ?? 'ctb';
           return (
             <li key={`${co}-${r.route}`} className="route-item">
-              <Link href={`/${co}/${r.route}`} className="route-id" aria-label={`${r.route} 路線`}>
+              <Link href={`/${co}/${r.route}`} className="route-id" aria-label={`${r.route} 路線`} onPointerDown={() => warmRoute(co, r.route)}>
                 <span className="route-num">{r.route}</span>
                 <CompanyTag companies={r.companies ?? ['CTB']} />
               </Link>
@@ -176,7 +185,7 @@ function RouteDirs({ r, co }: { r: Routes[number]; co: string }) {
   if (r.origTc === r.destTc) {
     return (
       <span className="route-dirs">
-        <Link href={base} className="route-dir">
+        <Link href={base} className="route-dir" onPointerDown={() => warmRoute(co, r.route)}>
           <span className="route-dir-to">{r.origTc}</span>
           <span className="route-dir-sub">循環線</span>
         </Link>
@@ -189,7 +198,7 @@ function RouteDirs({ r, co }: { r: Routes[number]; co: string }) {
   return (
     <span className="route-dirs">
       {options.map((o) => (
-        <Link key={o.d} href={`${base}?dir=${o.d}`} className="route-dir" aria-label={`${r.route} 往 ${o.to}`}>
+        <Link key={o.d} href={`${base}?dir=${o.d}`} className="route-dir" aria-label={`${r.route} 往 ${o.to}`} onPointerDown={() => warmRoute(co, r.route, { dir: o.d })}>
           <span className="route-dir-to">
             <small>往</small> {o.to}
           </span>

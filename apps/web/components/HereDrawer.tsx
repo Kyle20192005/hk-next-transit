@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { formatDistance, type Company } from '@hknt/core';
 import CompanyTag from './CompanyTag';
 import Icon from './Icon';
+import { warmRoute } from '@/lib/prefetch';
 import type { Co } from '@/lib/data';
 
 interface HereRoute {
@@ -93,6 +94,7 @@ export default function HereDrawer({ lat, lng, name, current }: { lat: number; l
                       <Link
                         href={`/${r.co}/${r.route}?dir=${r.dir}&stop=${r.stopId}`}
                         className={`here-row${isCurrent(r) ? ' current' : ''}`}
+                        onPointerDown={() => warmRoute(r.co, r.route, { dir: r.dir, stopId: r.stopId })}
                         onClick={() => setOpen(false)}
                       >
                         <span className="route-id">

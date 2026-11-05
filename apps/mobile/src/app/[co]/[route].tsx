@@ -5,6 +5,8 @@ import { Animated, FlatList, Pressable, Text, View, useWindowDimensions } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BusStabilizer,
+  defaultDir,
+  pickVariant,
   busDistanceTo,
   busFraction,
   companyColor,
@@ -179,7 +181,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
   const color = companyColor(data.company) ?? t.routeLine;
 
   const dirs = useMemo(() => (['O', 'I'] as Dir[]).filter((d) => data.directions[d]?.length), [data]);
-  const [dir, setDir] = useState<Dir>(dirs.includes(initialDir as Dir) ? (initialDir as Dir) : (dirs[0] ?? 'O'));
+  const [dir, setDir] = useState<Dir>(() => defaultDir(data, initialDir));
   const [variantId, setVariantId] = useState<string | null>(initialVariant ?? null);
   const [stopParam, setStopParam] = useState(initialStop ?? null);
 
@@ -191,8 +193,8 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
   }, []);
 
   const sorted = useMemo(() => sortVariants(variantsForDir(data, dir), calendar, now), [data, dir, calendar, now]);
-  const withStop = stopParam ? sorted.find((x) => `${dir}:${stopParam}` in x.variant.expSeq)?.variant : undefined;
-  const selected = sorted.find((x) => x.variant.id === variantId)?.variant ?? withStop ?? sorted[0]?.variant;
+  // pickVariant 同預先 fetch 共用，要一致，否則預熱嘅 /api/buses 網址對唔上
+  const selected = pickVariant(sorted, dir, { variantId, stopId: stopParam });
 
   const items: VariantItem[] = sorted.map(({ variant: v, status }) => {
     const w = serviceWindow(v, calendar, now);

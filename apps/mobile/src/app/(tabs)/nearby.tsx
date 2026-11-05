@@ -7,6 +7,7 @@ import { api, type NearStop } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { AppBar, BarButton, CompanyTag, EmptyState, ScheduledTag } from '@/components/ui';
 import { Icon } from '@/components/Icon';
+import { warmRoute } from '@/lib/prefetch';
 
 const AUTO_LOAD = 4;
 const REFRESH_MS = 30_000;
@@ -118,6 +119,7 @@ function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
           return (
               <Pressable
                 key={`${r.co}-${r.route}-${r.dir}`}
+                onPressIn={() => warmRoute(r.co, r.route, { dir: r.dir, stopId: stop.id })}
                 onPress={() => router.push({ pathname: '/[co]/[route]', params: { co: r.co, route: r.route, dir: r.dir, stop: stop.id } })}
                 accessibilityRole="link"
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: t.line }}>

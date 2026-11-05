@@ -12,6 +12,8 @@ import {
   stopCumMetres,
   type LatLng,
   sortVariants,
+  pickVariant,
+  defaultDir,
   statusText,
   variantLabel,
   variantStops,
@@ -58,13 +60,12 @@ export default async function RoutePage({ params, searchParams }: Props) {
 
   const now = new Date();
   const dirs = (['O', 'I'] as Dir[]).filter((d) => data.directions[d]?.length);
-  const dir: Dir = dirs.includes(dirParam as Dir) ? (dirParam as Dir) : (dirs[0] ?? 'O');
+  const dir: Dir = defaultDir(data, dirParam);
 
-  // 走法：現正服務嘅排先；預設揀第一個，用戶可以用 ?v= 揀其他
+  // 走法：現正服務嘅排先；預設揀第一個，用戶可以用 ?v= 揀其他；指定咗站就揀第一個經過佢嘅
+  // （pickVariant 同預先 fetch 共用，要一致，否則預熱嘅 /api/buses 網址對唔上）
   const sorted = sortVariants(variantsForDir(data, dir), calendar, now);
-  // 指定咗站（由「附近」撳入嚟）但冇指定走法：揀第一個經過呢個站嘅走法
-  const withStop = stopParam ? sorted.find((x) => `${dir}:${stopParam}` in x.variant.expSeq)?.variant : undefined;
-  const selected = sorted.find((x) => x.variant.id === vParam)?.variant ?? withStop ?? sorted[0]?.variant;
+  const selected = pickVariant(sorted, dir, { variantId: vParam, stopId: stopParam });
 
   const items: VariantItem[] = sorted.map(({ variant: v, status }) => {
     const w = serviceWindow(v, calendar, now);

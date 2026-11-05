@@ -7,6 +7,7 @@ import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { AppBar, CompanyTag } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { Keypad } from '@/components/Keypad';
+import { preloadRoute, warmRoute } from '@/lib/prefetch';
 
 type Route = RouteIndex['routes'][number];
 
@@ -51,6 +52,14 @@ export default function RoutesTab() {
   useEffect(() => {
     list.current?.scrollToOffset({ offset: 0, animated: false });
   }, [code, place]);
+
+  // 預先 fetch：候選得 3 條或以下、停咗 0.4 秒，預載佢哋嘅路線資料（唔 call 巴士公司）
+  useEffect(() => {
+    if (!code && !place?.trim()) return;
+    if (matches.length === 0 || matches.length > 3) return;
+    const id = setTimeout(() => matches.forEach((r) => preloadRoute((r.co ?? 'ctb') as Co, r.route)), 400);
+    return () => clearTimeout(id);
+  }, [matches, code, place]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -129,7 +138,7 @@ function RouteCard({ r }: { r: Route }) {
         .map((d) => ({ d, to: d === 'O' ? r.destTc : r.origTc, sub: dirs.length === 1 ? `由 ${d === 'O' ? r.origTc : r.destTc}` : null }));
   return (
     <View style={{ flexDirection: 'row', backgroundColor: t.card, borderRadius: radius.m, overflow: 'hidden', ...shadow }}>
-      <Pressable onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: r.route } })} accessibilityRole="link" style={{ width: 108, paddingVertical: 12, paddingLeft: 16, justifyContent: 'center', gap: 4 }} accessibilityLabel={`${r.route} 路線`}>
+      <Pressable onPressIn={() => warmRoute(co, r.route)} onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: r.route } })} accessibilityRole="link" style={{ width: 108, paddingVertical: 12, paddingLeft: 16, justifyContent: 'center', gap: 4 }} accessibilityLabel={`${r.route} 路線`}>
           <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, letterSpacing: -0.3, ...tabular }}>{r.route}</Text>
           <CompanyTag companies={r.companies ?? ['CTB']} />
       </Pressable>
@@ -138,6 +147,7 @@ function RouteCard({ r }: { r: Route }) {
         {options.map((o, i) => (
             <Pressable
               key={o.d}
+              onPressIn={() => warmRoute(co, r.route, { dir: o.d })}
               onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: r.route, dir: o.d } })}
               accessibilityRole="link"
               accessibilityLabel={`${r.route} 往 ${o.to}`}

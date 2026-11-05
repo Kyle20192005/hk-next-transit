@@ -243,9 +243,11 @@ create table segment_times (
 - [ ] Supabase 自架（Postgres + PostGIS + Realtime + Kong），Studio 唔對外
 - [ ] 備份：Postgres 每日備份去 VPS 以外（例如 S3 相容儲存）
 
-### 階段 0.5：預先 fetch（而家架構就做得，唔使等後端）
-- [ ] 網頁、App：撳落路線（未放手）背景 call `/api/buses`
-- [ ] 候選 ≤ 3 條、停咗 0.4 秒：預載路線資料
+### 階段 0.5：預先 fetch（而家架構就做得，唔使等後端）✅ 2026-11 完成
+- [x] 網頁、App：撳落路線（未放手，`pointerdown`／`onPressIn`）背景 call `/api/buses`
+      （路線列表、附近、收藏、喺度搭得；網頁 `lib/prefetch.ts`、App `src/lib/prefetch.ts`）
+- [x] 候選 ≤ 3 條、停咗 0.4 秒：預載路線資料
+- [x] 預設走法用 core `pickVariant`／`defaultDir`，路線頁同預熱一致（網址唔同就唔會命中伺服器 cache）
 - 驗收：由撳路線到見到第一架巴士嘅時間，比冇預載快
 
 ### 階段 1：tracker + 推送（只做巴士位置）

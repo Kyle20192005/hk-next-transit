@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Eta } from '@hknt/core';
 import CompanyTag from '@/components/CompanyTag';
 import Icon from '@/components/Icon';
+import { warmRoute } from '@/lib/prefetch';
 import { favKey, removeFavorite, useFavorites, type Favorite } from '@/lib/favorites';
 
 const REFRESH_MS = 30_000;
@@ -48,7 +49,7 @@ function FavItem({ f }: { f: Favorite }) {
   const href = `/${f.co}/${f.route}?dir=${f.dir}${f.stopId ? `&stop=${f.stopId}` : ''}`;
   return (
     <li className="fav card">
-      <Link href={href} className="fav-main">
+      <Link href={href} className="fav-main" onPointerDown={() => warmRoute(f.co, f.route, { dir: f.dir, stopId: f.stopId })}>
         <span className="route-id">
           <span className="route-num">{f.route}</span>
           <CompanyTag companies={f.companies} />

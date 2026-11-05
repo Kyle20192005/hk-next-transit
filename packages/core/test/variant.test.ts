@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { variantLabel, sortVariants, statusText, variantStatus, variantStops, variantsForDir, shortName, type Calendar, type RouteData } from '../src';
+import { variantLabel, sortVariants, statusText, variantStatus, pickVariant, defaultDir, variantStops, variantsForDir, shortName, type Calendar, type RouteData } from '../src';
 import route38 from './fixtures/ctb-38.json';
 import calendar38 from './fixtures/calendar-38.json';
 
@@ -69,5 +69,17 @@ describe('冇時間表嘅走法', () => {
     const s = variantStatus(v, {}, new Date());
     expect(s).toEqual({ state: 'unknown' });
     expect(statusText(s)).toBe('冇時間表資料');
+  });
+});
+
+describe('pickVariant／defaultDir', () => {
+  const route = route38 as unknown as RouteData;
+  const sorted = sortVariants(variantsForDir(route, 'O'), calendar38 as Calendar, new Date('2026-11-03T02:00:00Z'));
+  it('冇指定：排第一嘅走法', () => expect(pickVariant(sorted, 'O')?.id).toBe(sorted[0]!.variant.id));
+  it('指定走法 id', () => expect(pickVariant(sorted, 'O', { variantId: sorted.at(-1)!.variant.id })?.id).toBe(sorted.at(-1)!.variant.id));
+  it('方向：冇指定用 O，亂寫都用 O', () => {
+    expect(defaultDir(route)).toBe('O');
+    expect(defaultDir(route, 'X')).toBe('O');
+    expect(defaultDir(route, 'I')).toBe('I');
   });
 });
