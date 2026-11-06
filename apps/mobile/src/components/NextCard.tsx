@@ -7,6 +7,7 @@ import { api, type Co, type NearStop } from '@/lib/api';
 import { useFavorites, type Favorite } from '@/lib/favorites';
 import { warmRoute } from '@/lib/prefetch';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
+import Svg, { Path } from 'react-native-svg';
 import { Icon, type IconName } from './Icon';
 import type { NearbyState } from './Nearby';
 import { ScheduledTag } from './ui';
@@ -35,35 +36,30 @@ export function NextCard({ nearby, onLocate }: { nearby: NearbyState; onLocate: 
     setTab(v);
     AsyncStorage.setItem(TAB_KEY, v).catch(() => {});
   };
-  const tabBtn = (v: Tab, label: string, icon: IconName, side: 'left' | 'right') => {
+  const tabBtn = (v: Tab, label: string, icon: IconName, iconColor: string) => {
     const on = tab === v;
     return (
-      <Pressable
-        onPress={() => pick(v)}
-        accessibilityRole="tab"
-        accessibilityState={{ selected: on }}
-        style={{
-          flex: 1,
-          minHeight: 52,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          backgroundColor: on ? t.card : t.surface2,
-          // 文件夾分頁：揀咗嗰個白色連住下面；冇揀嗰個灰色，近揀咗嗰邊圓角
-          ...(on ? (side === 'left' ? { borderTopRightRadius: 18 } : { borderTopLeftRadius: 18 }) : side === 'left' ? { borderBottomRightRadius: 18 } : { borderBottomLeftRadius: 18 }),
-        }}
-      >
-        <Icon name={icon} size={22} color={on ? t.accent : t.muted} />
+      <Pressable onPress={() => pick(v)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={{ flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <Icon name={icon} size={22} color={iconColor} />
         <Text style={{ fontSize: 17, fontWeight: '800', color: on ? t.text : t.muted }}>{label}</Text>
       </Pressable>
     );
   };
   return (
     <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
-      <View style={{ flexDirection: 'row', backgroundColor: tab === 'next' ? t.card : t.surface2 }}>
-        <View style={{ flex: 1, backgroundColor: tab === 'next' ? t.surface2 : t.card, flexDirection: 'row' }}>{tabBtn('next', '下班車', 'clock', 'left')}</View>
-        <View style={{ flex: 1, backgroundColor: tab === 'favs' ? t.surface2 : t.card, flexDirection: 'row' }}>{tabBtn('favs', '收藏', 'star', 'right')}</View>
+      <View>
+        {/* 背景：揀咗嗰邊白色，中間斜邊（似港鐵 App），另一邊灰色；揀右邊時左右反轉 */}
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row', backgroundColor: t.surface2, transform: [{ scaleX: tab === 'favs' ? -1 : 1 }] }}>
+          <View style={{ flex: 1, backgroundColor: t.card }} />
+          <Svg width={56} height="100%" viewBox="0 0 56 52" preserveAspectRatio="none">
+            <Path d="M0 0H8Q16 0 19.5 7.5L34.5 44.5Q38 52 46 52H56V53H0Z" fill={t.card} />
+          </Svg>
+          <View style={{ flex: 1 }} />
+        </View>
+        <View style={{ flexDirection: 'row' }}>
+          {tabBtn('next', '下班車', 'clock', tab === 'next' ? '#2f6fd6' : 'rgba(47,111,214,0.6)')}
+          {tabBtn('favs', '收藏', tab === 'favs' ? 'star-fill' : 'star', tab === 'favs' ? t.brand : t.muted)}
+        </View>
       </View>
       <View style={{ paddingTop: 12, paddingBottom: 10 }}>{tab === 'next' ? <NearbyPane state={nearby} onLocate={onLocate} /> : <FavPane favs={favs} />}</View>
     </View>

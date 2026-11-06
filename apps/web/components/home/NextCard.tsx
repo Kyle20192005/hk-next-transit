@@ -54,13 +54,21 @@ export default function NextCard({ nearby, onLocate, onMore, onFavs }: { nearby:
 
   return (
     <section className="next-card">
-      <div className="nc-tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'next'} className="nc-tab" onClick={() => pick('next')}>
+      <div className={`nc-tabs ${tab}`} role="tablist">
+        {/* 背景：揀咗嗰邊白色，中間斜邊（似港鐵 App），另一邊灰色；揀右邊時成個左右反轉 */}
+        <div className="nc-tabs-bg" aria-hidden="true">
+          <span className="nc-tabs-on" />
+          <svg className="nc-tabs-slant" viewBox="0 0 56 52" preserveAspectRatio="none">
+            <path d="M0 0H8Q16 0 19.5 7.5L34.5 44.5Q38 52 46 52H56V53H0Z" />
+          </svg>
+          <span className="nc-tabs-off" />
+        </div>
+        <button role="tab" aria-selected={tab === 'next'} className="nc-tab nc-tab-next" onClick={() => pick('next')}>
           <Icon name="clock" size={22} />
           下班車
         </button>
-        <button role="tab" aria-selected={tab === 'favs'} className="nc-tab" onClick={() => pick('favs')}>
-          <Icon name="star" size={22} />
+        <button role="tab" aria-selected={tab === 'favs'} className="nc-tab nc-tab-favs" onClick={() => pick('favs')}>
+          <Icon name={tab === 'favs' ? 'star-fill' : 'star'} size={22} />
           收藏
         </button>
       </div>

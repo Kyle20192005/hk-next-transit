@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { TRANSPORT_MODES, type TransportMode } from '@hknt/core';
-import { AppBar, CompanyTag, SoonBadge } from '@/components/ui';
+import { COMPANIES, TRANSPORT_MODES, tint, type TransportMode } from '@hknt/core';
+import { AppBar, SoonBadge } from '@/components/ui';
 import { Icon, type IconName } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
 import { useNearbyStops } from '@/components/Nearby';
@@ -51,8 +51,8 @@ export default function HomeTab() {
             <Pressable key={m.id} onPress={() => router.navigate({ pathname: '/routes', params: { mode: m.id } })} accessibilityRole="button" accessibilityLabel={m.ready ? m.label : `${m.label}（即將推出）`} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
               {({ pressed }) => (
                 <>
-                  <View style={{ width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: t.card, transform: [{ scale: pressed ? 0.95 : 1 }], ...shadow }}>
-                    <Icon name={MODE_ICON[m.id]} size={26} color={m.ready ? t.accent : t.muted} />
+                  <View style={{ width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: tint(m.color, 0.14), transform: [{ scale: pressed ? 0.95 : 1 }] }}>
+                    <Icon name={MODE_ICON[m.id]} size={26} color={m.color} />
                   </View>
                   <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: m.ready ? '700' : '600', color: m.ready ? t.text : t.muted }}>
                     {m.label}
@@ -74,9 +74,8 @@ export default function HomeTab() {
                   accessibilityRole="link"
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: t.line }}
                 >
-                  <View style={{ width: 92, gap: 3 }}>
-                    <Text style={{ fontSize: 19, fontWeight: '800', color: t.text, ...tabular }}>{r.route}</Text>
-                    <CompanyTag companies={r.companies} />
+                  <View style={{ minWidth: 56, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: 'center', backgroundColor: COMPANIES[r.companies[0] ?? 'CTB'].bg }}>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: COMPANIES[r.companies[0] ?? 'CTB'].ink, ...tabular }}>{r.route}</Text>
                   </View>
                   <Text numberOfLines={1} style={{ flex: 1, fontSize: 16, fontWeight: '600', color: t.text }}>
                     <Text style={{ fontSize: 13, fontWeight: '500', color: t.muted }}>往 </Text>

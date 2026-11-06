@@ -1,7 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { TRANSPORT_MODES, type TransportMode } from '@hknt/core';
-import CompanyTag from '@/components/CompanyTag';
+import { COMPANIES, TRANSPORT_MODES, tint, type TransportMode } from '@hknt/core';
 import Icon, { type IconName } from '@/components/Icon';
 import Logo from '@/components/Logo';
 import { warmRoute } from '@/lib/prefetch';
@@ -41,7 +40,7 @@ export default function HomeTab({ onMode, onNav, onFavs, onNearby }: { onMode: (
 
         <div className="mode-grid" aria-label="交通工具">
           {TRANSPORT_MODES.map((m) => (
-            <button key={m.id} className={`mode-tile${m.ready ? '' : ' soon'}`} onClick={() => onMode(m.id)}>
+            <button key={m.id} className={`mode-tile${m.ready ? '' : ' soon'}`} onClick={() => onMode(m.id)} style={{ ['--mode' as string]: m.color, ['--mode-soft' as string]: tint(m.color, 0.14) }}>
               <span className="mode-tile-icon">
                 <Icon name={MODE_ICON[m.id]} size={26} />
               </span>
@@ -59,9 +58,8 @@ export default function HomeTab({ onMode, onNav, onFavs, onNearby }: { onMode: (
               {recent.slice(0, RECENT_SHOWN).map((r) => (
                 <li key={`${r.co}-${r.route}-${r.dir}`}>
                   <Link href={`/${r.co}/${r.route}?dir=${r.dir}`} className="recent-row" onPointerDown={() => warmRoute(r.co, r.route, { dir: r.dir })}>
-                    <span className="route-id">
-                      <span className="route-num sm">{r.route}</span>
-                      <CompanyTag companies={r.companies} />
+                    <span className="nc-badge" style={{ background: COMPANIES[r.companies[0] ?? 'CTB'].bg, color: COMPANIES[r.companies[0] ?? 'CTB'].ink }}>
+                      {r.route}
                     </span>
                     <span className="route-to">
                       <small>往</small> {r.dest}

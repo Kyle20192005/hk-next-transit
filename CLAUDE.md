@@ -179,9 +179,9 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 底部分頁列（網頁 `components/home/Home.tsx`、App `src/app/(tabs)/_layout.tsx`）：**首頁／路線／導航／收藏／設定**，預設首頁，
   記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`）：NextLeg 入口。黃色區「你想去邊？」（撳去導航，標即將推出）；
-    下面由上至下：**大卡**、交通工具捷徑（撳去路線分頁並揀咗嗰種，`?mode=`）、最近睇過（`lib/recent.ts`，路線頁開咗就記低，最多 8 條）。
+    下面由上至下：**大卡**、交通工具捷徑（每種一隻代表色 core `TRANSPORT_MODES.color`，圖示用嗰隻色、底色 `tint` 淺色；撳去路線分頁並揀咗嗰種，`?mode=`）、最近睇過（`lib/recent.ts`，路線頁開咗就記低，最多 8 條）。
   - **大卡**（網頁 `components/home/NextCard.tsx`、App `components/NextCard.tsx`，似港鐵 App「下班車」小工具）：頂部文件夾式兩個分頁
-    「下班車」（附近，一開就自動定位）同「收藏」（記住揀咗邊個）。入面一行站名跟住而家睇緊嗰張卡，右邊「更多／全部」；
+    「下班車」（附近，一開就自動定位）同「收藏」（記住揀咗邊個），中間斜邊似港鐵 App（背景一個 SVG 斜邊，揀右邊時 scaleX(-1) 反轉）。入面一行站名跟住而家睇緊嗰張卡，右邊「更多／全部」；
     下面打橫掃嘅到站卡（左右兩邊色條 = 第一班嘅公司色），每張最多 4 行「標籤、往邊、分鐘」，下面圓點指示。
     下班車：一張卡 = 一個站頭（core `groupStopHeads` 將 40 米內各公司嘅站併埋），每條線一班、最快 4 班（`busDepartureRows`，`/api/here`）。
     收藏：一個收藏咗嘅站一張卡（`groupFavorites`），淨係收藏路線嘅一張「收藏路線」放最後（冇時間，撳入去）；`favDepartureRows`。
