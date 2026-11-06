@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from './Icon';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { BusStabilizer, lineArrows, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
+import maplibregl, { type GeoJSONSource, type LngLatLike } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { BusStabilizer, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
 import { companyColor, companyInk } from '@/lib/company';
 import { BUSES_EVENT, FOCUS_STOP_EVENT, OPEN_STOP_EVENT, latestBuses, latestFocus, type BusesDetail } from '@/lib/events';
+import { firstSymbolLayer, loadMapStyle } from '@/lib/map-style';
 
 export interface MapStop {
   index: number;
@@ -23,26 +24,13 @@ export interface MapLine {
   segments: [number, number][][];
 }
 
-// 地政總署地圖 API（免費，唔使 key）：底圖 + 中文地名
-const LANDSD = 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz';
-const ATTRIBUTION =
-  '<a href="https://api.portal.hkmapservice.gov.hk/disclaimer" target="_blank" rel="noopener">© 地政總署</a>';
-
-const OSM_ATTRIBUTION =
-  '走線 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 貢獻者</a>';
-
-/** 箭嘴之間最少相隔幾多 px */
-const ARROW_SPACING_PX = 80;
-/** 箭嘴同站點最少相隔幾多 px */
-const ARROW_STOP_GAP_PX = 14;
-
-function cssVar(name: string, fallback: string): string {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v || fallback;
-}
-
 /** 巴士位置每幾耐按時間推前一次 */
 const BUS_TICK_MS = 5_000;
+/** 打開站時放大到幾多（MapLibre 512px 圖塊，16 ≈ 以前 Leaflet 17） */
+const FOCUS_ZOOM = 16;
+const CJK_FONTS = '"PingFang HK", "PingFang TC", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif';
+
+const toLngLat = ([lat, lng]: LatLng | [number, number]): [number, number] => [lng, lat];
 
 type Props = {
   lines: MapLine[];
@@ -51,202 +39,266 @@ type Props = {
   multiCompany?: boolean;
   /** 路線主要公司（走線、箭嘴、巴士預設顏色） */
   company: string;
-  /** 有走線來自 OpenStreetMap（港鐵巴士）：要註明出處（ODbL） */
+  /** 有走線來自 OpenStreetMap（港鐵巴士）：底圖本身已經註明 © OpenStreetMap 貢獻者 */
   osm?: boolean;
 };
 
-export default function RouteMap({ lines, stops, multiCompany = false, company, osm = false }: Props) {
+function useDarkMode(): boolean {
+  const [dark, setDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const on = () => setDark(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return dark;
+}
+
+/** 走線方向：細 V 形（向右，MapLibre 沿線擺放時會跟走線方向轉） */
+function chevronImage(color: string): ImageData {
+  const size = 32;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d')!;
+  g.strokeStyle = color;
+  g.lineWidth = 4;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.beginPath();
+  g.moveTo(12, 9);
+  g.lineTo(19, 16);
+  g.lineTo(12, 23);
+  g.stroke();
+  return g.getImageData(0, 0, size, size);
+}
+
+export default function RouteMap({ lines, stops, multiCompany = false, company }: Props) {
   const el = useRef<HTMLDivElement>(null);
+  const dark = useDarkMode();
+  const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!el.current) return;
-    // 觸控機用兩隻手指縮放，唔使 +／− 掣；電腦先顯示
-    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    const map = L.map(el.current, { zoomControl: finePointer, attributionControl: true, scrollWheelZoom: false, zoomSnap: 0.25 });
-    map.attributionControl.setPrefix(false);
-    // 底圖淡化（CSS .map-base），走線先突出；地名另一層，淡化少啲
-    L.tileLayer(`${LANDSD}/basemap/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10, attribution: ATTRIBUTION, className: 'map-base' }).addTo(map);
-    L.tileLayer(`${LANDSD}/label/hk/tc/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10, className: 'map-label' }).addTo(map);
-    if (osm) map.attributionControl.addAttribution(OSM_ATTRIBUTION);
+    const container = el.current;
+    if (!container) return;
+    let cancelled = false;
+    let cleanup: (() => void) | null = null;
 
-    // 走線用公司代表色；城巴黃色喺地圖黃色馬路上唔顯眼，所以底下加一條深色外框
-    const brand = companyColor(company) ?? cssVar('--route-line', '#c26a00');
-    const ink = companyInk(company);
-    const casing = '#1a1a1a';
-    const muted = cssVar('--muted', '#61676f');
+    loadMapStyle(dark)
+      .then((style) => {
+        if (cancelled) return;
+        // 觸控機用兩隻手指縮放，唔使 +／− 掣；電腦先顯示
+        const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+        const bounds = new maplibregl.LngLatBounds();
+        for (const s of stops) bounds.extend([s.lng, s.lat]);
+        let map: maplibregl.Map;
+        try {
+          map = new maplibregl.Map({
+            container,
+            style,
+            bounds,
+            fitBoundsOptions: { padding: 24 },
+            attributionControl: false,
+            dragRotate: false,
+            pitchWithRotate: false,
+            touchPitch: false,
+            scrollZoom: false,
+            localIdeographFontFamily: CJK_FONTS,
+          });
+        } catch (e) {
+          setFailed((e as Error).message || '瀏覽器唔支援 WebGL');
+          return;
+        }
+        map.touchZoomRotate.disableRotation();
+        map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+        if (finePointer) map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
 
-    // 其他走法：灰色虛線放底；揀咗嘅走法：實線放面
-    for (const l of [...lines].sort((a, b) => Number(a.selected) - Number(b.selected))) {
-      if (l.selected) {
-        L.polyline(l.segments, { color: casing, weight: 10, opacity: 0.4, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(map);
-      }
-      L.polyline(l.segments, l.selected
-        ? { color: brand, weight: 6, opacity: 1, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round', interactive: false }
-        : { color: muted, weight: 3, opacity: 0.45, dashArray: '4 6', interactive: false },
-      ).addTo(map);
-    }
-    // 方向箭嘴：只畫揀咗嘅走法。每次縮放都重新揀，令箭嘴之間有足夠距離、唔會壓住站
-    const sel = lines.find((l) => l.selected);
-    const arrowLayer = L.layerGroup().addTo(map);
-    const candidates = sel ? lineArrows(sel.segments, 40, [0.2, 0.4, 0.6, 0.8]) : [];
-    // 箭嘴：走線上面細細嘅 V 形，用走線上面嘅字色（城巴黃線用深色、九巴紅線用白色）
-    const arrowColor = ink;
-    const drawArrows = () => {
-      arrowLayer.clearLayers();
-      const stopPts = stops.map((s) => map.latLngToLayerPoint([s.lat, s.lng]));
-      let last: L.Point | null = null;
-      for (const a of candidates) {
-        const pt = map.latLngToLayerPoint([a.lat, a.lng]);
-        if (last && pt.distanceTo(last) < ARROW_SPACING_PX) continue;
-        if (stopPts.some((sp) => sp.distanceTo(pt) < ARROW_STOP_GAP_PX)) continue;
-        last = pt;
-        L.marker([a.lat, a.lng], {
-          interactive: false,
-          keyboard: false,
-          icon: L.divIcon({
-            className: 'map-arrow',
-            iconSize: [12, 12],
-            iconAnchor: [6, 6],
-            html: `<svg viewBox="0 0 12 12" width="12" height="12" style="transform:rotate(${a.bearing}deg)" aria-hidden="true"><path d="M3 8 L6 4.5 L9 8" fill="none" stroke="${arrowColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-          }),
-        }).addTo(arrowLayer);
-      }
-    };
-    map.on('zoomend', drawArrows);
+        const brand = companyColor(company) ?? '#c26a00';
+        const ink = companyInk(company);
+        const muted = dark ? '#8a9097' : '#7a7f86';
+        const casing = '#1a1a1a';
+        const sel = lines.find((l) => l.selected);
+        // 揀咗嘅走線駁成一條連續折線（巴士位置、箭嘴用）
+        const path: LatLng[] = sel ? sel.segments.flatMap((seg, i) => (i === 0 ? seg : seg.slice(1))) : [];
 
-    // 揀咗嘅走法冇走線數據：用站點連直線頂住
-    if (!lines.some((l) => l.selected) && stops.length > 1) {
-      L.polyline(stops.map((s) => [s.lat, s.lng] as [number, number]), { color: brand, weight: 4, opacity: 0.6, dashArray: '2 8' }).addTo(map);
-    }
+        // ---------- 站點、站名標籤 ----------
+        let focusIndex: number | null = null;
+        const stopData = () => ({
+          type: 'FeatureCollection' as const,
+          features: stops.map((s, i) => ({
+            type: 'Feature' as const,
+            properties: { index: s.index, end: i === 0 || i === stops.length - 1, focus: s.index === focusIndex },
+            geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
+          })),
+        });
+        const tag = new maplibregl.Popup({ closeButton: false, closeOnClick: false, anchor: 'bottom', offset: 12, maxWidth: 'none', className: 'map-tag' });
+        const hoverTag = new maplibregl.Popup({ closeButton: false, closeOnClick: false, anchor: 'bottom', offset: 10, maxWidth: 'none', className: 'map-tag' });
+        const byIndex = new Map(stops.map((s) => [s.index, s]));
 
-    // 中途站：白點深色邊；起點、終點：深色實心加白邊，大啲；打開咗嘅站：公司色大點
-    const stopStyle = (end: boolean): L.CircleMarkerOptions => ({
-      radius: end ? 7 : 4.5,
-      color: end ? '#ffffff' : '#262626',
-      weight: end ? 3 : 2,
-      fillColor: end ? '#262626' : '#ffffff',
-      fillOpacity: 1,
-    });
-    const focusStyle: L.CircleMarkerOptions = { radius: 9, color: '#262626', weight: 3, fillColor: brand, fillOpacity: 1 };
-    const markers = stops.map((s, i) => {
-      const end = i === 0 || i === stops.length - 1;
-      const m = L.circleMarker([s.lat, s.lng], stopStyle(end))
-        .bindTooltip(stopTag(s, brand, ink), { direction: 'top', offset: [0, -10], className: 'map-tag', opacity: 1 })
-        .on('click', () => window.dispatchEvent(new CustomEvent(OPEN_STOP_EVENT, { detail: s.index })))
-        .addTo(map);
-      return { stop: s, marker: m, end };
-    });
+        const focus = (index: number, fly: boolean) => {
+          const s = byIndex.get(index);
+          if (!s) return;
+          focusIndex = index;
+          (map.getSource('stops') as GeoJSONSource | undefined)?.setData(stopData());
+          hoverTag.remove();
+          tag.setLngLat([s.lng, s.lat]).setHTML(stopTag(s, brand, ink)).addTo(map);
+          if (fly) map.flyTo({ center: [s.lng, s.lat], zoom: FOCUS_ZOOM, duration: 600 });
+        };
+        const onFocus = (e: Event) => focus((e as CustomEvent<number>).detail, true);
 
-    const bounds = L.latLngBounds(stops.map((s) => [s.lat, s.lng] as [number, number]));
-    map.fitBounds(bounds, { padding: [24, 24] });
-    drawArrows();
+        // ---------- 巴士 ----------
+        const pathIdx = path.length
+          ? new Map(stopPathIndices(path, stops.map((s) => [s.lat, s.lng] as LatLng)).map((p, k) => [stops[k]!.index, p]))
+          : new Map<number, number>();
+        const locate = (from: number, fraction: number): [number, number] | null => {
+          const i0 = pathIdx.get(from);
+          const i1 = pathIdx.get(from + 1);
+          if (i0 !== undefined && i1 !== undefined) {
+            const p = pointOnPath(path, i0, i1, fraction);
+            if (p) return [p.lng, p.lat];
+          }
+          // 冇走線：喺兩個站之間直線估
+          const a = byIndex.get(from);
+          const b = byIndex.get(from + 1);
+          return a && b ? [a.lng + (b.lng - a.lng) * fraction, a.lat + (b.lat - a.lat) * fraction] : null;
+        };
+        let latest: BusesDetail | null = latestBuses();
+        let fittedFor: number | null = null;
+        let busMarkers: maplibregl.Marker[] = [];
+        // 成條線嘅巴士（由 /api/buses 追蹤），每 5 秒按時間推前；只准向前，ETA 推遲就停喺原位
+        const stabilizer = new BusStabilizer();
+        const lastStop = Math.max(...stops.map((x) => x.index));
+        const drawBuses = () => {
+          for (const m of busMarkers) m.remove();
+          busMarkers = [];
+          if (!latest) return;
+          const now = Date.now();
+          const openIdx = latest.openIndex;
+          const target = openIdx !== null ? byIndex.get(openIdx) : undefined;
+          let nearest: [number, number] | null = null;
+          for (const { bus: b, progress } of stabilizer.update(latest.buses, latest.segSeconds, now)) {
+            const from = Math.min(Math.floor(progress), lastStop - 1);
+            // 有真實 GPS（港鐵巴士）就直接用，冇先推算
+            const where = b.gps ? ([b.gps.lng, b.gps.lat] as [number, number]) : locate(from, Math.min(1, progress - from));
+            if (!where) continue;
+            const next = byIndex.get(from + 1);
+            const mins = Math.max(0, Math.round((b.nextEta - now) / 60000));
+            if (openIdx !== null && from < openIdx && !nearest) nearest = where;
+            const node = document.createElement('div');
+            node.className = b.schedule ? 'map-bus is-schedule' : 'map-bus';
+            node.title = (b.schedule ? '按時間表估計：' : '') + (mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`);
+            const bg = (multiCompany && companyColor(b.company)) || brand;
+            const fg = multiCompany && b.company ? companyInk(b.company) : ink;
+            node.innerHTML = `<span style="background:${bg}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="${fg}" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>`;
+            busMarkers.push(new maplibregl.Marker({ element: node }).setLngLat(where).addTo(map));
+          }
+          // 打開站後第一次：調整地圖，同時睇到個站同最近嗰架車；左右留位，站名標籤唔會俾地圖邊切走
+          if (openIdx !== null && fittedFor !== openIdx && target && nearest) {
+            fittedFor = openIdx;
+            const side = Math.min(120, container.clientWidth / 4);
+            map.fitBounds(new maplibregl.LngLatBounds([target.lng, target.lat], [target.lng, target.lat]).extend(nearest), {
+              padding: { top: 64, bottom: 28, left: side, right: side },
+              maxZoom: FOCUS_ZOOM,
+              duration: 600,
+            });
+          }
+          if (openIdx === null) fittedFor = null;
+        };
+        const onBuses = (e: Event) => {
+          latest = (e as CustomEvent<BusesDetail>).detail;
+          drawBuses();
+        };
 
-    // 列表打開咗某個站 → 地圖移過去
-    const onFocus = (e: Event) => {
-      const found = markers.find((m) => m.stop.index === (e as CustomEvent<number>).detail);
-      if (!found) return;
-      map.flyTo(found.marker.getLatLng(), 17, { duration: 0.6 });
-      // 每次只保留一個站名，唔好疊埋一齊
-      for (const m of markers) {
-        if (m === found) continue;
-        m.marker.closeTooltip();
-        m.marker.setStyle(stopStyle(m.end));
-      }
-      found.marker.setStyle(focusStyle).bringToFront();
-      found.marker.openTooltip();
-    };
-    window.addEventListener(FOCUS_STOP_EVENT, onFocus);
-    // 地圖載入之前已經打開咗站：補返放大
-    const pending = latestFocus();
-    if (pending !== null) onFocus(new CustomEvent(FOCUS_STOP_EVENT, { detail: pending }));
+        map.on('load', () => {
+          // 出處預設收埋（撳「i」先展開），唔好遮住地圖
+          container.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
+          const before = firstSymbolLayer(style);
+          // 其他走法：灰色虛線放底
+          map.addSource('others', {
+            type: 'geojson',
+            data: {
+              type: 'FeatureCollection',
+              features: lines.filter((l) => !l.selected).map((l) => ({ type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: l.segments.map((seg) => seg.map(toLngLat)) } })),
+            },
+          });
+          map.addLayer({ id: 'others', type: 'line', source: 'others', paint: { 'line-color': muted, 'line-width': 3, 'line-opacity': 0.5, 'line-dasharray': [1.5, 2] } }, before);
+          // 揀咗嘅走法：深色外框 + 公司色（城巴黃色喺淺色地圖上要外框先睇得清）
+          const selCoords = sel ? path.map(toLngLat) : stops.map((s) => [s.lng, s.lat]);
+          map.addSource('sel', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: selCoords } } });
+          if (sel) {
+            map.addLayer({ id: 'sel-casing', type: 'line', source: 'sel', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': casing, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 7, 16, 11], 'line-opacity': 0.35 } }, before);
+            map.addLayer({ id: 'sel-line', type: 'line', source: 'sel', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': brand, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 4.5, 16, 8] } }, before);
+            map.addImage('chevron', chevronImage(ink), { pixelRatio: 2 });
+            map.addLayer({
+              id: 'sel-arrows',
+              type: 'symbol',
+              source: 'sel',
+              layout: { 'symbol-placement': 'line', 'symbol-spacing': 90, 'icon-image': 'chevron', 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotation-alignment': 'map' },
+            });
+          } else {
+            // 揀咗嘅走法冇走線數據：用站點連虛線頂住
+            map.addLayer({ id: 'sel-line', type: 'line', source: 'sel', paint: { 'line-color': brand, 'line-width': 4, 'line-opacity': 0.7, 'line-dasharray': [0.5, 2] } }, before);
+          }
+          // 站點：中途白點深色邊；起點、終點深色實心白邊；打開咗嘅站公司色大點
+          map.addSource('stops', { type: 'geojson', data: stopData() });
+          map.addLayer({
+            id: 'stops',
+            type: 'circle',
+            source: 'stops',
+            paint: {
+              // zoom 只可以喺最外層 interpolate 用
+              'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['case', ['get', 'focus'], 9, ['get', 'end'], 7, 3.5], 16, ['case', ['get', 'focus'], 10, ['get', 'end'], 8, 5.5]],
+              'circle-color': ['case', ['get', 'focus'], brand, ['get', 'end'], '#262626', '#ffffff'],
+              'circle-stroke-color': ['case', ['get', 'focus'], '#262626', ['get', 'end'], '#ffffff', '#262626'],
+              'circle-stroke-width': ['case', ['get', 'end'], 3, 2],
+            },
+          });
+          map.on('click', 'stops', (e) => {
+            const idx = e.features?.[0]?.properties?.index;
+            if (typeof idx === 'number') window.dispatchEvent(new CustomEvent(OPEN_STOP_EVENT, { detail: idx }));
+          });
+          map.on('mouseenter', 'stops', (e) => {
+            map.getCanvas().style.cursor = 'pointer';
+            const idx = e.features?.[0]?.properties?.index;
+            const s = typeof idx === 'number' ? byIndex.get(idx) : undefined;
+            if (s && idx !== focusIndex) hoverTag.setLngLat([s.lng, s.lat]).setHTML(stopTag(s, brand, ink)).addTo(map);
+          });
+          map.on('mouseleave', 'stops', () => {
+            map.getCanvas().style.cursor = '';
+            hoverTag.remove();
+          });
 
-    // ---------- 巴士位置：由打開咗嘅站嘅 ETA 倒推，喺走線上顯示 ----------
-    // 揀咗嘅走線駁成一條連續折線，再搵每個站喺折線上嘅位置
-    const path: LatLng[] = sel ? sel.segments.flatMap((seg, i) => (i === 0 ? seg : seg.slice(1))) : [];
-    const byIndex = new Map(stops.map((s) => [s.index, s]));
-    const pathIdx = path.length
-      ? new Map(stopPathIndices(path, stops.map((s) => [s.lat, s.lng] as LatLng)).map((p, k) => [stops[k]!.index, p]))
-      : new Map<number, number>();
-    const busLayer = L.layerGroup().addTo(map);
-    let latest: BusesDetail | null = latestBuses();
-    let fittedFor: number | null = null;
-    const busColor = brand;
+          // 地圖載入之前已經打開咗站：補返放大
+          const pending = latestFocus();
+          if (pending !== null) focus(pending, true);
+          drawBuses();
+        });
 
-    const locate = (from: number, fraction: number): L.LatLngExpression | null => {
-      const i0 = pathIdx.get(from);
-      const i1 = pathIdx.get(from + 1);
-      if (i0 !== undefined && i1 !== undefined) {
-        const p = pointOnPath(path, i0, i1, fraction);
-        if (p) return [p.lat, p.lng];
-      }
-      // 冇走線：喺兩個站之間直線估
-      const a = byIndex.get(from);
-      const b = byIndex.get(from + 1);
-      return a && b ? [a.lat + (b.lat - a.lat) * fraction, a.lng + (b.lng - a.lng) * fraction] : null;
-    };
-
-    // 成條線嘅巴士（由 /api/buses 追蹤），每 5 秒按時間推前；只准向前，ETA 推遲就停喺原位
-    const stabilizer = new BusStabilizer();
-    const lastStop = Math.max(...stops.map((x) => x.index));
-    const drawBuses = () => {
-      busLayer.clearLayers();
-      if (!latest) return;
-      const now = Date.now();
-      const openIdx = latest.openIndex;
-      const target = openIdx !== null ? byIndex.get(openIdx) : undefined;
-      let nearest: L.LatLngExpression | null = null;
-      for (const { bus: b, progress } of stabilizer.update(latest.buses, latest.segSeconds, now)) {
-        const from = Math.min(Math.floor(progress), lastStop - 1);
-        // 有真實 GPS（港鐵巴士）就直接用，冇先推算
-        const where: L.LatLngExpression | null = b.gps ? [b.gps.lat, b.gps.lng] : locate(from, Math.min(1, progress - from));
-        if (!where) continue;
-        const next = byIndex.get(from + 1);
-        const mins = Math.max(0, Math.round((b.nextEta - now) / 60000));
-        // 打開咗站：最近嗰架上游車
-        if (openIdx !== null && from < openIdx && !nearest) nearest = where;
-        L.marker(where, {
-          keyboard: false,
-          zIndexOffset: 1000,
-          icon: L.divIcon({
-            className: b.schedule ? 'map-bus is-schedule' : 'map-bus',
-            iconSize: [28, 28],
-            iconAnchor: [14, 14],
-            html: `<span style="background:${(multiCompany && companyColor(b.company)) || busColor}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="${multiCompany && b.company ? companyInk(b.company) : ink}" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>`,
-          }),
-        })
-          .bindTooltip((b.schedule ? '按時間表估計：' : '') + (mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`), { direction: 'top', offset: [0, -14], className: 'map-tip' })
-          .addTo(busLayer);
-      }
-      // 打開站後第一次：調整地圖，同時睇到個站同最近嗰架車
-      if (openIdx !== null && fittedFor !== openIdx && target && nearest) {
-        fittedFor = openIdx;
-        // 左右留多啲位，站名標籤（喺站上面、置中）唔會俾地圖邊切走
-        const side = Math.min(120, map.getSize().x / 4);
-        map.fitBounds(L.latLngBounds([[target.lat, target.lng], nearest]), { paddingTopLeft: [side, 64], paddingBottomRight: [side, 28], maxZoom: 17 });
-      }
-      if (openIdx === null) fittedFor = null;
-    };
-    const onBuses = (e: Event) => {
-      latest = (e as CustomEvent<BusesDetail>).detail;
-      drawBuses();
-    };
-    window.addEventListener(BUSES_EVENT, onBuses);
-    const tick = setInterval(drawBuses, BUS_TICK_MS);
-    drawBuses();
+        window.addEventListener(FOCUS_STOP_EVENT, onFocus);
+        window.addEventListener(BUSES_EVENT, onBuses);
+        const tick = setInterval(drawBuses, BUS_TICK_MS);
+        cleanup = () => {
+          window.removeEventListener(FOCUS_STOP_EVENT, onFocus);
+          window.removeEventListener(BUSES_EVENT, onBuses);
+          clearInterval(tick);
+          map.remove();
+        };
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setFailed(e.message);
+      });
 
     return () => {
-      window.removeEventListener(FOCUS_STOP_EVENT, onFocus);
-      window.removeEventListener(BUSES_EVENT, onBuses);
-      clearInterval(tick);
-      map.off('zoomend', drawArrows);
-      map.remove();
+      cancelled = true;
+      cleanup?.();
     };
-  }, [lines, stops, multiCompany, company, osm]);
+  }, [lines, stops, multiCompany, company, dark]);
 
   const [help, setHelp] = useState(false);
   return (
     <div className="route-map-wrap">
-      <div ref={el} className="route-map card" role="region" aria-label="路線地圖" />
+      <div ref={el} className="route-map card" role="region" aria-label="路線地圖">
+        {failed && <p className="map-failed muted">地圖載入唔到（{failed}），站點列表照用得</p>}
+      </div>
       <button className="map-help-btn" onClick={() => setHelp((h) => !h)} aria-expanded={help} aria-label="巴士位置點樣計？">
         <Icon name="info" size={20} />
       </button>
