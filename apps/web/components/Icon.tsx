@@ -20,9 +20,43 @@ export type IconName =
   | 'bus'
   | 'warning'
   | 'navigate'
-  | 'settings';
+  | 'settings'
+  | 'home'
+  | 'train'
+  | 'minibus'
+  | 'ferry'
+  | 'tram';
 
 const PATHS: Record<IconName, React.ReactNode> = {
+  home: <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1Z" />,
+  train: (
+    <>
+      <rect x="5.5" y="3.5" width="13" height="13" rx="3" />
+      <path d="M5.5 10.5h13M8.5 20.5l1.5-4M15.5 20.5l-1.5-4" />
+      <circle cx="9" cy="13.5" r="0.9" fill="currentColor" />
+      <circle cx="15" cy="13.5" r="0.9" fill="currentColor" />
+    </>
+  ),
+  minibus: (
+    <>
+      <path d="M5.5 17.5H4.5a1 1 0 0 1-1-1V9a3 3 0 0 1 3-3h9.3a2 2 0 0 1 1.6.8l3.1 4.2v5.5a1 1 0 0 1-1 1h-1M9.5 17.5h5" />
+      <path d="M3.5 11h17M10 6v5" />
+      <circle cx="7.5" cy="17.5" r="1.8" />
+      <circle cx="16.5" cy="17.5" r="1.8" />
+    </>
+  ),
+  ferry: (
+    <>
+      <path d="M3.5 13.5h17l-2.3 5H5.8l-2.3-5Z" />
+      <path d="M7 13.5V9.5h10v4M12 9.5V6M9 6h6" />
+    </>
+  ),
+  tram: (
+    <>
+      <rect x="6" y="6.5" width="12" height="12" rx="2" />
+      <path d="M6 12.5h12M12 6.5V3.5M9 3.5h6M9 21l1-2.5M15 21l-1-2.5" />
+    </>
+  ),
   navigate: <path d="M4.5 11.2 19.5 4.5l-6.7 15-1.9-6.4-6.4-1.9Z" />,
   settings: (
     <>

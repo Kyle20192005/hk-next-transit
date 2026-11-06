@@ -38,6 +38,7 @@ import {
 } from '@hknt/core';
 import { api, cachedRoute, calendarOnce, freshRoute, isCo, type Co } from '@/lib/api';
 import { useFavorite } from '@/lib/favorites';
+import { addRecent } from '@/lib/recent';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { Icon } from '@/components/Icon';
 import { BarButton } from '@/components/ui';
@@ -221,6 +222,12 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
     [selected, data, dir],
   );
   const dest = stops[stops.length - 1]?.name ?? '';
+  // 首頁「最近睇過」
+  useEffect(() => {
+    if (dest) addRecent({ co, route: data.route, dir, dest, companies });
+    // companies 每次 render 都係新 array，用路線、方向、目的地判斷就夠
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [co, data.route, dir, dest]);
   const joyYou = data.joyYou !== false;
   const fares = stops.map((s, i) => {
     const adult = i < stops.length - 1 ? selected?.fares?.[s.stopId] : undefined;

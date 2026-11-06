@@ -5,7 +5,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { useFavorites } from '@/lib/favorites';
 import { useTheme } from '@/lib/theme';
 
-/** 底部分頁列：導航／路線／附近／收藏／設定（導航未做）（同網頁版一樣，揀咗嘅圖示有淡黃底） */
+/** 底部分頁列：首頁／路線／導航／收藏／設定（導航未做；附近唔係分頁，由首頁同巴士路線頁入）（同網頁版一樣，揀咗嘅圖示有淡黃底） */
 export default function TabLayout() {
   const t = useTheme();
   const favCount = useFavorites().length;
@@ -36,9 +36,9 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: t.bg },
       }}
     >
+      <Tabs.Screen name="index" options={{ title: '首頁', tabBarIcon: icon('home') }} />
+      <Tabs.Screen name="routes" options={{ title: '路線', tabBarIcon: icon('route') }} />
       <Tabs.Screen name="navigation" options={{ title: '導航', tabBarIcon: icon('navigate') }} />
-      <Tabs.Screen name="index" options={{ title: '路線', tabBarIcon: icon('route') }} />
-      <Tabs.Screen name="nearby" options={{ title: '附近', tabBarIcon: icon('pin') }} />
       <Tabs.Screen name="favorites" options={{ title: '收藏', tabBarIcon: icon('star', 'star-fill') }} />
       <Tabs.Screen name="settings" options={{ title: '設定', tabBarIcon: icon('settings') }} />
     </Tabs>

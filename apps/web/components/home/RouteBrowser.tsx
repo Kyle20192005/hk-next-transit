@@ -18,11 +18,24 @@ const PAGE = 40;
  * - 號碼鍵盤只開可以接落去嘅數字同字母
  * - 無限捲動：每次載入 40 條
  */
-export default function RouteBrowser({ routes, updated }: { routes: Routes; updated: string | null }) {
+export default function RouteBrowser({
+  routes,
+  updated,
+  mode,
+  onMode,
+  onNearby,
+}: {
+  routes: Routes;
+  updated: string | null;
+  /** 交通工具（由首頁捷徑揀都會帶過嚟） */
+  mode: TransportMode;
+  onMode: (m: TransportMode) => void;
+  /** 「附近巴士站」捷徑 */
+  onNearby: () => void;
+}) {
   const [code, setCode] = useState(''); // 路線號碼（鍵盤）
   const [place, setPlace] = useState<string | null>(null); // 地點搜尋（null = 用緊號碼鍵盤）
   const [shown, setShown] = useState(PAGE);
-  const [mode, setMode] = useState<TransportMode>('bus'); // 交通工具：暫時只有巴士做好
   const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
   const listRef = useRef<HTMLUListElement>(null);
   const sentinel = useRef<HTMLLIElement>(null);
@@ -109,7 +122,7 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
         {/* 交通工具分類：喺搜尋欄上面；揀咗未做嘅，搜尋欄同鍵盤都收埋 */}
         <div className="mode-chips" role="tablist" aria-label="交通工具">
           {TRANSPORT_MODES.map((m) => (
-            <button key={m.id} role="tab" aria-selected={mode === m.id} className="mode-chip" onClick={() => setMode(m.id)}>
+            <button key={m.id} role="tab" aria-selected={mode === m.id} className="mode-chip" onClick={() => onMode(m.id)}>
               {m.label}
             </button>
           ))}
@@ -155,6 +168,20 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
       ) : (
       <>
       <ul className="route-list" ref={listRef}>
+        {!code && place === null && (
+          <li className="nearby-shortcut-item">
+            <button className="nearby-shortcut card" onClick={onNearby}>
+              <span className="empty-icon sm">
+                <Icon name="pin" size={20} />
+              </span>
+              <span className="nearby-shortcut-text">
+                <strong>附近巴士站</strong>
+                <small className="muted">搵你附近 600 米內嘅站同每條線下一班車</small>
+              </span>
+              <Icon name="chevron-right" size={18} className="muted" />
+            </button>
+          </li>
+        )}
         {matches.slice(0, shown).map((r) => {
           const co = r.co ?? 'ctb';
           return (

@@ -25,6 +25,7 @@ import { COMPANIES } from '@/lib/company';
 import StopList from '@/components/StopList';
 import TimetableDrawer from '@/components/TimetableDrawer';
 import FavButton from '@/components/FavButton';
+import { RecordRecent } from '@/lib/recent';
 import Icon from '@/components/Icon';
 import VariantPicker, { type VariantItem } from '@/components/VariantPicker';
 import RouteMap, { type MapLine, type MapStop } from '@/components/RouteMapLazy';
@@ -158,6 +159,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
             {serviceLine && <span className="route-service">{serviceLine}</span>}
           </span>
           <FavButton target={{ co, route: data.route, dir, dest: dest ?? '', companies }} />
+          <RecordRecent target={{ co, route: data.route, dir, dest: dest ?? '', companies }} />
           <TimetableDrawer
             key={`${dir}-${selected?.id}`}
             variants={drawerVariants}

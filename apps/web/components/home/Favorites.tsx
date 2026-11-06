@@ -45,7 +45,7 @@ export default function Favorites({ onBrowse }: { onBrowse: () => void }) {
   );
 }
 
-function FavItem({ f }: { f: Favorite }) {
+export function FavItem({ f }: { f: Favorite }) {
   const href = `/${f.co}/${f.route}?dir=${f.dir}${f.stopId ? `&stop=${f.stopId}` : ''}`;
   return (
     <li className="fav card">

@@ -1,28 +1,34 @@
 'use client';
 import { useEffect, useState } from 'react';
-import type { RouteIndex } from '@hknt/core';
+import type { RouteIndex, TransportMode } from '@hknt/core';
 import Icon, { type IconName } from '@/components/Icon';
 import { useFavorites } from '@/lib/favorites';
+import HomeTab from './HomeTab';
 import RouteBrowser from './RouteBrowser';
 import Nearby from './Nearby';
 import Favorites from './Favorites';
 import Navigation from './Navigation';
 import Settings from './Settings';
 
-type Tab = 'nav' | 'routes' | 'nearby' | 'favs' | 'settings';
+type Tab = 'home' | 'routes' | 'nav' | 'favs' | 'settings';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
-  { id: 'nav', label: '導航', icon: 'navigate' },
+  { id: 'home', label: '首頁', icon: 'home' },
   { id: 'routes', label: '路線', icon: 'route' },
-  { id: 'nearby', label: '附近', icon: 'pin' },
+  { id: 'nav', label: '導航', icon: 'navigate' },
   { id: 'favs', label: '收藏', icon: 'star' },
   { id: 'settings', label: '設定', icon: 'settings' },
 ];
 /** 由路線頁返嚟時返返上次嘅分頁 */
 const TAB_KEY = 'hknt.tab';
 
-/** 首頁：底部分頁列（導航／路線／附近／收藏／設定；導航未做，顯示「即將推出」），每個分頁有自己嘅黃色標題區 */
+/**
+ * 首頁：底部分頁列（首頁／路線／導航／收藏／設定；導航未做，顯示「即將推出」），每個分頁有自己嘅黃色標題區。
+ * 「附近車站」唔係分頁：由首頁「附近」或者巴士路線頁「附近巴士站」撳入，有返回掣。
+ */
 export default function Home({ routes, updated }: { routes: RouteIndex['routes']; updated: string | null }) {
-  const [tab, setTab] = useState<Tab>('routes');
+  const [tab, setTab] = useState<Tab>('home');
+  const [nearby, setNearby] = useState(false);
+  const [mode, setMode] = useState<TransportMode>('bus');
   const favCount = useFavorites().length;
 
   useEffect(() => {
@@ -35,6 +41,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   }, []);
   const pick = (t: Tab) => {
     setTab(t);
+    setNearby(false);
     try {
       sessionStorage.setItem(TAB_KEY, t);
     } catch {
@@ -45,11 +52,27 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   return (
     <main className="home">
       <div className="home-body">
-        {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} />}
-        {tab === 'nearby' && <Nearby />}
-        {tab === 'favs' && <Favorites onBrowse={() => pick('routes')} />}
-        {tab === 'nav' && <Navigation />}
-        {tab === 'settings' && <Settings updated={updated} />}
+        {nearby ? (
+          <Nearby onBack={() => setNearby(false)} />
+        ) : (
+          <>
+            {tab === 'home' && (
+              <HomeTab
+                onMode={(m) => {
+                  setMode(m);
+                  pick('routes');
+                }}
+                onNav={() => pick('nav')}
+                onFavs={() => pick('favs')}
+                onNearby={() => setNearby(true)}
+              />
+            )}
+            {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} mode={mode} onMode={setMode} onNearby={() => setNearby(true)} />}
+            {tab === 'nav' && <Navigation />}
+            {tab === 'favs' && <Favorites onBrowse={() => pick('routes')} />}
+            {tab === 'settings' && <Settings updated={updated} />}
+          </>
+        )}
       </div>
       <nav className="tab-bar" role="tablist" aria-label="首頁">
         {TABS.map((t) => (

@@ -176,9 +176,15 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 視覺（2026-11 改版）：保留黃色標題列（`.app-bar`、`.route-bar`，底部圓角），其他用卡片（圓角 14–18、柔和陰影）、
   統一 SVG 圖示（`components/Icon.tsx`），**唔好用 emoji 或者文字符號做圖示**（⇅、⌫、🕒 喺唔同系統大細唔同）。
   顏色、圓角、陰影全部用 `globals.css` 嘅 CSS 變數，深色模式只改變數。
-- 首頁底部分頁列（`components/home/Home.tsx`）：路線／附近／收藏，記住上次分頁（sessionStorage）；
-  闊螢幕分頁列移去頂部黃色區。收藏（`lib/favorites.ts`，localStorage，try/catch）：路線頁標題列星號收藏路線（某方向），
-  打開站撳「收藏呢個站」；收藏頁直接顯示收藏咗嘅站嘅下一班（`/api/eta`，同方向）。
+- 底部分頁列（網頁 `components/home/Home.tsx`、App `src/app/(tabs)/_layout.tsx`）：**首頁／路線／導航／收藏／設定**，預設首頁，
+  記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區。
+  - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`）：NextLeg 入口。黃色區「你想去邊？」（撳去導航，標即將推出）；
+    下面捷徑：交通工具（撳去路線分頁並揀咗嗰種，`?mode=`）、收藏（頭 3 個，直接顯示下一班）、附近（一開就自動定位，頭 2 個站）、
+    最近睇過（`lib/recent.ts`，路線頁開咗就記低，最多 8 條）。
+  - **附近車站唔係分頁**：由首頁「附近 › 更多」或者巴士路線頁頂「附近巴士站」捷徑入，有返回掣（網頁 Home 入面嘅 view，App `src/app/nearby.tsx` stack）。
+    定位邏輯 `useNearbyStops`（網頁 `components/home/Nearby.tsx`、App `components/Nearby.tsx`）。
+  - 收藏（`lib/favorites.ts`，localStorage，try/catch）：路線頁標題列星號收藏路線（某方向），打開站撳「收藏呢個站」；
+    收藏頁同首頁直接顯示收藏咗嘅站嘅下一班（`/api/eta`，同方向；App `components/FavItem.tsx`）。
 - 地圖走線、時間線、巴士圖示用公司代表色（城巴 #FFD800、九巴 #D01A1E，`lib/company.ts`）；地圖走線底加深色外框，
   因為黃色喺地圖馬路上唔顯眼。聯營線：走線用路線檔嘅公司，每架巴士用自己公司嘅顏色。特別班只用標籤區分。
 - 路線列表：雙向路線列出兩個目的地，各自撳入 `?dir=O|I`（唔好要用戶入咗頁先轉方向）。「只限 XX」標示：全部係特別班先用紅色。
@@ -198,7 +204,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   打開站時將站名對齊列表頂部。標題、方向、走法、地圖固定，只有站點列表捲動；走法選擇平時收埋，展開時蓋住地圖。
   站點一次只開一個，打開時地圖放大去嗰個站；撳地圖嘅站會打開列表對應嘅站（web 用 `lib/events.ts` 嘅 window event）。
 - 地圖方向箭嘴：網頁由 MapLibre 沿線自動擺放（symbol-placement line）；App 用 core `lineArrows`，只喺 300 米以上嘅段放。
-- 首頁：「路線」用巴士號碼鍵盤（`components/home/Keypad.tsx`，只開可以接落去嘅數字同字母，唔彈系統鍵盤；
+- 路線分頁：用巴士號碼鍵盤（`components/home/Keypad.tsx`，只開可以接落去嘅數字同字母，唔彈系統鍵盤；
   「地點」轉做打字搜起訖點），列表無限捲動（每次 40 條），搜尋欄固定。「附近」用定位
   （`/api/nearby` 搵 600 米內嘅站，`/api/stop-etas` 一次攞一個站所有路線嘅下一班；站點索引 `out/ctb/stops.json` 唔包終點站）。
   撳附近嘅路線開 `/ctb/<路線>?dir=&stop=`，路線頁會自動揀經過嗰個站嘅走法同打開嗰個站。
@@ -253,10 +259,11 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   `unknown`（「冇時間表資料」，灰色），唔好寫「今日沒有班次」；「班次」掣只計有時間表嘅走法。
 - 賽馬日改路等按事件嘅走法：政府數據冇。
 - ETA `seq` 規律只喺 38 號驗證過。
-- 港鐵、輕鐵、小巴、電車、渡輪、導航（點到點）未做。介面已經預留（2026-11，用戶要求）：底部分頁「導航／路線／附近／收藏／設定」，
-  導航顯示「功能即將推出」；「路線」標題下面、搜尋欄上面一行交通工具分類（core `TRANSPORT_MODES`，`ready: false` 嘅揀咗就收埋搜尋欄同鍵盤，
+- 港鐵、輕鐵、小巴、電車、渡輪、導航（點到點）未做。介面已經預留（2026-11，用戶要求）：底部分頁「首頁／路線／導航／收藏／設定」，
+  導航顯示「功能即將推出」（將來做好，首頁「你想去邊？」直接用）；「路線」標題下面、搜尋欄上面一行交通工具分類（core `TRANSPORT_MODES`，`ready: false` 嘅揀咗就收埋搜尋欄同鍵盤，
   只顯示「功能即將推出」）。網頁 `components/home/{ComingSoon,Navigation,Settings}.tsx`，App `src/app/(tabs)/{navigation,settings}.tsx` + `ui.tsx` 嘅 `ComingSoon`。
   加新交通工具：喺 `TRANSPORT_MODES` 改 `ready: true` 再接返列表。附近同收藏將來包埋所有交通工具；首頁標題「下一程」。
+  App 用 Expo Router typed routes：加／改路由檔之後要開一次 `expo start` 先會更新 `.expo/types`，否則 tsc 話路徑唔存在。
 - 「附近」：聯營線只列喺城巴站下面（避免同一條線喺相鄰嘅九巴站同城巴站出兩次）。
 - App 未喺實機或者模擬器測試過：確認到 iOS／Android bundle 到（`npx expo export --platform ios --platform android`），
   介面用 Expo web 預覽截圖驗證過（地圖除外）。

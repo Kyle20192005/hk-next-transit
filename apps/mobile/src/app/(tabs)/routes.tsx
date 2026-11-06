@@ -1,0 +1,221 @@
+import { router, useLocalSearchParams } from 'expo-router';
+import { Logo } from '@/components/Logo';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { TRANSPORT_MODES, type RouteIndex, type TransportMode } from '@hknt/core';
+import { api, type Co } from '@/lib/api';
+import { radius, shadow, tabular, useTheme } from '@/lib/theme';
+import { AppBar, ComingSoon, CompanyTag } from '@/components/ui';
+import { Icon } from '@/components/Icon';
+import { Keypad } from '@/components/Keypad';
+import { preloadRoute, warmRoute } from '@/lib/prefetch';
+
+type Route = RouteIndex['routes'][number];
+
+/**
+ * 路線列表（同網頁版首頁一樣）：
+ * - 黃色標題區入面嘅搜尋欄；預設用巴士號碼鍵盤（唔彈系統鍵盤），撳「地點」轉做打字搜起點／終點
+ * - 鍵盤只開可以接落去嘅數字同字母
+ * - 雙向路線列出兩個目的地，各自撳入對應方向
+ */
+export default function RoutesTab() {
+  const t = useTheme();
+  const [routes, setRoutes] = useState<Route[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [place, setPlace] = useState<string | null>(null);
+  // 交通工具：暫時只有巴士做好；首頁捷徑會帶 ?mode= 過嚟
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<TransportMode>('bus');
+  const [seenParam, setSeenParam] = useState<string | undefined>(undefined);
+  if (params.mode !== seenParam) {
+    setSeenParam(params.mode);
+    if (TRANSPORT_MODES.some((m) => m.id === params.mode)) setMode(params.mode as TransportMode);
+  }
+  const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
+  const list = useRef<FlatList<Route>>(null);
+
+  const fetchRoutes = () => api.routes().then((r) => setRoutes(r.routes)).catch((e: Error) => setError(e.message));
+  useEffect(() => {
+    void fetchRoutes();
+  }, []);
+  const load = () => {
+    setError(null);
+    void fetchRoutes();
+  };
+
+  const matches = useMemo(() => {
+    if (!routes) return [];
+    if (place !== null) {
+      const s = place.trim();
+      return s ? routes.filter((r) => r.origTc?.includes(s) || r.destTc?.includes(s) || r.route.includes(s.toUpperCase())) : routes;
+    }
+    return code ? routes.filter((r) => r.route.startsWith(code)) : routes;
+  }, [routes, code, place]);
+
+  const nextChars = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of routes ?? []) if (r.route.startsWith(code) && r.route.length > code.length) set.add(r.route[code.length]!);
+    return set;
+  }, [routes, code]);
+
+  useEffect(() => {
+    list.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [code, place]);
+
+  // 預先 fetch：候選得 3 條或以下、停咗 0.4 秒，預載佢哋嘅路線資料（唔 call 巴士公司）
+  useEffect(() => {
+    if (!code && !place?.trim()) return;
+    if (matches.length === 0 || matches.length > 3) return;
+    const id = setTimeout(() => matches.forEach((r) => preloadRoute((r.co ?? 'ctb') as Co, r.route)), 400);
+    return () => clearTimeout(id);
+  }, [matches, code, place]);
+
+  return (
+    <View style={{ flex: 1 }}>
+      <AppBar>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Logo size={26} />
+          <Text style={{ fontSize: 24, fontWeight: '800', color: t.onBrand, letterSpacing: -0.3 }}>下一程</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginLeft: 2, marginTop: 6 }}>NextLeg</Text>
+        </View>
+        {/* 交通工具分類（同網頁一樣）：喺搜尋欄上面；揀咗未做嘅，搜尋欄同鍵盤都收埋 */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16, marginTop: -4, marginBottom: -2 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+          {TRANSPORT_MODES.map((m) => {
+            const on = mode === m.id;
+            return (
+              <Pressable key={m.id} onPress={() => setMode(m.id)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: on ? t.onBrand : t.onBrandSoft }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: on ? t.brand : t.onBrand }}>{m.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        {modeInfo.ready && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingLeft: 14, paddingRight: 8, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
+          <Icon name="search" size={20} color={t.muted} />
+          {place === null ? (
+            <Pressable style={{ flex: 1, paddingVertical: 12 }} onPress={() => setPlace('')} accessibilityRole="search" accessibilityLabel="搜尋路線">
+              <Text style={code ? { fontSize: 24, fontWeight: '800', color: t.text, letterSpacing: 0.5 } : { fontSize: 17, color: t.muted }}>{code || '輸入路線號碼'}</Text>
+            </Pressable>
+          ) : (
+            <TextInput
+              autoFocus
+              value={place}
+              onChangeText={setPlace}
+              placeholder="輸入地點，例如 北角、中環"
+              placeholderTextColor={t.muted}
+              returnKeyType="search"
+              style={{ flex: 1, fontSize: 17, color: t.text, paddingVertical: 12 }}
+            />
+          )}
+          {(code || place !== null) && (
+            <Pressable
+              onPress={() => (place !== null ? setPlace(null) : setCode(''))}
+              accessibilityLabel={place !== null ? '轉返號碼鍵盤' : '清除'}
+              style={{ minWidth: 34, height: 34, paddingHorizontal: 8, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}
+            >
+              {place !== null ? <Text style={{ fontWeight: '700', color: t.muted }}>123</Text> : <Icon name="close" size={18} color={t.muted} />}
+            </Pressable>
+          )}
+        </View>
+        )}
+      </AppBar>
+
+      {!modeInfo.ready ? (
+        <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
+      ) : error ? (
+        <Pressable onPress={load} style={{ padding: 24, alignItems: 'center' }}>
+          <Text style={{ color: t.special }}>載入失敗：{error}</Text>
+          <Text style={{ color: t.accent, marginTop: 6, fontWeight: '600' }}>撳一下再試</Text>
+        </Pressable>
+      ) : !routes ? (
+        <ActivityIndicator style={{ marginTop: 32 }} />
+      ) : (
+        <FlatList
+          ref={list}
+          data={matches}
+          keyExtractor={(r) => `${r.co ?? 'ctb'}-${r.route}`}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ padding: 12, gap: 8 }}
+          initialNumToRender={15}
+          windowSize={7}
+          renderItem={({ item }) => <RouteCard r={item} />}
+          ListHeaderComponent={!code && place === null ? <NearbyShortcut /> : undefined}
+          ListEmptyComponent={<Text style={{ textAlign: 'center', padding: 20, color: t.muted }}>搵唔到路線</Text>}
+        />
+      )}
+
+      {modeInfo.ready && place === null && routes && (
+        <Keypad nextChars={nextChars} onKey={(k) => setCode((c) => c + k)} onBack={() => setCode((c) => c.slice(0, -1))} onPlace={() => setPlace('')} canBack={code.length > 0} />
+      )}
+    </View>
+  );
+}
+
+/** 一條路線一張卡：左邊號碼同公司，右邊每個方向一行（撳入對應方向） */
+function RouteCard({ r }: { r: Route }) {
+  const t = useTheme();
+  const co = (r.co ?? 'ctb') as Co;
+  const dirs = r.dirs ?? ['O'];
+  const loop = r.origTc === r.destTc;
+  const options = loop
+    ? [{ d: 'O' as const, to: r.origTc, sub: '循環線' }]
+    : (['O', 'I'] as const)
+        .filter((d) => dirs.includes(d))
+        .map((d) => ({ d, to: d === 'O' ? r.destTc : r.origTc, sub: dirs.length === 1 ? `由 ${d === 'O' ? r.origTc : r.destTc}` : null }));
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: t.card, borderRadius: radius.m, overflow: 'hidden', ...shadow }}>
+      <Pressable onPressIn={() => warmRoute(co, r.route)} onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: r.route } })} accessibilityRole="link" style={{ width: 108, paddingVertical: 12, paddingLeft: 16, justifyContent: 'center', gap: 4 }} accessibilityLabel={`${r.route} 路線`}>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, letterSpacing: -0.3, ...tabular }}>{r.route}</Text>
+          <CompanyTag companies={r.companies ?? ['CTB']} />
+      </Pressable>
+      <View style={{ flex: 1 }}>
+        {/* 唔用 Link asChild：web 版唔會將 Pressable 嘅 style 傳落 <a>，排版會亂 */}
+        {options.map((o, i) => (
+            <Pressable
+              key={o.d}
+              onPressIn={() => warmRoute(co, r.route, { dir: o.d })}
+              onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: r.route, dir: o.d } })}
+              accessibilityRole="link"
+              accessibilityLabel={`${r.route} 往 ${o.to}`}
+              style={{ flex: 1, minHeight: 46, flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingLeft: 4, paddingRight: 12, borderTopWidth: i ? 1 : 0, borderTopColor: t.line }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text numberOfLines={1} style={{ color: t.text, fontWeight: '600', fontSize: 16 }}>
+                  {!loop && <Text style={{ color: t.muted, fontWeight: '500', fontSize: 13 }}>往 </Text>}
+                  {o.to}
+                </Text>
+                {o.sub && (
+                  <Text numberOfLines={1} style={{ color: t.muted, fontSize: 13 }}>
+                    {o.sub}
+                  </Text>
+                )}
+              </View>
+              <Icon name="chevron-right" size={18} color={t.muted} />
+            </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** 巴士路線頁頂：「附近巴士站」捷徑（同網頁一樣） */
+function NearbyShortcut() {
+  const t = useTheme();
+  return (
+    <Pressable
+      onPress={() => router.push('/nearby')}
+      accessibilityRole="link"
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: radius.m, backgroundColor: t.card, transform: [{ scale: pressed ? 0.98 : 1 }], ...shadow })}
+    >
+      <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: t.brandSoft }}>
+        <Icon name="pin" size={20} color={t.accent} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: t.text }}>附近巴士站</Text>
+        <Text style={{ fontSize: 13, color: t.muted }}>搵你附近 600 米內嘅站同每條線下一班車</Text>
+      </View>
+      <Icon name="chevron-right" size={18} color={t.muted} />
+    </Pressable>
+  );
+}

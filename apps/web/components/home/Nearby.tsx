@@ -7,7 +7,7 @@ import { formatDistance, type Company } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 
-interface NearStop {
+export interface NearStop {
   id: string;
   co: Co;
   name: string;
@@ -22,11 +22,11 @@ interface StopEtas {
 const AUTO_LOAD = 4;
 const REFRESH_MS = 30_000;
 
-type State = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[] };
+export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[] };
 
-/** 附近車站：用手機定位搵 600 米內嘅城巴站，顯示每條路線下一班車 */
-export default function Nearby() {
-  const [state, setState] = useState<State>({ kind: 'idle' });
+/** 定位 + 搵 600 米內嘅站（首頁同附近頁共用）；auto = 一開就定位 */
+export function useNearbyStops(auto = false) {
+  const [state, setState] = useState<NearbyState>({ kind: 'idle' });
 
   const locate = useCallback(() => {
     if (!('geolocation' in navigator)) {
@@ -54,8 +54,24 @@ export default function Nearby() {
     );
   }, []);
 
+  useEffect(() => {
+    if (!auto) return;
+    const id = setTimeout(locate, 0);
+    return () => clearTimeout(id);
+  }, [auto, locate]);
+
+  return { state, locate };
+}
+
+/** 附近車站（由首頁或者巴士路線頁撳入嚟，唔係分頁）：定位搵 600 米內嘅站，顯示每條路線下一班車 */
+export default function Nearby({ onBack }: { onBack: () => void }) {
+  const { state, locate } = useNearbyStops(true);
+
   const head = (
     <header className="app-bar">
+      <button className="bar-btn" onClick={onBack} aria-label="返回">
+        <Icon name="back" />
+      </button>
       <div className="app-title">
         <h1>附近車站</h1>
         {state.kind === 'ok' && <span className="app-sub">{state.stops.length ? `600 米內 ${state.stops.length} 個車站` : '600 米內冇車站'}</span>}
@@ -101,7 +117,7 @@ export default function Nearby() {
   );
 }
 
-function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
+export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
   const [open, setOpen] = useState(autoLoad);
   const [etas, setEtas] = useState<StopEtas | null>(null);
   const [now, setNow] = useState(() => Date.now());
