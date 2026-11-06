@@ -118,3 +118,33 @@ export function restyleMap<T extends MapStyleJson>(src: T, dark: boolean): T {
 export function firstSymbolLayer(st: MapStyleJson): string | undefined {
   return st.layers.find((l) => l.type === 'symbol')?.id;
 }
+
+/** 調色板（App 嘅 Google 地圖都用，同網頁一致） */
+export const MAP_PALETTE = { light: LIGHT, dark: DARK };
+
+/**
+ * Android Google 地圖（react-native-maps `customMapStyle`）用嘅樣式：同網頁一樣嘅顏色，
+ * 收埋商戶、巴士站等圖示（唔好同我哋自己嘅站點撞）。iOS Apple 地圖唔可以調色，用 mutedStandard。
+ */
+export function googleMapStyle(dark: boolean): { featureType?: string; elementType?: string; stylers: Record<string, string>[] }[] {
+  const c = dark ? DARK : LIGHT;
+  return [
+    { elementType: 'geometry', stylers: [{ color: c.background }] },
+    { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: c.place }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: c.placeHalo }] },
+    { featureType: 'administrative', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
+    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ visibility: 'on' }, { color: c.park }] },
+    { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: c.wood }] },
+    { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: c.residential }] },
+    { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: c.road }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: c.roadCasing }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: c.roadLabel }] },
+    { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: c.roadHalo }] },
+    { featureType: 'transit.line', elementType: 'geometry', stylers: [{ color: c.rail }] },
+    { featureType: 'transit.station.bus', stylers: [{ visibility: 'off' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: c.water }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: c.waterLabel }] },
+  ];
+}

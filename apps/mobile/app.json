@@ -30,8 +30,7 @@
         {
           "locationWhenInUsePermission": "用嚟搵你附近嘅巴士站同路線上最近嘅站。"
         }
-      ],
-      "@maplibre/maplibre-react-native"
+      ]
     ],
     "scheme": "hknt",
     "experiments": {
