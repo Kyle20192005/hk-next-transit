@@ -6,14 +6,14 @@ import { AppBar, CompanyTag, SoonBadge } from '@/components/ui';
 import { FavItem } from '@/components/FavItem';
 import { Icon, type IconName } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
-import { NearbyStop, useNearbyStops } from '@/components/Nearby';
+import { useNearbyStops } from '@/components/Nearby';
+import { DepartureCards } from '@/components/DepartureCards';
 import { favKey, useFavorites } from '@/lib/favorites';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 
 const MODE_ICON: Record<TransportMode, IconName> = { bus: 'bus', rail: 'train', minibus: 'minibus', ferry: 'ferry', tram: 'tram' };
-const NEAR_SHOWN = 2;
 const FAV_SHOWN = 3;
 const RECENT_SHOWN = 5;
 
@@ -80,11 +80,7 @@ export default function HomeTab() {
         <Section title="附近" action={state.kind === 'ok' && state.stops.length > 0 ? { label: '更多', onPress: () => router.push('/nearby') } : undefined}>
           {state.kind === 'ok' ? (
             state.stops.length ? (
-              <View style={{ gap: 10 }}>
-                {state.stops.slice(0, NEAR_SHOWN).map((s) => (
-                  <NearbyStop key={`${s.co}-${s.id}`} stop={s} autoLoad />
-                ))}
-              </View>
+              <DepartureCards stops={state.stops} />
             ) : (
               <Hint>600 米內冇巴士站</Hint>
             )

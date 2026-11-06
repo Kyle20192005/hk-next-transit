@@ -16,3 +16,4 @@ export * from './company';
 export * from './map-style';
 export * from './transport';
 export * from './version';
+export * from './departures';

@@ -8,12 +8,11 @@ import { favKey, useFavorites } from '@/lib/favorites';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
 import { FavItem } from './Favorites';
-import { NearbyStop, useNearbyStops } from './Nearby';
+import { useNearbyStops } from './Nearby';
+import DepartureCards from './DepartureCards';
 
 export const MODE_ICON: Record<TransportMode, IconName> = { bus: 'bus', rail: 'train', minibus: 'minibus', ferry: 'ferry', tram: 'tram' };
 
-/** 附近：首頁只顯示最近幾個站 */
-const NEAR_SHOWN = 2;
 const FAV_SHOWN = 3;
 const RECENT_SHOWN = 5;
 
@@ -84,11 +83,7 @@ export default function HomeTab({ onMode, onNav, onFavs, onNearby }: { onMode: (
           </div>
           {state.kind === 'ok' ? (
             state.stops.length ? (
-              <ul className="nearby-list compact">
-                {state.stops.slice(0, NEAR_SHOWN).map((s) => (
-                  <NearbyStop key={`${s.co}-${s.id}`} stop={s} autoLoad />
-                ))}
-              </ul>
+              <DepartureCards stops={state.stops} />
             ) : (
               <p className="feed-hint card">600 米內冇巴士站</p>
             )

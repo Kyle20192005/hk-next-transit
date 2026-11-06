@@ -11,6 +11,8 @@ export interface NearStop {
   id: string;
   co: Co;
   name: string;
+  lat: number;
+  lng: number;
   distance: number;
   routes: { co: Co; route: string; dir: 'O' | 'I'; dest: string; companies: Company[] }[];
 }

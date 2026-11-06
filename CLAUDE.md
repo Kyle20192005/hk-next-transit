@@ -179,7 +179,10 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 底部分頁列（網頁 `components/home/Home.tsx`、App `src/app/(tabs)/_layout.tsx`）：**首頁／路線／導航／收藏／設定**，預設首頁，
   記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`）：NextLeg 入口。黃色區「你想去邊？」（撳去導航，標即將推出）；
-    下面捷徑：交通工具（撳去路線分頁並揀咗嗰種，`?mode=`）、收藏（頭 3 個，直接顯示下一班）、附近（一開就自動定位，頭 2 個站）、
+    下面捷徑：交通工具（撳去路線分頁並揀咗嗰種，`?mode=`）、收藏（頭 3 個，直接顯示下一班）、附近（一開就自動定位；到站卡，似港鐵「下班車」：一張卡 = 一個站頭，core `groupStopHeads` 將 40 米內各公司嘅站併埋，
+    每張只顯示最快 4 班、每條線一班 `busDepartureRows`，打橫掃睇第二、第三近，掃到先 call `/api/here`；網頁 `DepartureCards.tsx`、
+    App `components/DepartureCards.tsx`。卡嘅結構通用（`DepartureRow`：色條、標籤、往邊、分鐘、月台），將來港鐵站卡用同一款，
+    港鐵站範圍放大到 800 米並排第一）、
     最近睇過（`lib/recent.ts`，路線頁開咗就記低，最多 8 條）。
   - **附近車站唔係分頁**：由首頁「附近 › 更多」或者巴士路線頁頂「附近巴士站」捷徑入，有返回掣（網頁 Home 入面嘅 view，App `src/app/nearby.tsx` stack）。
     定位邏輯 `useNearbyStops`（網頁 `components/home/Nearby.tsx`、App `components/Nearby.tsx`）。
