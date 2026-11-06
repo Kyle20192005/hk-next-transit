@@ -179,7 +179,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   顏色、圓角、陰影全部用 `globals.css` 嘅 CSS 變數，深色模式只改變數。
 - 底部分頁列（網頁 `components/home/Home.tsx`、App `src/app/(tabs)/_layout.tsx`）：**首頁／路線／導航／收藏／設定**，預設首頁，
   記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區，變成一條頂部欄：左邊品牌（`.tab-brand`，logo 下一程 NextLeg）、
-  右邊分頁，對齊 1100px；闊螢幕各分頁自己嘅品牌標題行（`.app-title:has(> .logo)`）同首頁頂部欄（`.home-topbar`）收埋，唔好重複。
+  右邊分頁，對齊 1100px；闊螢幕各分頁自己嘅品牌標題行（`.app-title:has(> .logo)`）同首頁 header 頂部一行（`.hh-bar`）收埋，唔好重複。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
     黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
     quarter 權重 1.4、屋苑 3.5，村名只喺 1.2 公里內冇其他地區名先用；冇地區數據就用最近站頭名），
@@ -194,7 +194,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
     `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
     最近睇過（`lib/recent.ts`，最多 8 條）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。
-    網頁闊螢幕：內容限 1100px 置中（設定頁 720px）；頂部欄由分頁列做（`.home-topbar` 收埋）；到站卡有左右箭嘴（只限有滑鼠）、圓點撳得；≥ 1024px 兩條獨立直欄（`.home-col-main` 大卡 + 最近睇過、`.home-col-side` 常用工具 + 交通消息），
+    網頁闊螢幕：內容限 1100px 置中（設定頁 720px）；頂部欄由分頁列做（`.hh-bar` 收埋）；到站卡有左右箭嘴（只限有滑鼠）、圓點撳得；≥ 1024px 兩條獨立直欄（`.home-col-main` 大卡 + 最近睇過、`.home-col-side` 常用工具 + 交通消息），
     手機 `.home-col { display: contents }` 再用 `order` 排返「工具、大卡、消息、最近」。到站卡每張最闊 440px，闊螢幕一次見幾張。
   - **交通消息**（`/api/news`）：運輸署特別交通消息（`resource.data.one.gov.hk/td/tc/specialtrafficnews.xml`）+ 事故消息
     （`td.gov.hk/tc/special_news/trafficnews.xml`，有完結狀態）。冇座標，「附近」= 內文提到用戶 1.5 公里內巴士站名嘅路名／地方名
