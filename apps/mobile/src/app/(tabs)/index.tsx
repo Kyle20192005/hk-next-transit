@@ -61,12 +61,13 @@ export default function HomeTab() {
     opacity: clampI([locEnd * 0.6, locEnd * 1.5], [0, 1]),
     transform: [{ translateY: clampI([locEnd * 0.6, locEnd * 1.5], [14, 0]) }, { scale: clampI([locEnd * 0.6, locEnd * 1.5], [0.7, 1]) }],
   };
-  const s0 = searchBox.y - 10;
-  const s1 = searchBox.y + searchBox.h;
+  // 搜尋欄同大字一樣：頂部碰到頂部欄（連 18px 圓角）之前 56px 開始收窄淡出，碰到時已經完全收埋（同網頁一樣）
+  const s1 = Math.max(1, searchBox.y - 18);
+  const s0 = s1 - 56;
   const searchStyle = {
-    opacity: clampI([s0, s1], [1, 0.1]),
+    opacity: clampI([s0, s1], [1, 0]),
     transformOrigin: 'right',
-    transform: [{ translateY: clampI([s0, s1], [0, -6]) }, { scaleX: clampI([s0, s1], [1, 0.18]) }],
+    transform: [{ scaleX: clampI([s0, s1], [1, 0.18]) }],
   };
   const btnStyle = {
     opacity: clampI([s0, s1], [0, 1]),

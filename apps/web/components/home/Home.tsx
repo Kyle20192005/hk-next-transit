@@ -54,7 +54,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   };
 
   return (
-    <main className="home">
+    <main className={`home tab-${view ? view.kind : tab}`}>
       <div className="home-body">
         {view?.kind === 'nearby' ? (
           <Nearby onBack={() => setView(null)} />

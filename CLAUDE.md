@@ -188,8 +188,9 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     無縫、冇淡入。頂部欄下面長期有一截 18px 圓角黃色（喺黃色區上面睇唔到，捲走後變 header 圓角底），所以黃色區頂要留 ≥ 18px 唔好遮字；
     **捲動變形**（全部跟捲動距離計、只郁 transform／opacity）：大字地區名慢一拍下沉（PARALLAX 0.6）、縮細、淡出（網頁 `--pl`／`--ly`），
     **頂部碰到頂部欄（連 18px 圓角）之前一定要完全淡出**（淡出距離 = 空位 ÷ (1 − PARALLAX)），唔好俾頂部欄切開一半；
-    去到一半 header 右邊彈出地區膠囊（`.home-topbar-loc`，`--pp`）；搜尋欄捲到 header 底時由左向右收窄（網頁 clip-path、App scaleX
-    transformOrigin right）收入右邊搜尋掣，個掣放大轉入嚟（`--ps`）。網頁 HomeTab 用 requestAnimationFrame 設 CSS 變數（唔 setState），
+    去到一半 header 右邊彈出地區膠囊（`.home-topbar-loc`，`--pp`）；搜尋欄**同一規則**：頂部碰到 header（連圓角）之前 56px 開始由左向右收窄淡出（網頁 clip-path、App scaleX
+    transformOrigin right），碰到時已經完全收埋，收入右邊搜尋掣，個掣放大轉入嚟（`--ps`）。
+    電腦版：分頁列就係 header（`.home.tab-home .tab-bar::after` 同樣 18px 圓角底），冇搜尋掣，搜尋欄只係縮細淡出。網頁 HomeTab 用 requestAnimationFrame 設 CSS 變數（唔 setState），
     App `Animated` interpolate + `useNativeDriver`，位置靠 onLayout 量。內容最少一版高，黃色區一定捲得走；頂部欄上面墊黃色，iPhone 拉落唔露灰）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
     （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
     `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；

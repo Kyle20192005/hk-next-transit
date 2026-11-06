@@ -63,7 +63,9 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
       const pl = clamp(y / locEnd);
       const pp = clamp((y - locEnd * 0.6) / (locEnd * 0.9));
       el.style.setProperty('--ly', `${(Math.min(y, locEnd) * PARALLAX).toFixed(1)}px`);
-      const ps = clamp((y - (at(f) - barH - 10)) / (f.offsetHeight + 10));
+      // 搜尋欄同一個規則：頂部碰到頂部欄（連 18px 圓角）之前 56px 開始收窄淡出，碰到時已經完全收埋
+      const sEnd = at(f) - barH - 18;
+      const ps = clamp((y - (sEnd - 56)) / 56);
       el.style.setProperty('--pl', pl.toFixed(3));
       el.style.setProperty('--pp', pp.toFixed(3));
       el.style.setProperty('--ps', ps.toFixed(3));
