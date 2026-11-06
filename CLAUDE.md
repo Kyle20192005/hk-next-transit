@@ -183,15 +183,14 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
     黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
     quarter 權重 1.4、屋苑 3.5，村名只喺 1.2 公里內冇其他地區名先用；冇地區數據就用最近站頭名），
-    下面一行「最近巴士站：X · N 米」（**向上捲**：頂部「logo 下一程 NextLeg」嗰行同黃色區係連埋嘅一塊，
-    **sticky 黐住頂**（網頁 `.home-topbar` position sticky、App `stickyHeaderIndices={[0]}`），大字同搜尋欄喺佢下面捲走，捲完佢就係 header：
-    無縫、冇淡入。頂部欄下面長期有一截 18px 圓角黃色（喺黃色區上面睇唔到，捲走後變 header 圓角底），所以黃色區頂要留 ≥ 18px 唔好遮字；
-    **捲動變形**（全部跟捲動距離計、只郁 transform／opacity）：大字地區名慢一拍下沉（PARALLAX 0.6）、縮細、淡出（網頁 `--pl`／`--ly`），
-    **頂部碰到頂部欄（連 18px 圓角）之前一定要完全淡出**（淡出距離 = 空位 ÷ (1 − PARALLAX)），唔好俾頂部欄切開一半；
-    去到一半 header 右邊彈出地區膠囊（`.home-topbar-loc`，`--pp`）；搜尋欄**同一規則**：頂部碰到 header（連圓角）之前 56px 開始由左向右收窄淡出（網頁 clip-path、App scaleX
-    transformOrigin right），碰到時已經完全收埋，收入右邊搜尋掣，個掣放大轉入嚟（`--ps`）。
-    電腦版：分頁列就係 header（`.home.tab-home .tab-bar::after` 同樣 18px 圓角底），冇搜尋掣，搜尋欄只係縮細淡出。網頁 HomeTab 用 requestAnimationFrame 設 CSS 變數（唔 setState），
-    App `Animated` interpolate + `useNativeDriver`，位置靠 onLayout 量。內容最少一版高，黃色區一定捲得走；頂部欄上面墊黃色，iPhone 拉落唔露灰）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
+    下面一行「最近巴士站：X · N 米」。**頂部一行 + 大字 + 搜尋欄係同一個 component `HomeHeader`**（網頁 `components/home/HomeHeader.tsx`、
+    App `src/components/HomeHeader.tsx`），浮喺捲動區上面（網頁放捲動區入面一個高度 0 嘅 sticky 外框，後面 spacer 留位；App 絕對定位 +
+    `contentContainerStyle.paddingTop`）。捲上去時黃色底同捲動 1:1 收起（內容黐住佢底，唔會捲入佢下面、唔會留空白黃色），收到剩頂部一行；
+    收縮期間**變形唔淡走**：大字中心移去頂部右邊地區膠囊、縮到膠囊字咁大（最後 10% 先同真膠囊交接）；英文名同最近巴士站跟黃色底收走、早啲淡出；
+    搜尋欄中心移去搜尋掣、闊高縮到掣咁大，白色漸變做掣色（黃色 + 8% 黑，實色唔會變啡），圓角按縮放反向補返；節奏頭尾慢中間快。
+    位置用 offsetLeft／offsetTop（網頁，子元素唔好 position，否則唔係以 header 計）或 onLayout（App）。網頁 rAF 直接改 style 唔 setState；
+    App `Animated` + `useNativeDriver`。電腦版冇頂部一行（分頁列就係 header，`.home.tab-home .tab-bar::after` 圓角底），冇目標位：
+    大字同搜尋欄喺頂部碰到邊之前淡出、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
     （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
     `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
     最近睇過（`lib/recent.ts`，最多 8 條）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。

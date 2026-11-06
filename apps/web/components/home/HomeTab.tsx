@@ -3,12 +3,12 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { COMPANIES, MAX_TOOLS, TOOLS, filterNews, formatDistance, groupStopHeads, tint, toggleTool as toggle, type NewsFilter, type ToolId } from '@hknt/core';
 import Icon from '@/components/Icon';
-import Logo from '@/components/Logo';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
 import { loadTools, saveTools, useNews } from '@/lib/news';
 import { useNearbyStops } from './Nearby';
 import NextCard from './NextCard';
+import HomeHeader from './HomeHeader';
 import { NewsChips, NewsList } from './News';
 
 const RECENT_SHOWN = 5;
@@ -31,48 +31,7 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
-  // 向上捲（連貫變形，全部跟捲動距離計，只郁 transform／opacity）：
-  // 頂部「下一程」嗰行（.home-topbar）同黃色區連埋，sticky 黐住頂，捲完就係 header。
-  // 捲嘅時候：大字地區名慢一拍下沉、縮細、淡出（--pl）；去到一半 header 右邊彈出地區膠囊（--pp）；
-  // 搜尋欄捲到 header 底時由左向右收窄，收入右邊搜尋掣，個掣同時放大出現（--ps）。
-  // 用 CSS 變數 + requestAnimationFrame，唔 setState，每格都順
   const scroller = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLDivElement>(null);
-  const locRef = useRef<HTMLDivElement>(null);
-  const topbar = useRef<HTMLDivElement>(null);
-  const frame = useRef(0);
-  const PARALLAX = 0.6;
-  const onScroll = () => {
-    if (frame.current) return;
-    frame.current = requestAnimationFrame(() => {
-      frame.current = 0;
-      const el = scroller.current;
-      const f = searchRef.current;
-      const loc = locRef.current;
-      const tb = topbar.current;
-      if (!el || !f || !loc || !tb) return;
-      const top = el.getBoundingClientRect().top;
-      const y = el.scrollTop;
-      const at = (n: HTMLElement) => n.getBoundingClientRect().top - top + y; // 喺捲動內容入面嘅位置
-      const barH = tb.offsetHeight;
-      const clamp = (v: number) => Math.min(1, Math.max(0, v));
-      // 大字要喺頂部碰到頂部欄（連下面 18px 圓角）之前完全淡出，唔好俾頂部欄切開一半：
-      // 佢跟 PARALLAX 嘅比例向下沉，所以頂部去到頂部欄嘅捲動距離 = 空位 ÷ (1 − PARALLAX)
-      const gap = Math.max(8, at(loc) - barH - 18);
-      const locEnd = Math.max(16, (gap / (1 - PARALLAX)) * 0.9);
-      const pl = clamp(y / locEnd);
-      const pp = clamp((y - locEnd * 0.6) / (locEnd * 0.9));
-      el.style.setProperty('--ly', `${(Math.min(y, locEnd) * PARALLAX).toFixed(1)}px`);
-      // 搜尋欄同一個規則：頂部碰到頂部欄（連 18px 圓角）之前 56px 開始收窄淡出，碰到時已經完全收埋
-      const sEnd = at(f) - barH - 18;
-      const ps = clamp((y - (sEnd - 56)) / 56);
-      el.style.setProperty('--pl', pl.toFixed(3));
-      el.style.setProperty('--pp', pp.toFixed(3));
-      el.style.setProperty('--ps', ps.toFixed(3));
-      el.dataset.searchHidden = ps > 0.5 ? '1' : '0';
-    });
-  };
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
   // 有位置就預設睇附近
@@ -89,55 +48,35 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
 
   return (
     <div className="home-tab">
-      <div className="home-scroll" ref={scroller} onScroll={onScroll}>
-      {/* 頂部欄：同下面黃色區連埋一塊，sticky 黐住頂；捲走黃色區之後佢就係 header */}
-      <div className="home-topbar" ref={topbar}>
-        <Logo size={24} />
-        <h1>下一程</h1>
-        <span className="app-sub">NextLeg</span>
-        {/* 地區膠囊：大字縮細淡出到一半先彈出，好似大字飛咗入嚟 */}
-        {(area || head) && (
-          <span className="home-topbar-loc" aria-hidden="true">
-            <Icon name="navigate" size={13} />
-            {area ? area.n : head?.name}
-          </span>
-        )}
-        <button className="bar-btn home-topbar-search" onClick={() => go('nav')} aria-label="導航：想去邊度？">
-          <Icon name="search" />
-        </button>
-      </div>
-      <header className="app-bar home-hero">
-        {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
-        <div className="hero-loc" aria-live="polite" ref={locRef}>
-          <span className="hero-name">{area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}</span>
-          {area?.en && <span className="hero-en">{area.en}</span>}
-          <span className="hero-sub">
-            {head ? (
-              <>
-                <Icon name="navigate" size={14} /> 最近巴士站：{head.name} · {formatDistance(head.distance)}
-              </>
-            ) : state.kind === 'error' ? (
-              <button className="hero-retry" onClick={locate}>
-                {state.message} · 再試
-              </button>
-            ) : state.kind === 'ok' ? (
-              '600 米內冇巴士站'
-            ) : (
-              '搵緊你附近嘅巴士站'
-            )}
-          </span>
-        </div>
-        <div className="search-field hero-search" ref={searchRef}>
-          <button className="hero-search-main" onClick={() => go('nav')} aria-label="導航：想去邊度？">
-            <Icon name="search" size={20} className="search-icon" />
-            <span className="search-placeholder">想去邊度？</span>
-          </button>
+      <div className="home-scroll" ref={scroller}>
+      <HomeHeader
+        scroller={scroller}
+        name={area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}
+        en={area?.en}
+        pill={area ? area.n : head ? head.name : null}
+        onSearch={() => go('nav')}
+        sub={
+          head ? (
+            <>
+              <Icon name="navigate" size={14} /> 最近巴士站：{head.name} · {formatDistance(head.distance)}
+            </>
+          ) : state.kind === 'error' ? (
+            <button className="hero-retry" onClick={locate}>
+              {state.message} · 再試
+            </button>
+          ) : state.kind === 'ok' ? (
+            '600 米內冇巴士站'
+          ) : (
+            '搵緊你附近嘅巴士站'
+          )
+        }
+        status={
           <button className="status-chip" onClick={() => go('news', pos)} aria-label={`交通消息：${nearNews.length ? `附近 ${nearNews.length} 條` : '附近冇消息'}`}>
             <span className={`status-dot${nearNews.length ? ' warn' : ''}`} />
             交通消息
           </button>
-        </div>
-      </header>
+        }
+      />
 
       <div className="home-feed">
         {/* 闊螢幕分兩欄（左：大卡、最近睇過；右：常用工具、交通消息）；手機一欄，用 order 排返：工具、大卡、消息、最近 */}

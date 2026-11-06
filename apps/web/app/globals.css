@@ -271,30 +271,28 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .nc-message { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px 6px; font-size: 0.9375rem; line-height: 1.6; }
 .nc-message .error { color: var(--special); }
 /* 首頁黃色區：大字顯示最近嘅站頭（似港鐵 App 嘅「青衣 Tsing Yi」） */
-.home-hero { gap: 10px; padding-bottom: 18px; }
-.home-hero .app-title h1 { font-size: 1.125rem; }
-/* 首頁捲動：頂部欄（.home-topbar）同黃色區（.home-hero）係連埋嘅一塊。頂部欄 sticky 黐住捲動區頂，
-   黃色區（大字、搜尋欄）喺佢下面捲走，捲完之後頂部欄自己就係 header：無縫，冇淡入。
-   頂部欄下面長期有一截圓角黃色（::after）：喺黃色區上面睇唔到，黃色區捲走之後就變成 header 嘅圓角底。 */
+/* 首頁 header（HomeHeader）：一件嘢，捲上去時黃色底同捲動 1:1 收縮，大字飛去頂部變地區膠囊、搜尋欄變搜尋掣。
+   放喺捲動區入面：高度 0 嘅 sticky 外框黐住頂，header 絕對定位浮喺內容上面，後面一個 spacer 留位。 */
 .home-tab { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .home-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; }
-.home-scroll > .home-feed { overflow: visible; flex: none; min-height: 100%; } /* 內容唔夠長都要捲得走黃色區 */
-.home-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 12px 2px 16px; background: var(--brand); color: var(--on-brand); }
-.home-topbar h1 { margin: 0; font-size: 1.125rem; font-weight: 800; }
-.home-topbar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 18px; background: var(--brand); border-radius: 0 0 18px 18px; pointer-events: none; }
-/* iPhone 頂部拉落時唔好露出灰色 */
-.home-topbar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 400px; background: var(--brand); }
-/* 捲動變形（--pl 大字、--pp 地區膠囊、--ps 搜尋欄 → 搜尋掣，由 HomeTab 每格設定，0–1） */
-.hero-loc { transform-origin: 50% 0; transform: translateY(var(--ly, 0px)) scale(calc(1 - var(--pl, 0) * 0.18)); opacity: calc(1 - var(--pl, 0)); will-change: transform, opacity; }
-.home-topbar-loc { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; max-width: 40vw; padding: 5px 10px 5px 8px; border-radius: 999px; background: var(--on-brand-soft); font-size: 0.875rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  opacity: var(--pp, 0); transform: translateY(calc((1 - var(--pp, 0)) * 14px)) scale(calc(0.7 + var(--pp, 0) * 0.3)); transform-origin: 50% 100%; will-change: transform, opacity; }
-.hero-search { transform-origin: 100% 50%; clip-path: inset(0 0 0 calc(var(--ps, 0) * 82%) round 16px); opacity: calc(1 - var(--ps, 0)); will-change: clip-path, opacity; }
-.home-topbar-search { margin-left: 6px; opacity: var(--ps, 0); transform: scale(calc(0.4 + var(--ps, 0) * 0.6)) rotate(calc((1 - var(--ps, 0)) * -90deg)); pointer-events: none; will-change: transform, opacity; }
-.home-scroll[data-search-hidden="1"] .home-topbar-search { pointer-events: auto; }
-.home-topbar:not(:has(.home-topbar-loc)) .home-topbar-search { margin-left: auto; }
-@media (prefers-reduced-motion: reduce) { .hero-loc, .home-topbar-loc, .hero-search, .home-topbar-search { transition: none; } }
-.home-scroll > .home-hero { padding-top: 18px; } /* 頂部欄下面嗰截圓角（18px）唔好遮住大字 */
-.home-hero .app-title h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-scroll > .home-feed { overflow: visible; flex: none; min-height: 100%; }
+.hh-sticky { position: sticky; top: 0; height: 0; z-index: 20; }
+.hh { position: absolute; z-index: 0; top: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 16px 18px; color: var(--on-brand); pointer-events: none; }
+/* 子元素唔好 position（offsetLeft／offsetTop 要以 header 計）；黃色底用 z-index -1 放後面 */
+.hh-bg { position: absolute; z-index: -1; inset: 0; background: var(--brand); border-radius: 0 0 var(--bar-radius, 22px) var(--bar-radius, 22px); will-change: transform; }
+/* iPhone 頂部拉落唔露灰 */
+.hh-bg::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 400px; background: var(--brand); }
+.hh-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; pointer-events: auto; }
+.hh-bar h1 { margin: 0; font-size: 1.125rem; font-weight: 800; }
+.hh-pill { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; max-width: 40vw; padding: 5px 10px 5px 8px; border-radius: 999px; background: var(--on-brand-soft); font-size: 0.875rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; }
+.hh-btn { margin-left: 6px; opacity: 0; pointer-events: none; }
+.hh-bar:not(:has(.hh-pill)) .hh-btn { margin-left: auto; }
+.hh-loc { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 6px; }
+.hh-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 2.375rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; transform-origin: 50% 50%; will-change: transform, opacity; }
+.hh-rest { display: flex; flex-direction: column; align-items: center; will-change: transform, opacity; }
+.hh-rest .hero-retry { pointer-events: auto; }
+.hh-search { pointer-events: auto; transform-origin: 50% 50%; will-change: transform, opacity; }
+.hh-search-inner { display: flex; align-items: center; width: 100%; min-width: 0; }
 .hero-loc { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; text-align: center; }
 .hero-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 2.375rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; }
 .hero-en { margin-top: -2px; font-size: 1.125rem; font-weight: 800; letter-spacing: 0.01em; opacity: 0.85; }
@@ -620,7 +618,9 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 /* 首頁闊螢幕：內容同黃色區一樣限 1100px 置中；平板一欄，電腦兩欄（左大卡、右常用工具同交通消息，最近睇過喺下面） */
 @media (min-width: 768px) {
   .home-scroll > .home-feed { width: 100%; max-width: 1100px; margin: 0 auto; padding: 20px 16px 32px; }
-  .home-hero .hero-search { width: 100%; max-width: 720px; align-self: center; }
+  .hh .hero-search { width: 100%; max-width: 720px; align-self: center; }
+  .hh { padding-left: max(16px, calc((100% - 1100px) / 2 + 16px)); padding-right: max(16px, calc((100% - 1100px) / 2 + 16px)); }
+  .hh-bg { border-radius: 0 0 18px 18px; }
 }
 /* 手機：兩欄外框唔存在（display: contents），用 order 排：工具、大卡、消息、最近 */
 .home-col { display: contents; }
@@ -640,8 +640,8 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
   .tab-brand { display: flex; align-items: center; gap: 8px; margin-right: auto; color: var(--on-brand); }
   .tab-brand strong { font-size: 1.25rem; font-weight: 800; }
   .app-bar > .app-title:has(> .logo) { display: none; }
-  .home-topbar { display: none; }
-  .home-scroll > .home-hero { padding-top: 12px; }
+  .hh-bar { display: none; }
+  .hh { padding-top: 24px; }
 }
 
 /* 電腦版首頁：分頁列就係 header，下面同手機一樣有一截 18px 圓角黃色（喺黃色區上面睇唔到，捲走後變圓角底）；
@@ -649,6 +649,4 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 @media (min-width: 768px) {
   .home.tab-home .tab-bar { position: relative; z-index: 30; }
   .home.tab-home .tab-bar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 18px; background: var(--brand); border-radius: 0 0 18px 18px; pointer-events: none; }
-  .home-scroll > .home-hero { padding-top: 24px; }
-  .home-hero .hero-search { clip-path: none; transform: scale(calc(1 - var(--ps, 0) * 0.06)); }
 }
