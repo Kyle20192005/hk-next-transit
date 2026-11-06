@@ -39,15 +39,13 @@ export default function HomeTab() {
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
-  // 向上捲（似 iPhone 大標題，同網頁一樣）：成個黃色區喺捲動區入面跟手指捲走；
-  // 黃色區差唔多捲完時，頂部細標題列（App 名）實色由上面滑落。原生動畫（useNativeDriver），每格都順
+  // 向上捲（同網頁一樣）：頂部「下一程」嗰行同黃色區係連埋嘅一塊，用 stickyHeaderIndices 黐住頂；
+  // 大字同搜尋欄喺佢下面捲走，佢自己就變成 header（無縫，冇淡入）。只有右邊搜尋掣：搜尋欄捲到佢下面先出（原生動畫）
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
   const [scrollY] = useState(() => new Animated.Value(0));
-  const [heroH, setHeroH] = useState(260);
-  const barH = insets.top + 56;
-  const slideEnd = Math.max(1, heroH - barH);
-  const barY = scrollY.interpolate({ inputRange: [slideEnd - 70, slideEnd], outputRange: [-(barH + 12), 0], extrapolate: 'clamp' });
+  const [searchBottom, setSearchBottom] = useState(200);
+  const btnOpacity = scrollY.interpolate({ inputRange: [searchBottom - 40, searchBottom], outputRange: [0, 1], extrapolate: 'clamp' });
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
   const openNews = () => router.push({ pathname: '/news', params: pos ? { lat: String(pos.lat), lng: String(pos.lng) } : {} });
@@ -65,17 +63,25 @@ export default function HomeTab() {
       <Animated.ScrollView
         style={{ flex: 1 }}
         scrollEventThrottle={16}
+        stickyHeaderIndices={[0]}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
       >
-      <View onLayout={(e) => setHeroH(e.nativeEvent.layout.height)}>
-      {/* iPhone 頂部拉落時唔好露出灰色：黃色區上面再墊一截黃色 */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: '100%', height: 600, backgroundColor: t.brand }} />
-      <AppBar style={{ gap: 10, paddingBottom: 18 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Logo size={22} />
-          <Text style={{ fontSize: 18, fontWeight: '800', color: t.onBrand }}>下一程</Text>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>NextLeg</Text>
-        </View>
+      {/* 頂部欄：同下面黃色區連埋一塊，黐住頂；捲走黃色區之後佢就係 header */}
+      <View style={{ zIndex: 2, paddingTop: insets.top + 10, paddingBottom: 4, paddingLeft: 16, paddingRight: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: t.brand }}>
+        {/* iPhone 頂部拉落時唔好露出灰色 */}
+        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: '100%', height: 600, backgroundColor: t.brand }} />
+        {/* 下面長期有一截圓角黃色：喺黃色區上面睇唔到，黃色區捲走之後就變成 header 嘅圓角底 */}
+        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: '100%', height: 18, backgroundColor: t.brand, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }} />
+        <Logo size={22} />
+        <Text style={{ fontSize: 18, fontWeight: '800', color: t.onBrand }}>下一程</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>NextLeg</Text>
+        <Animated.View style={{ marginLeft: 'auto', opacity: btnOpacity }}>
+          <Pressable onPress={() => go('nav')} accessibilityLabel="導航：想去邊度？" hitSlop={6} style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: t.onBrandSoft }}>
+            <Icon name="search" size={22} color={t.onBrand} />
+          </Pressable>
+        </Animated.View>
+      </View>
+      <AppBar style={{ gap: 10, paddingTop: 14, paddingBottom: 18 }}>
         {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
         <View style={{ alignItems: 'center', paddingTop: 4, paddingBottom: 2 }}>
           <Text numberOfLines={1} style={{ fontSize: 38, fontWeight: '900', color: t.onBrand, letterSpacing: 0.5 }}>
@@ -97,7 +103,7 @@ export default function HomeTab() {
             </Pressable>
           )}
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 50, paddingRight: 6, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
+        <View onLayout={(e) => setSearchBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 50, paddingRight: 6, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
           <Pressable onPress={() => go('nav')} accessibilityRole="search" accessibilityLabel="導航：想去邊度？" style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14, alignSelf: 'stretch' }}>
             <Icon name="search" size={20} color={t.muted} />
             <Text style={{ fontSize: 17, color: t.muted }}>想去邊度？</Text>
@@ -108,7 +114,6 @@ export default function HomeTab() {
           </Pressable>
         </View>
       </AppBar>
-      </View>
 
       <View style={{ minHeight: screenH, padding: 12, paddingBottom: 24, gap: 18 }}>
         <Section
@@ -213,18 +218,6 @@ export default function HomeTab() {
       </View>
       </Animated.ScrollView>
 
-      {/* 捲咗上去先出嘅細標題列：App 名 + 搜尋 */}
-      <Animated.View
-        pointerEvents="box-none"
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: barH, paddingTop: insets.top, paddingLeft: 16, paddingRight: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: t.brand, borderBottomLeftRadius: 18, borderBottomRightRadius: 18, transform: [{ translateY: barY }], ...shadow }}
-      >
-        <Logo size={24} />
-        <Text style={{ fontSize: 20, fontWeight: '800', color: t.onBrand }}>下一程</Text>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>NextLeg</Text>
-        <Pressable onPress={() => go('nav')} accessibilityLabel="導航：想去邊度？" hitSlop={6} style={{ marginLeft: 'auto', width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: t.onBrandSoft }}>
-          <Icon name="search" size={22} color={t.onBrand} />
-        </Pressable>
-      </Animated.View>
     </View>
   );
 }

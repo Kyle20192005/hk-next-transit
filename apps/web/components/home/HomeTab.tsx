@@ -31,24 +31,22 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
-  // 向上捲（似 iPhone 大標題）：成個黃色區跟手指捲走，頂部細標題列（App 名）跟住捲動距離慢慢淡入。
-  // 直接改 style（唔 setState），每格都順
+  // 向上捲：頂部「下一程」嗰行（.home-topbar）同黃色區係同一塊，sticky 黐住頂；大字同搜尋欄喺佢下面捲走，
+  // 佢自己就變成 header（無縫，唔淡入）。只有右邊搜尋掣：搜尋欄捲到佢下面先出（直接改 style，唔 setState）
   const scroller = useRef<HTMLDivElement>(null);
-  const bar = useRef<HTMLDivElement>(null);
-  const heroRef = useRef<HTMLElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const topBtn = useRef<HTMLButtonElement>(null);
+  const topbar = useRef<HTMLDivElement>(null);
   const onScroll = () => {
     const el = scroller.current;
-    const b = bar.current;
-    if (!el || !b) return;
-    const hero = heroRef.current?.offsetHeight ?? 240;
-    const barH = b.offsetHeight;
-    // 黃色區底部去到細標題列底部之前 70px 開始滑落，到齊位時完全出現
-    const end = hero - barH;
-    const p = Math.min(1, Math.max(0, (el.scrollTop - (end - 70)) / 70));
-    // 實色由上面滑落（唔用半透明，唔會見到後面嘅字）
-    b.style.transform = `translateY(${(p - 1) * (barH + 12)}px)`;
-    b.style.visibility = p > 0 ? 'visible' : 'hidden';
-    b.style.pointerEvents = p > 0.6 ? 'auto' : 'none';
+    const f = searchRef.current;
+    const btn = topBtn.current;
+    const tb = topbar.current;
+    if (!el || !f || !btn || !tb) return;
+    // 搜尋欄底部去到頂部欄底部時 = 1
+    const p = Math.min(1, Math.max(0, (el.scrollTop - (f.offsetTop + f.offsetHeight - tb.offsetHeight - 40)) / 40));
+    btn.style.opacity = String(p);
+    btn.style.pointerEvents = p > 0.5 ? 'auto' : 'none';
   };
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
@@ -66,22 +64,17 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
 
   return (
     <div className="home-tab">
-      {/* 捲咗上去先出嘅細標題列：App 名 + 搜尋 */}
-      <div className="home-minibar" ref={bar} aria-hidden="true">
+      <div className="home-scroll" ref={scroller} onScroll={onScroll}>
+      {/* 頂部欄：同下面黃色區連埋一塊，sticky 黐住頂；捲走黃色區之後佢就係 header */}
+      <div className="home-topbar" ref={topbar}>
         <Logo size={24} />
-        <strong>下一程</strong>
+        <h1>下一程</h1>
         <span className="app-sub">NextLeg</span>
-        <button className="bar-btn" onClick={() => go('nav')} aria-label="導航：想去邊度？" tabIndex={-1}>
+        <button className="bar-btn home-topbar-search" ref={topBtn} onClick={() => go('nav')} aria-label="導航：想去邊度？">
           <Icon name="search" />
         </button>
       </div>
-      <div className="home-scroll" ref={scroller} onScroll={onScroll}>
-      <header className="app-bar home-hero" ref={heroRef}>
-        <div className="app-title">
-          <Logo size={24} />
-          <h1>下一程</h1>
-          <span className="app-sub">NextLeg</span>
-        </div>
+      <header className="app-bar home-hero">
         {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
         <div className="hero-loc" aria-live="polite">
           <span className="hero-name">{area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}</span>
@@ -102,7 +95,7 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
             )}
           </span>
         </div>
-        <div className="search-field hero-search">
+        <div className="search-field hero-search" ref={searchRef}>
           <button className="hero-search-main" onClick={() => go('nav')} aria-label="導航：想去邊度？">
             <Icon name="search" size={20} className="search-icon" />
             <span className="search-placeholder">想去邊度？</span>

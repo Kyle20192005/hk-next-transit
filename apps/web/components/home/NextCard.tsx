@@ -202,6 +202,12 @@ function Swiper<T extends { key: string }>({ items, header, action, card }: { it
     setIndex(i);
     setReached((r) => Math.max(r, i + 1));
   };
+  const goTo = (i: number) => {
+    const el = track.current;
+    const first = el?.firstElementChild as HTMLElement | null;
+    if (!el || !first) return;
+    el.scrollTo({ left: Math.max(0, Math.min(items.length - 1, i)) * (first.offsetWidth + 10), behavior: 'smooth' });
+  };
   return (
     <>
       <div className="nc-head">
@@ -211,17 +217,30 @@ function Swiper<T extends { key: string }>({ items, header, action, card }: { it
           <Icon name="chevron-right" size={16} />
         </button>
       </div>
-      <div className="nc-track" ref={track} onScroll={onScroll}>
-        {items.map((it, i) => (
-          <div key={it.key} className="nc-slot">
-            {card(it, i <= reached)}
-          </div>
-        ))}
+      <div className="nc-track-wrap">
+        <div className="nc-track" ref={track} onScroll={onScroll}>
+          {items.map((it, i) => (
+            <div key={it.key} className="nc-slot">
+              {card(it, i <= reached)}
+            </div>
+          ))}
+        </div>
+        {/* 電腦冇得打橫掃：左右箭嘴（只喺有滑鼠嘅裝置顯示） */}
+        {items.length > 1 && (
+          <>
+            <button className="nc-arrow prev" onClick={() => goTo(index - 1)} disabled={index <= 0} aria-label="上一個">
+              <Icon name="back" size={20} />
+            </button>
+            <button className="nc-arrow next" onClick={() => goTo(index + 1)} disabled={index >= items.length - 1} aria-label="下一個">
+              <Icon name="chevron-right" size={20} />
+            </button>
+          </>
+        )}
       </div>
       {items.length > 1 && (
-        <div className="nc-dots" aria-hidden="true">
+        <div className="nc-dots">
           {items.map((it, i) => (
-            <span key={it.key} className={i === index ? 'on' : undefined} />
+            <button key={it.key} className={i === index ? 'on' : undefined} onClick={() => goTo(i)} aria-label={`第 ${i + 1} 個`} />
           ))}
         </div>
       )}

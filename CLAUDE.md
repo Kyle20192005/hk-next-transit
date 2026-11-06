@@ -183,14 +183,14 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
     黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
     quarter 權重 1.4、屋苑 3.5，村名只喺 1.2 公里內冇其他地區名先用；冇地區數據就用最近站頭名），
-    下面一行「最近巴士站：X · N 米」（**向上捲**似 iPhone 大標題：成個黃色區喺捲動區入面跟手指捲走，
-    黃色區差唔多捲完時頂部細標題列「logo 下一程 NextLeg + 搜尋掣」**實色由上面滑落**（唔用半透明，唔會見到後面嘅字），位置跟捲動距離計；
-    網頁 `.home-scroll` + `.home-minibar`（HomeTab 直接改 style，唔 setState）、App `Animated.ScrollView` + `useNativeDriver`；
-    內容最少一版高（`min-height: 100%`／`screenH`），黃色區一定捲得走；黃色區上面墊一截黃色，iPhone 拉落唔露灰）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
+    下面一行「最近巴士站：X · N 米」（**向上捲**：頂部「logo 下一程 NextLeg」嗰行同黃色區係連埋嘅一塊，
+    **sticky 黐住頂**（網頁 `.home-topbar` position sticky、App `stickyHeaderIndices={[0]}`），大字同搜尋欄喺佢下面捲走，捲完佢就係 header：
+    無縫、冇淡入。頂部欄下面長期有一截 18px 圓角黃色（喺黃色區上面睇唔到，捲走後變 header 圓角底），所以黃色區頂要留 ≥ 18px 唔好遮字；
+    右邊搜尋掣喺搜尋欄捲到佢下面先出（網頁直接改 style、App 原生動畫）。內容最少一版高，黃色區一定捲得走；頂部欄上面墊黃色，iPhone 拉落唔露灰）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
     （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
     `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
     最近睇過（`lib/recent.ts`，最多 8 條）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。
-    網頁闊螢幕：內容限 1100px 置中；≥ 1024px 兩條獨立直欄（`.home-col-main` 大卡 + 最近睇過、`.home-col-side` 常用工具 + 交通消息），
+    網頁闊螢幕：內容限 1100px 置中（設定頁 720px）；頂部欄由分頁列做（`.home-topbar` 收埋）；到站卡有左右箭嘴（只限有滑鼠）、圓點撳得；≥ 1024px 兩條獨立直欄（`.home-col-main` 大卡 + 最近睇過、`.home-col-side` 常用工具 + 交通消息），
     手機 `.home-col { display: contents }` 再用 `order` 排返「工具、大卡、消息、最近」。到站卡每張最闊 440px，闊螢幕一次見幾張。
   - **交通消息**（`/api/news`）：運輸署特別交通消息（`resource.data.one.gov.hk/td/tc/specialtrafficnews.xml`）+ 事故消息
     （`td.gov.hk/tc/special_news/trafficnews.xml`，有完結狀態）。冇座標，「附近」= 內文提到用戶 1.5 公里內巴士站名嘅路名／地方名
