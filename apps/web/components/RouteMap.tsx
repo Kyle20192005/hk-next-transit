@@ -32,9 +32,9 @@ const OSM_ATTRIBUTION =
   '走線 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 貢獻者</a>';
 
 /** 箭嘴之間最少相隔幾多 px */
-const ARROW_SPACING_PX = 60;
+const ARROW_SPACING_PX = 80;
 /** 箭嘴同站點最少相隔幾多 px */
-const ARROW_STOP_GAP_PX = 6;
+const ARROW_STOP_GAP_PX = 14;
 
 function cssVar(name: string, fallback: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -60,32 +60,37 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
 
   useEffect(() => {
     if (!el.current) return;
-    const map = L.map(el.current, { zoomControl: true, attributionControl: true, scrollWheelZoom: false, zoomSnap: 0.25 });
-    L.tileLayer(`${LANDSD}/basemap/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10, attribution: ATTRIBUTION }).addTo(map);
-    L.tileLayer(`${LANDSD}/label/hk/tc/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10 }).addTo(map);
+    // 觸控機用兩隻手指縮放，唔使 +／− 掣；電腦先顯示
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    const map = L.map(el.current, { zoomControl: finePointer, attributionControl: true, scrollWheelZoom: false, zoomSnap: 0.25 });
+    map.attributionControl.setPrefix(false);
+    // 底圖淡化（CSS .map-base），走線先突出；地名另一層，淡化少啲
+    L.tileLayer(`${LANDSD}/basemap/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10, attribution: ATTRIBUTION, className: 'map-base' }).addTo(map);
+    L.tileLayer(`${LANDSD}/label/hk/tc/WGS84/{z}/{x}/{y}.png`, { maxZoom: 20, maxNativeZoom: 20, minZoom: 10, className: 'map-label' }).addTo(map);
     if (osm) map.attributionControl.addAttribution(OSM_ATTRIBUTION);
 
     // 走線用公司代表色；城巴黃色喺地圖黃色馬路上唔顯眼，所以底下加一條深色外框
     const brand = companyColor(company) ?? cssVar('--route-line', '#c26a00');
     const ink = companyInk(company);
-    const casing = '#3a2f00';
+    const casing = '#1a1a1a';
     const muted = cssVar('--muted', '#61676f');
 
     // 其他走法：灰色虛線放底；揀咗嘅走法：實線放面
     for (const l of [...lines].sort((a, b) => Number(a.selected) - Number(b.selected))) {
       if (l.selected) {
-        L.polyline(l.segments, { color: casing, weight: 9, opacity: 0.55, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+        L.polyline(l.segments, { color: casing, weight: 10, opacity: 0.4, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(map);
       }
       L.polyline(l.segments, l.selected
-        ? { color: brand, weight: 6, opacity: 1, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round' }
-        : { color: muted, weight: 3, opacity: 0.5, dashArray: '6 6' },
+        ? { color: brand, weight: 6, opacity: 1, smoothFactor: 0.5, lineJoin: 'round', lineCap: 'round', interactive: false }
+        : { color: muted, weight: 3, opacity: 0.45, dashArray: '4 6', interactive: false },
       ).addTo(map);
     }
     // 方向箭嘴：只畫揀咗嘅走法。每次縮放都重新揀，令箭嘴之間有足夠距離、唔會壓住站
     const sel = lines.find((l) => l.selected);
     const arrowLayer = L.layerGroup().addTo(map);
     const candidates = sel ? lineArrows(sel.segments, 40, [0.2, 0.4, 0.6, 0.8]) : [];
-    const arrowColor = brand;
+    // 箭嘴：走線上面細細嘅 V 形，用走線上面嘅字色（城巴黃線用深色、九巴紅線用白色）
+    const arrowColor = ink;
     const drawArrows = () => {
       arrowLayer.clearLayers();
       const stopPts = stops.map((s) => map.latLngToLayerPoint([s.lat, s.lng]));
@@ -100,9 +105,9 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
           keyboard: false,
           icon: L.divIcon({
             className: 'map-arrow',
-            iconSize: [18, 18],
-            iconAnchor: [9, 9],
-            html: `<svg viewBox="0 0 18 18" width="18" height="18" style="transform:rotate(${a.bearing}deg)" aria-hidden="true"><path d="M9 2 L15 14 L9 11 L3 14 Z" fill="${arrowColor}" stroke="${casing}" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6],
+            html: `<svg viewBox="0 0 12 12" width="12" height="12" style="transform:rotate(${a.bearing}deg)" aria-hidden="true"><path d="M3 8 L6 4.5 L9 8" fill="none" stroke="${arrowColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
           }),
         }).addTo(arrowLayer);
       }
@@ -114,19 +119,22 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
       L.polyline(stops.map((s) => [s.lat, s.lng] as [number, number]), { color: brand, weight: 4, opacity: 0.6, dashArray: '2 8' }).addTo(map);
     }
 
+    // 中途站：白點深色邊；起點、終點：深色實心加白邊，大啲；打開咗嘅站：公司色大點
+    const stopStyle = (end: boolean): L.CircleMarkerOptions => ({
+      radius: end ? 7 : 4.5,
+      color: end ? '#ffffff' : '#262626',
+      weight: end ? 3 : 2,
+      fillColor: end ? '#262626' : '#ffffff',
+      fillOpacity: 1,
+    });
+    const focusStyle: L.CircleMarkerOptions = { radius: 9, color: '#262626', weight: 3, fillColor: brand, fillOpacity: 1 };
     const markers = stops.map((s, i) => {
       const end = i === 0 || i === stops.length - 1;
-      const m = L.circleMarker([s.lat, s.lng], {
-        radius: end ? 8 : 6,
-        color: '#1f1f1f',
-        weight: 2,
-        fillColor: end ? '#ffd23f' : '#ffffff',
-        fillOpacity: 1,
-      })
-        .bindTooltip(`${s.index + 1}. ${s.name}`, { direction: 'top', offset: [0, -6] })
+      const m = L.circleMarker([s.lat, s.lng], stopStyle(end))
+        .bindTooltip(`${s.index + 1}. ${s.name}`, { direction: 'top', offset: [0, -8], className: 'map-tip' })
         .on('click', () => window.dispatchEvent(new CustomEvent(OPEN_STOP_EVENT, { detail: s.index })))
         .addTo(map);
-      return { stop: s, marker: m };
+      return { stop: s, marker: m, end };
     });
 
     const bounds = L.latLngBounds(stops.map((s) => [s.lat, s.lng] as [number, number]));
@@ -139,7 +147,12 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
       if (!found) return;
       map.flyTo(found.marker.getLatLng(), 17, { duration: 0.6 });
       // 每次只保留一個站名，唔好疊埋一齊
-      for (const m of markers) if (m !== found) m.marker.closeTooltip();
+      for (const m of markers) {
+        if (m === found) continue;
+        m.marker.closeTooltip();
+        m.marker.setStyle(stopStyle(m.end));
+      }
+      found.marker.setStyle(focusStyle).bringToFront();
       found.marker.openTooltip();
     };
     window.addEventListener(FOCUS_STOP_EVENT, onFocus);
@@ -201,7 +214,7 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
             html: `<span style="background:${(multiCompany && companyColor(b.company)) || busColor}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="${multiCompany && b.company ? companyInk(b.company) : ink}" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>`,
           }),
         })
-          .bindTooltip((b.schedule ? '按時間表估計：' : '') + (mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`), { direction: 'top', offset: [0, -12] })
+          .bindTooltip((b.schedule ? '按時間表估計：' : '') + (mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`), { direction: 'top', offset: [0, -14], className: 'map-tip' })
           .addTo(busLayer);
       }
       // 打開站後第一次：調整地圖，同時睇到個站同最近嗰架車

@@ -281,7 +281,19 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .map-help-close { display: block; margin-left: auto; padding: 8px 18px; border: 0; border-radius: var(--radius-s); background: var(--brand); color: var(--on-brand); font-weight: 700; cursor: pointer; }
 .map-arrow, .map-bus { background: none; border: 0; }
 .map-bus > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); }
-.leaflet-container { font-family: inherit; }
+.leaflet-container { font-family: inherit; background: #eef0ee; }
+/* 地政總署底圖好花（等高線、黃色馬路），淡化之後走線先突出 */
+.map-base { filter: saturate(0.2) brightness(1.06) contrast(0.88); }
+.map-label { filter: saturate(0.5) opacity(0.85); }
+.leaflet-control-attribution { font-size: 10px; background: rgb(255 255 255 / 0.7) !important; border-radius: 6px 0 0 0; }
+.map-tip { border: 0; border-radius: 8px; padding: 4px 8px; font-size: 13px; font-weight: 600; color: var(--text); background: var(--card); box-shadow: var(--shadow); }
+.map-tip::before { border-top-color: var(--card) !important; }
+@media (prefers-color-scheme: dark) {
+  .leaflet-container { background: #1d1f22; }
+  .map-base { filter: grayscale(1) invert(1) brightness(0.82) contrast(0.85); }
+  .map-label { filter: grayscale(1) invert(1) brightness(0.95); }
+  .leaflet-control-attribution { background: rgb(0 0 0 / 0.5) !important; color: #bbb; }
+}
 .leaflet-bar { border: 0 !important; box-shadow: var(--shadow) !important; border-radius: 10px !important; overflow: hidden; }
 .leaflet-bar a { background: var(--card) !important; color: var(--text) !important; border-bottom-color: var(--line) !important; }
 

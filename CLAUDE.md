@@ -179,6 +179,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   「現正服務」= 未來 60 分鐘有班次由總站開出，或者有車行緊。站點用 `variantStops`（包埋城巴獨有站）。
 - 走法名稱用 `variantLabel`：正常走法叫「正常路線」，括號係走法描述（經／繞／不）先加，目的地唔加。
 - 地圖底圖用地政總署 API（`mapapi.geodata.gov.hk`，免費唔使 key），要註明「© 地政總署」。
+  底圖好花（等高線、黃色馬路），所以淡化：網頁 CSS `.map-base`／`.map-label` filter（深色模式反轉），App 用 `UrlTile opacity` 疊喺淺色底。
+  走線方向用走線上面嘅細 V 形（公司 ink 色），站點：中途白點、起終點深色實心、打開咗嘅站公司色大點。觸控機唔顯示 +／− 掣。
   網頁用 Leaflet（只喺瀏覽器載入），App 用 react-native-maps 加 `UrlTile`。
 - 路線頁版面要緊湊（手機 Safari 底部有浮動工具列）：方向用一行「往 X ⇅」，地圖高度 clamp(150px, 26dvh, 280px)。
   打開站時將站名對齊列表頂部。標題、方向、走法、地圖固定，只有站點列表捲動；走法選擇平時收埋，展開時蓋住地圖。
