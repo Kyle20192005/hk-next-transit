@@ -186,7 +186,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     下面一行「最近巴士站：X · N 米」。**頂部一行 + 大字 + 搜尋欄係同一個 component `HomeHeader`**（網頁 `components/home/HomeHeader.tsx`、
     App `src/components/HomeHeader.tsx`），浮喺捲動區上面（網頁放捲動區入面一個高度 0 嘅 sticky 外框，後面 spacer 留位；App 絕對定位 +
     `contentContainerStyle.paddingTop`）。捲上去時黃色底同捲動 1:1 收起（內容黐住佢底，唔會捲入佢下面、唔會留空白黃色），收到剩頂部一行；
-    收縮期間**變形唔淡走**：大字中心移去頂部右邊地區膠囊、縮到膠囊字咁大（最後 10% 先同真膠囊交接）；英文名同最近巴士站跟黃色底收走、早啲淡出；
+    收到頂部一行**上下留一樣嘅位（`PAD` 12px，同 CSS padding-top 一致）**，膠囊同搜尋掣喺 header 正中。收縮期間**變形唔淡走**：大字中心移去頂部右邊地區膠囊、縮到膠囊字咁大（最後 10% 先同真膠囊交接）；英文名同最近巴士站跟黃色底收走、早啲淡出；
     搜尋欄中心移去搜尋掣、闊高縮到掣咁大，白色漸變做掣色（黃色 + 8% 黑，實色唔會變啡），圓角按縮放反向補返；節奏頭尾慢中間快。
     位置用 offsetLeft／offsetTop（網頁，子元素唔好 position，否則唔係以 header 計）或 onLayout（App）。網頁 rAF 直接改 style 唔 setState；
     App `Animated` + `useNativeDriver`。電腦版冇頂部一行（分頁列就係 header，`.home.tab-home .tab-bar::after` 圓角底），冇目標位：

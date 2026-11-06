@@ -14,6 +14,9 @@ import Logo from '@/components/Logo';
  * 電腦版（≥ 768px）冇頂部一行（分頁列就係 header），冇目標位：大字同搜尋欄喺頂部碰到邊之前淡出。
  * App 版 apps/mobile/src/components/HomeHeader.tsx。
  */
+/** 頂部一行上下嘅空位（同 CSS .hh 嘅 padding-top 一樣） */
+const PAD = 12;
+
 export default function HomeHeader({
   scroller,
   name,
@@ -70,7 +73,8 @@ export default function HomeHeader({
       if (!r || !b || !n || !s || !bg.current || !rest.current || !searchInner.current) return;
       const y = Math.max(0, sc.scrollTop);
       const barH = b.offsetParent ? b.offsetHeight : 0; // 電腦版頂部一行收埋 = 0
-      const D = Math.max(1, r.offsetHeight - barH - (barH ? 8 : 0)); // 收縮距離
+      // 收縮距離：收到頂部一行上下留一樣嘅位（PAD），膠囊同搜尋掣就喺 header 正中
+      const D = barH ? Math.max(1, r.offsetHeight - (b.offsetTop + barH + PAD)) : Math.max(1, r.offsetHeight);
       const d = Math.min(y, D);
       const p = d / D;
       const ease = (t: number) => t * t * (3 - 2 * t); // 頭尾慢、中間快

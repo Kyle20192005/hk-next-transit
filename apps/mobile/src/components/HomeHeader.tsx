@@ -5,6 +5,9 @@ import { radius, shadow, useTheme } from '@/lib/theme';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
 
+/** 頂部一行上下嘅空位 */
+const PAD = 12;
+
 type Box = { x: number; y: number; w: number; h: number };
 const box = (e: LayoutChangeEvent): Box => {
   const l = e.nativeEvent.layout;
@@ -47,7 +50,8 @@ export function HomeHeader({
   const [btnB, setBtnB] = useState<Box>({ x: 0, y: 0, w: 40, h: 40 });
   const [search, setSearch] = useState<Box>({ x: 16, y: 200, w: 300, h: 50 });
 
-  const D = Math.max(1, H - (bar.y + bar.h) - 8); // 收縮距離
+  // 收縮距離：收到頂部一行上下留一樣嘅位（PAD），膠囊同搜尋掣就喺 header 正中
+  const D = Math.max(1, H - (bar.y + bar.h + PAD));
   const ease = Easing.inOut(Easing.cubic);
   /** 由 from 變到 to（捲 0 → D），e = 用頭尾慢嘅節奏 */
   const lerp = (to: number, e = true, from = 0) => scrollY.interpolate({ inputRange: [0, D], outputRange: [from, to], extrapolate: 'clamp', ...(e ? { easing: ease } : {}) });
@@ -67,7 +71,7 @@ export function HomeHeader({
   const restTop = loc.y + nameB.y + nameB.h;
 
   return (
-    <View pointerEvents="box-none" onLayout={(e) => (setH(e.nativeEvent.layout.height), onHeight(e.nativeEvent.layout.height))} style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 10, paddingHorizontal: 16, paddingBottom: 18, gap: 10 }}>
+    <View pointerEvents="box-none" onLayout={(e) => (setH(e.nativeEvent.layout.height), onHeight(e.nativeEvent.layout.height))} style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + PAD, paddingHorizontal: 16, paddingBottom: 18, gap: 10 }}>
       {/* 黃色底：同捲動 1:1 收起；上面再墊一截，iPhone 拉落唔露灰 */}
       <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: -600, bottom: 0, backgroundColor: t.brand, borderBottomLeftRadius: radius.bar, borderBottomRightRadius: radius.bar, transform: [{ translateY: lerp(-D, false) }], ...shadow }} />
       <View onLayout={(e) => setBar(box(e))} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40 }}>

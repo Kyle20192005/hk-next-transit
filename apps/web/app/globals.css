@@ -277,7 +277,7 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .home-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; }
 .home-scroll > .home-feed { overflow: visible; flex: none; min-height: 100%; }
 .hh-sticky { position: sticky; top: 0; height: 0; z-index: 20; }
-.hh { position: absolute; z-index: 0; top: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 16px 18px; color: var(--on-brand); pointer-events: none; }
+.hh { position: absolute; z-index: 0; top: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) 16px 18px; color: var(--on-brand); pointer-events: none; } /* 12px 同 HomeHeader 嘅 PAD 一樣 */
 /* 子元素唔好 position（offsetLeft／offsetTop 要以 header 計）；黃色底用 z-index -1 放後面 */
 .hh-bg { position: absolute; z-index: -1; inset: 0; background: var(--brand); border-radius: 0 0 var(--bar-radius, 22px) var(--bar-radius, 22px); will-change: transform; }
 /* iPhone 頂部拉落唔露灰 */
