@@ -12,8 +12,10 @@ export interface Place {
 }
 
 /** 種類權重：距離乘呢個數再比較（越大越要近先揀）；最遠幾多米 */
-const WEIGHT: Record<string, number> = { suburb: 1, town: 1, quarter: 1.15, neighbourhood: 1.6, village: 1.8 };
+const WEIGHT: Record<string, number> = { suburb: 1, town: 1, quarter: 1.4, neighbourhood: 3.5 };
 const MAX_M = 2000;
+/** 村名只喺附近完全冇其他地區名先用（例如郊野），市區用村名會好怪（例如青衣顯示「涌美老屋村」） */
+const VILLAGE_M = 1200;
 
 const metres = (lat1: number, lng1: number, lat2: number, lng2: number) => {
   const dy = (lat1 - lat2) * 111320;
@@ -24,14 +26,18 @@ const metres = (lat1: number, lng1: number, lat2: number, lng2: number) => {
 export function pickArea(places: Place[], lat: number, lng: number): { n: string; en: string | null } | null {
   let best: Place | null = null;
   let bestScore = Infinity;
+  let village: Place | null = null;
+  let villageD = Infinity;
   for (const p of places) {
     const d = metres(lat, lng, p.lat, p.lng);
+    if (p.t === 'village') {
+      if (d <= VILLAGE_M && d < villageD) [village, villageD] = [p, d];
+      continue;
+    }
     if (d > MAX_M) continue;
     const score = d * (WEIGHT[p.t] ?? 2);
-    if (score < bestScore) {
-      best = p;
-      bestScore = score;
-    }
+    if (score < bestScore) [best, bestScore] = [p, score];
   }
-  return best ? { n: best.n, en: best.en } : null;
+  const pick = best ?? village;
+  return pick ? { n: pick.n, en: pick.en } : null;
 }

@@ -180,7 +180,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 底部分頁列（網頁 `components/home/Home.tsx`、App `src/app/(tabs)/_layout.tsx`）：**首頁／路線／導航／收藏／設定**，預設首頁，
   記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
-    黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`；冇地區數據就用最近站頭名），
+    黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
+    quarter 權重 1.4、屋苑 3.5，村名只喺 1.2 公里內冇其他地區名先用；冇地區數據就用最近站頭名），
     下面一行「最近巴士站：X · N 米」、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
     （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
     `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
@@ -193,6 +194,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     「下班車」（附近，一開就自動定位）同「收藏」（記住揀咗邊個），中間斜邊似港鐵 App（背景一個 SVG 斜邊，揀右邊時 scaleX(-1) 反轉）。入面一行站名跟住而家睇緊嗰張卡，右邊「更多／全部」；
     下面打橫掃嘅到站卡（左右兩邊色條 = 第一班嘅公司色），每張最多 4 行「標籤、往邊、分鐘」，下面圓點指示。
     下班車：一張卡 = 一個站頭（core `groupStopHeads` 將 40 米內各公司嘅站併埋），每條線一班、最快 4 班（`busDepartureRows`，`/api/here`）。
+    最近 8 個站頭一齊載入，**冇班次嘅唔出卡**；全部載入完先出（逐張加會推走畫面，唔再係第一張），出咗嘅卡之後冇車都保留，唔好跳位。
     收藏：一個收藏咗嘅站一張卡（`groupFavorites`），淨係收藏路線嘅一張「收藏路線」放最後（冇時間，撳入去）；`favDepartureRows`。
     卡掃到先載入，每 30 秒更新。結構通用（core `DepartureRow`，有月台欄），將來港鐵站卡（綫色、800 米、排第一）用同一款。
   - **附近車站唔係分頁**：由首頁「附近 › 更多」或者巴士路線頁頂「附近巴士站」捷徑入，有返回掣（網頁 Home 入面嘅 view，App `src/app/nearby.tsx` stack）。

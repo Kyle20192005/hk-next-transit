@@ -13,6 +13,8 @@ import type { NearbyState } from './Nearby';
 import { ScheduledTag } from './ui';
 
 const MAX_CARDS = 5;
+/** 載入幾多個站頭（有啲冇車，要多攞幾個先夠 5 張） */
+const LOAD_HEADS = 8;
 const ROWS = 4;
 const REFRESH_MS = 30_000;
 const GAP = 10;
@@ -80,6 +82,9 @@ export function NextCard({ nearby, onLocate, notice }: { nearby: NearbyState; on
 
 function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => void }) {
   const t = useTheme();
+  const heads = state.kind === 'ok' ? groupStopHeads(state.stops).slice(0, LOAD_HEADS) : [];
+  const data = useHeadRows(heads);
+  const [shown] = useState(() => new Set<string>());
   if (state.kind !== 'ok') {
     return (
       <Message
@@ -89,11 +94,16 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
       />
     );
   }
-  const heads = groupStopHeads(state.stops).slice(0, MAX_CARDS);
   if (!heads.length) return <Message text="600 米內冇巴士站" />;
+  // 冇班次嘅站頭唔出卡。全部載入完先出（逐張加會推走畫面）；出咗嘅卡之後冇車都保留（同網頁一樣）
+  const ready = heads.every((h) => data[h.key]);
+  if (!ready && !shown.size) return <Message text="載入中…" />;
+  const cards = heads.filter((h) => data[h.key]?.rows.length || shown.has(h.key)).slice(0, MAX_CARDS);
+  cards.forEach((h) => shown.add(h.key));
+  if (!cards.length) return <Message text="附近暫時冇班次" />;
   return (
     <Swiper
-      items={heads}
+      items={cards}
       header={(h) => (
         <>
           <Icon name="navigate" size={18} color="#2f6fd6" />
@@ -104,9 +114,41 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
         </>
       )}
       action={{ label: '更多', onPress: () => router.push('/nearby') }}
-      card={(h, active) => <HereCard head={h} active={active} />}
+      card={(h) => <RowsCard rows={data[h.key]?.rows ?? null} now={data[h.key]?.now ?? 0} />}
     />
   );
+}
+
+/** 附近幾個站頭一齊載入（先知邊啲有車），每 30 秒更新 */
+function useHeadRows(heads: StopHead<NearStop>[]): Record<string, { rows: DepartureRow[]; now: number }> {
+  const [data, setData] = useState<Record<string, { rows: DepartureRow[]; now: number }>>({});
+  const key = heads.map((h) => h.key).join('|');
+  const headsRef = useRef(heads);
+  useEffect(() => {
+    headsRef.current = heads;
+  });
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    const tick = () =>
+      headsRef.current.forEach(async (h) => {
+        let rows: DepartureRow[] = [];
+        try {
+          const body = await api.here(h.lat, h.lng);
+          rows = busDepartureRows(body.routes, Date.now(), ROWS);
+        } catch {
+          /* 當冇車，下次再試 */
+        }
+        if (!cancelled) setData((d) => ({ ...d, [h.key]: { rows, now: Date.now() } }));
+      });
+    tick();
+    const id = setInterval(tick, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [key]);
+  return data;
 }
 
 function FavPane({ favs }: { favs: Favorite[] }) {
@@ -189,21 +231,6 @@ function usePoll(active: boolean, key: string, run: () => Promise<void>, onError
       clearInterval(id);
     };
   }, [active, key]);
-}
-
-function HereCard({ head, active }: { head: StopHead<NearStop>; active: boolean }) {
-  const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
-  usePoll(
-    active,
-    `${head.lat},${head.lng}`,
-    async () => {
-      const body = await api.here(head.lat, head.lng);
-      const now = Date.now();
-      setState({ rows: busDepartureRows(body.routes, now, ROWS), now });
-    },
-    () => setState((s) => s ?? { rows: [], now: Date.now() }),
-  );
-  return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} />;
 }
 
 function FavCard({ group, active }: { group: FavGroup<Favorite>; active: boolean }) {
