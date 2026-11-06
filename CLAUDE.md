@@ -42,10 +42,10 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 
 完成任何改動前：跑 core 測試同 `pnpm -r typecheck`。改 UI 要開 dev server 實際睇過。
 
-## 計劃中：實時後端（Supabase）
+## 計劃中：實時後端同帳戶
 
-改用香港常駐 tracker（is*hosting VPS + Dokploy）同自架 Supabase（Postgres + Realtime）嘅計劃、
-數據表、頻道格式同階段：**`docs/realtime-backend.md`**。做嘅時候照住佢，改咗設計就更新嗰份文件。
+香港 VPS（4GB，Dokploy）跑 tracker + Postgres/PostGIS + Valkey，tracker 自己用 WebSocket 推巴士位置（唔自架 Supabase）；
+帳戶（登入、收藏同步）用 Supabase 雲端版（新加坡），唔登入照用得。計劃、數據表、訊息格式、同步規則同階段：**`docs/realtime-backend.md`**。做嘅時候照住佢，改咗設計就更新嗰份文件。
 
 ## 九巴同聯營線
 

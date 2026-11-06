@@ -1,8 +1,13 @@
-# 實時後端計劃：常駐 tracker + Supabase
+# 實時後端計劃：香港 tracker + Supabase 帳戶
 
 > 狀態：**計劃中**（2026-11）。未開始實作。
 > 做嘅時候逐步更新呢份文件（每個階段完成就喺「階段」嗰度打剔，改咗設計就改返呢度），
 > 完成後將重點搬入根目錄 `CLAUDE.md`。
+>
+> **2026-11-06 決定**：實時部分（巴士位置、到站時間、過站紀錄）放自己嘅香港 VPS，用輕量方案
+> （Postgres + Valkey + tracker 自己用 WebSocket 推送），**唔自架 Supabase**；
+> 帳戶（登入、收藏同步、設定）用 **Supabase 雲端版（新加坡）**。原因：帳戶數據流量細、唔怕慢幾十毫秒，
+> 但最怕外洩同冇備份，交俾託管服務；實時數據要快、要喺香港，自己架。VPS 因此 4GB 就夠（自架整套 Supabase 要 8GB）。
 
 ## 1. 目標
 
@@ -12,6 +17,7 @@
 - **後端有記憶**：記住每架車過去幾分鐘嘅 ETA，用實際車速同過站時間計位置，唔再每次由零開始。
 - **自己量行車時間**：由過站紀錄計每段路實際行車時間，取代第三方 hk-bus-time-between-stops（實驗性質、有異常值）。
 - **預先 fetch**：用戶搜尋、撳落路線嗰陣已經開始準備數據，入到路線頁差唔多即刻有巴士位置（見第 4.7 節）。
+- **帳戶**：登入後收藏、設定喺手機同電腦之間同步；唔登入照用得（見第 4.8 節）。
 - **順帶**：每日數據更新改喺自己伺服器排程跑，唔再靠 GitHub Actions（而家因為 GitHub 收費問題行唔到）。
 
 唔係目標：將網頁搬離 Vercel（網頁可以繼續用 Vercel 香港機房 hkg1 同 CDN）。
@@ -47,31 +53,37 @@
 ## 4. 目標架構
 
 ```
-              is*hosting 香港 VPS（Dokploy 管理）
+              香港 VPS（4GB RAM、40GB SSD，Dokploy 管理）
  ┌───────────────────────────────────────────────────────┐
  │ tracker（Node 22 + TypeScript，用 @hknt/core）          │
- │   ├ Presence 同預熱訊號 → 只 poll 有人睇／就嚟睇嘅線    │
+ │   ├ WebSocket 訂閱同預熱訊號 → 只 poll 有人睇／就嚟睇嘅線 │
  │   ├ 每條線每 10–15 秒 poll 一次（按公司 API 特性）     │
  │   ├ 每架車維持狀態（歷史 ETA、上次位置、實測車速）     │
- │   ├ 計位置 → Supabase Realtime Broadcast              │──► 網頁 / App 訂閱
+ │   ├ 計位置 → WebSocket 推送                           │──► 網頁 / App
  │   ├ 偵測過站 → 批量寫入 Postgres（trips）               │
- │   └ HTTP：/health、/snapshot（後備同首次載入用）        │
+ │   └ HTTP：/health、/snapshot、/warm                    │
  │ pipeline（Python，Dokploy 每日排程 04:17）             │
  │   └ 路線、站、走法、時間表 → Postgres（同時照出 JSON）  │
  │ aggregator（SQL／排程）                                │
- │   └ trips → segment_times（按星期、時段）       │
- │ Redis（或 Valkey）：上游 cache、限流、預熱、快照、車輛狀態 │
- │ Supabase 自架（Postgres + PostGIS + Realtime + Kong）   │
+ │   └ trips → segment_times（按星期、時段）              │
+ │ Valkey（或 Redis）：上游 cache、限流、預熱、快照、車輛狀態 │
+ │ Postgres 17 + PostGIS（只聽內網）                      │
  └───────────────────────────────────────────────────────┘
  Vercel（網頁，hkg1）──讀 Postgres（或者暫時照讀 GitHub JSON）
+
+ Supabase 雲端版（新加坡，免費版起步）
+   Auth（Google、Apple、電郵連結）＋ 用戶數據表（收藏、設定），RLS 保護 ◄── 網頁 / App 直接連
 ```
+
+點解唔用 Supabase Realtime 推巴士位置：多經一個伺服器（新加坡）會慢；tracker 本身已經知道邊條線有人睇，
+自己推最直接。WebSocket 瀏覽器同 React Native 都原生支援，唔使額外套件。
 
 ### 4.1 tracker
 
 - 語言：TypeScript（同網頁、App 共用 `packages/core`：`etasAtStop`、`trackLine`、`BusStabilizer`、`mergeScheduleBuses` 等）。
 - 部署：Dokploy Docker app，一個 instance 就夠（記憶體狀態唔使分散）。重啟後由下一輪 poll 重新建立狀態。
 - **lazy poll**：
-  - 用 Realtime Presence：客戶端訂閱頻道時 `track()` 自己；tracker 監聽 Presence，頻道有人就開 poller。
+  - 客戶端經 WebSocket 訂閱某條線，tracker 記住每條線有幾多個連線，有人就開 poller。
   - 冇人睇 **3 分鐘**先停（避免轉頁、轉方向時重複開關）。
   - 預熱名單（可選）：收藏最多、繁忙時段熱門線常駐。
 - **每間公司點 poll**：
@@ -113,11 +125,19 @@
 - 網頁 `/api/eta`、`/api/buses`（Vercel hkg1）**暫時唔連 Redis**：Vercel 連 VPS 要經公網，仲要另外處理 TLS 同密碼。
   等 tracker 穩定之後，網頁 API 可以改為轉發去 tracker（tracker 讀 Redis），或者直接由前端訂閱推送。
 
-### 4.2 Realtime 頻道格式
+### 4.2 WebSocket 訊息格式
 
-頻道名：`route:{co}:{route}:{variantId}`，例如 `route:ctb:38:1000304-1`。
+連線：`wss://rt.kyle05.dev/ws`（網址未定）。客戶端送：
 
-Broadcast 事件 `buses`：
+```jsonc
+{ "op": "sub", "topic": "route:ctb:38:1000304-1" }   // 訂閱（同時只可以訂幾條，例如 3 條）
+{ "op": "unsub", "topic": "route:ctb:38:1000304-1" }
+{ "op": "warm", "co": "ctb", "route": "38", "dir": "O" } // 預熱（見第 4.7 節）
+```
+
+訂閱後即刻收到最新快照（`snap:*`），之後有新數據先推。每 25 秒 ping／pong，冇回應就當斷線。
+
+topic `route:{co}:{route}:{variantId}`，事件 `buses`：
 
 ```jsonc
 {
@@ -140,7 +160,7 @@ Broadcast 事件 `buses`：
 }
 ```
 
-另外 `etas` 事件（按站）：前端打開一個站時，用同一個頻道收該站 ETA，唔使再自己 call `/api/eta`。
+另外 `etas` 事件（按站）：前端打開一個站時，用同一條連線收該站 ETA，唔使再自己 call `/api/eta`。
 第一階段可以照用 `/api/eta`，之後先搬。
 
 ### 4.3 數據庫表（Postgres + PostGIS）
@@ -206,13 +226,16 @@ create table segment_times (
 
 ### 4.4 權限
 
-- 前端（網頁、App）只用 **anon key**：Realtime 只可以訂閱 `route:*` 頻道、只讀；Postgres 表開 RLS，`routes`、`stops`、`calendar`、`segment_times` 只讀，`trips` 唔開放。
-- tracker、pipeline 用 **service role key**，只放喺伺服器環境變數，唔入 repo。
-- Supabase Studio 唔好直接開放上網（用 Dokploy 內網或者加 IP 限制）。
+- VPS 嘅 Postgres、Valkey **只聽內網**，唔對外開放；網頁（Vercel）要讀 Postgres 時經 tracker 嘅 HTTP API，
+  或者開一個只讀帳戶 + TLS + IP 限制（階段 4 再決定）。
+- tracker 嘅 WebSocket 公開但只讀：只可以訂閱 `route:*`、送 `warm`；每個 IP 連線數同訊息頻率有上限。
+- 睇數據庫用 pgweb／Adminer（只喺內網或者加 IP 限制），或者 SSH tunnel 用電腦嘅工具。
+- Supabase 雲端：前端只用 **anon key**（本身係公開嘅），所有用戶表一定要開 RLS；**service role key** 只放伺服器環境變數，唔入 repo、唔入 App。
 
 ### 4.5 前端改動
 
-- `lib/realtime.ts`（網頁）同 `src/lib/realtime.ts`（App）：supabase-js 訂閱頻道，Presence `track()`。
+- `lib/realtime.ts`（網頁）同 `src/lib/realtime.ts`（App）：原生 WebSocket，斷線自動重連（退避），訂閱而家睇緊嘅線。
+  邏輯放 `packages/core`（純 TS，兩邊共用），只有 WebSocket 本身由平台提供。
 - `StopList`（網頁）同路線頁（App）：收到 `buses` 就更新；冇連線或者 45 秒冇收到推送，**自動退返而家嘅 `/api/buses` 輪詢**。
 - 前端唔再做 `BusStabilizer`（後端做咗），只按 `nextEta` 同 `segSeconds` 每秒沿走線推前。
 - App 去咗背景會斷線：返到前台即刻重新訂閱，同時 call 一次 `/snapshot` 補返最新狀態。
@@ -231,7 +254,7 @@ create table segment_times (
 | 每打一個字就預熱所有候選 | 低 | ❌ 唔做（打「1」已經 100 幾條候選） | — |
 
 預熱訊號：
-- 前端 `POST /warm`（tracker HTTP）`{ co, route, dir }`，或者用 Realtime Broadcast 送去 `warm` 頻道。
+- 前端 `POST /warm`（tracker HTTP）`{ co, route, dir }`，或者經 WebSocket 送 `{ "op": "warm" }`。
 - tracker 寫 `warm:{co}:{route}:{dir}`（TTL 60 秒），即刻開始 poll 嗰條線嘅預設走法（`sortVariants` 第一個；
   城巴逐站 ETA 本身已經包兩個方向，所以其實係預熱成條線）。
 - 60 秒內冇人真正訂閱就停。
@@ -244,6 +267,52 @@ create table segment_times (
 效果預期：路線資料本身已經好快（App 有快取），最慢係第一次攞巴士位置同到站時間（城巴長線要逐站問）。
 預熱可以將呢段時間收埋喺用戶揀路線嘅空檔入面。
 
+### 4.8 帳戶（Supabase 雲端版）
+
+原則：**唔登入照用得**。收藏同設定一律先存喺部機（而家嘅 localStorage／AsyncStorage），登入之後先同步上雲。
+
+- **地區**：新加坡（離香港最近）。收藏同步唔怕慢幾十毫秒。
+- **方案**：免費版（每月 5 萬活躍用戶、500MB 數據庫）；一個禮拜冇人用會暫停，有用戶就唔會。
+  正式上架或者用戶多咗就升 Pro（每月 25 美元，有每日備份）。
+- **登入方式**：Google、Apple、電郵連結（magic link），唔設密碼。
+  iOS App 有第三方登入就**一定要有「以 Apple 登入」**（App Store 規定）。
+  App 用 `expo-apple-authentication`、Google 用 Supabase OAuth（`expo-auth-session`／`expo-web-browser`）；用之前睇 Expo SDK 58 文件。
+- **刪除帳戶**：App 入面要有（App Store、Google Play 都要求），刪埋所有用戶數據。
+- **私隱政策頁**：上架前要有，寫明存咩（電郵、收藏、設定）、存喺邊（Supabase 新加坡）、點刪。
+- **唔存位置**：定位只喺部機用，唔上傳。
+
+表（全部開 RLS：`user_id = auth.uid()` 先讀寫得）：
+
+```sql
+create table favorites (
+  user_id uuid references auth.users on delete cascade,
+  key text,                       -- favKey：`${co}/${route}/${dir}/${stopId ?? ''}`
+  co text, route text, dir text,
+  dest text, companies text[],
+  stop_id text, stop_name text,
+  added_at timestamptz,           -- 對應 Favorite.at
+  deleted_at timestamptz,         -- 軟刪除：同步時要知道「刪咗」，唔係「未同步到」
+  updated_at timestamptz default now(),
+  primary key (user_id, key)
+);
+create table user_settings (
+  user_id uuid primary key references auth.users on delete cascade,
+  data jsonb,                     -- 例如深色模式、預設分頁；加欄位唔使改表
+  updated_at timestamptz default now()
+);
+alter table favorites enable row level security;
+create policy own on favorites using (user_id = auth.uid()) with check (user_id = auth.uid());
+alter table user_settings enable row level security;
+create policy own on user_settings using (user_id = auth.uid()) with check (user_id = auth.uid());
+```
+
+同步規則：
+- **第一次登入**：本機收藏同雲端**合併**（按 `key` 取聯集），唔好覆蓋任何一邊。
+- **之後**：每項以 `updated_at` 較新嗰邊為準；刪除寫 `deleted_at`（軟刪除），30 日後清走。
+- **離線**：本機照改，記低未同步嘅改動，有網先上傳。
+- **登出**：問用戶要唔要保留本機收藏（預設保留）。
+- 本機格式（`Favorite`）唔變，只係多記 `updatedAt`／`deletedAt`；網頁同 App 同步邏輯放 `packages/core`。
+
 ### 4.6 每日數據更新
 
 - Dokploy 排程（每日 04:17）跑：`fetch.py` → `build.py` → `check.py` → 寫入 Postgres（新 `version`）→ 照推 GitHub `data` 分支（過渡期網頁仲讀緊）。
@@ -253,10 +322,20 @@ create table segment_times (
 ## 5. 階段
 
 ### 階段 0：伺服器準備
-- [ ] is*hosting 香港 VPS 規格確認（Supabase 自架建議最少 4GB RAM；連 tracker、pipeline 建議 8GB）
-- [ ] Dokploy 安裝、網址同 HTTPS（例如 `db.kyle05.dev`、`rt.kyle05.dev`）
-- [ ] Supabase 自架（Postgres + PostGIS + Realtime + Kong），Studio 唔對外
-- [ ] 備份：Postgres 每日備份去 VPS 以外（例如 S3 相容儲存）
+- [ ] 香港 VPS：**4GB RAM、40GB SSD** 就夠（平時約 1.1–1.6GB，每日 pipeline 高峰再加 1.6GB：
+      2026-11-06 實測 build.py 最高 1643MB、59 秒）；想用 2GB 要先減細 pipeline 記憶體 + 開 swap。
+      先由細規格開始，唔夠先升級
+- [ ] Dokploy 安裝、網址同 HTTPS（例如 `rt.kyle05.dev`）
+- [ ] Postgres 17 + PostGIS、Valkey（只聽內網）
+- [ ] 備份：Postgres 每晚 `pg_dump` 壓縮去 VPS 以外（例如 S3 相容儲存）
+
+### 階段 A：帳戶（獨立，唔使等 VPS，隨時可以做）
+- [ ] Supabase 雲端項目（新加坡）；Auth：Google、Apple、電郵連結
+- [ ] `favorites`、`user_settings` 表 + RLS；用另一個帳戶驗證讀唔到人哋嘅數據
+- [ ] core：同步邏輯（合併、`updated_at` 較新為準、軟刪除、離線佇列）+ 測試
+- [ ] 網頁、App：登入／登出、收藏同步、刪除帳戶
+- [ ] 私隱政策頁
+- 驗收：手機收藏 → 電腦即刻見到；離線改完上網自動同步；刪除帳戶後數據清走
 
 ### 階段 0.5：預先 fetch（而家架構就做得，唔使等後端）✅ 2026-11 完成
 - [x] 網頁、App：撳落路線（未放手，`pointerdown`／`onPressIn`）背景 call `/api/buses`
@@ -266,13 +345,13 @@ create table segment_times (
 - 驗收：由撳路線到見到第一架巴士嘅時間，比冇預載快
 
 ### 階段 1：tracker + 推送（只做巴士位置）
-- [ ] Redis（或 Valkey）：Dokploy 部署，只聽內網
+- [ ] Valkey：Dokploy 部署，只聽內網
 - [ ] `apps/tracker`：Node + TypeScript，用 `@hknt/core`；Dockerfile；Dokploy 部署
 - [ ] 上游 cache、合併同時請求、全局限流全部經 Redis
 - [ ] 預熱訊號（`/warm`）同上限；快照（`snap:*`）
-- [ ] Presence 驅動嘅 lazy poll、全局限流、退避
+- [ ] WebSocket 訂閱驅動嘅 lazy poll、全局限流、退避
 - [ ] 計位置（先沿用 `trackLine` + `BusStabilizer` + `mergeScheduleBuses`，未有記憶）
-- [ ] Broadcast `buses` 事件；`/health`、`/snapshot`
+- [ ] WebSocket `buses` 事件；`/health`、`/snapshot`
 - [ ] 網頁同 App 訂閱，失敗自動退返 `/api/buses`
 - 驗收：兩個瀏覽器睇同一條線，巴士公司 API 每 15 秒只被 call 一輪；斷開 tracker，前端 45 秒內退返輪詢
 
@@ -302,18 +381,22 @@ create table segment_times (
 |---|---|
 | data.gov.hk 封 IP（全部請求同一個 IP） | 全局限流、lazy poll、跟來源節奏；監察 429／錯誤率；必要時加第二個出口 IP |
 | tracker 死咗或者重啟 | 前端自動退返 `/api/buses`；Dokploy 自動重啟；狀態下一輪重建 |
-| 自架 Supabase 記憶體唔夠 | 階段 0 先確認規格；Realtime 頻道數同 Presence 數有監察 |
+| VPS 記憶體唔夠（pipeline 高峰） | 先 4GB；監察記憶體；pipeline 減細記憶體或者開 swap，真係唔夠先升級 |
+| WebSocket 連線太多 | 每個 IP 連線上限；監察連線數；4GB 機撐幾千條連線冇問題 |
+| 帳戶數據外洩 | 所有用戶表開 RLS 並用第二個帳戶測試；service role key 唔入 repo／App；唔存位置 |
+| Supabase 免費版暫停或者超額 | 有用戶就唔會暫停；監察用量，大咗升 Pro；收藏本機一定有一份，雲端出事都唔會冇咗 |
 | App 背景斷線 | 返前台重新訂閱 + `/snapshot` |
 | 數據庫越嚟越大 | 唔存原始 ETA；`trips` 90 日分區；只長期保留統計 |
 | 預熱估錯浪費上游請求 | 只喺撳落／候選 ≤ 3 先做；每客戶端 3 條、全局上限；60 秒冇人訂閱就停；優先級低過真正有人睇嘅線 |
-| Redis 冇咗 | 只放短命數據；tracker 自動退返記憶體 cache，只係慢少少 |
+| Valkey／Redis 冇咗 | 只放短命數據；tracker 自動退返記憶體 cache，只係慢少少 |
 | 一個 VPS 單點故障 | 網頁照放 Vercel、靜態數據過渡期照放 GitHub；實時部分有輪詢後備 |
 
 ## 7. 未決定 / 要問
 
-- VPS 規格（RAM、CPU、儲存）
-- Dokploy、Supabase 架好未
-- 網址：tracker、Supabase 用咩子網域
+- VPS 供應商（香港；新加坡都得，延遲約 30–40 毫秒）
+- Dokploy 架好未
+- 網址：tracker 用咩子網域
+- 帳戶要唔要電郵連結以外再加電話號碼登入（SMS 要錢）
 - 網頁最終留 Vercel 定搬上 Dokploy（建議留 Vercel）
 - 預熱名單：要唔要常駐 poll 熱門線，幾多條
-- 用 Redis 定 Valkey（功能一樣；Valkey 係完全開源授權）
+- 用 Redis 定 Valkey（功能一樣；建議 Valkey，完全開源授權）
