@@ -54,12 +54,12 @@
  │   ├ 每條線每 10–15 秒 poll 一次（按公司 API 特性）     │
  │   ├ 每架車維持狀態（歷史 ETA、上次位置、實測車速）     │
  │   ├ 計位置 → Supabase Realtime Broadcast              │──► 網頁 / App 訂閱
- │   ├ 偵測過站 → 批量寫入 Postgres（stop_passages）       │
+ │   ├ 偵測過站 → 批量寫入 Postgres（trips）               │
  │   └ HTTP：/health、/snapshot（後備同首次載入用）        │
  │ pipeline（Python，Dokploy 每日排程 04:17）             │
  │   └ 路線、站、走法、時間表 → Postgres（同時照出 JSON）  │
  │ aggregator（SQL／排程）                                │
- │   └ stop_passages → segment_times（按星期、時段）       │
+ │   └ trips → segment_times（按星期、時段）       │
  │ Redis（或 Valkey）：上游 cache、限流、預熱、快照、車輛狀態 │
  │ Supabase 自架（Postgres + PostGIS + Realtime + Kong）   │
  └───────────────────────────────────────────────────────┘
