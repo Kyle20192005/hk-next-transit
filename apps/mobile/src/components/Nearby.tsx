@@ -8,12 +8,14 @@ import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { warmRoute } from '@/lib/prefetch';
 import { CompanyTag, ScheduledTag } from './ui';
 import { Icon } from './Icon';
+import { EtaInline } from './EtaInline';
+import { getPrefs } from '@/lib/prefs';
 
 const REFRESH_MS = 30_000;
 
 export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[]; lat: number; lng: number; area: { n: string; en: string | null } | null };
 
-/** 定位 + 搵 600 米內嘅站（首頁同附近頁共用）；auto = 一開就定位（第一次會問權限） */
+/** 定位 + 搵附近嘅站（範圍跟設定，預設 600 米；首頁同附近頁共用）；auto = 一開就定位（第一次會問權限；設定關咗自動定位就唔會） */
 export function useNearbyStops(auto = false) {
   const [state, setState] = useState<NearbyState>({ kind: 'idle' });
 
@@ -26,7 +28,7 @@ export function useNearbyStops(auto = false) {
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const body = await api.nearby(pos.coords.latitude, pos.coords.longitude);
+      const body = await api.nearby(pos.coords.latitude, pos.coords.longitude, getPrefs().nearbyRadius);
       setState({ kind: 'ok', stops: body.stops, lat: pos.coords.latitude, lng: pos.coords.longitude, area: body.area ?? null });
     } catch (e) {
       setState({ kind: 'error', message: (e as Error).message || '攞唔到位置，請再試' });
@@ -34,7 +36,7 @@ export function useNearbyStops(auto = false) {
   }, []);
 
   useEffect(() => {
-    if (!auto) return;
+    if (!auto || !getPrefs().autoLocate) return;
     const id = setTimeout(() => void locate(), 0);
     return () => clearTimeout(id);
   }, [auto, locate]);
@@ -84,7 +86,6 @@ export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boole
       {open &&
         stop.routes.map((r) => {
           const list = etas?.routes.find((x) => x.route === r.route && x.dir === r.dir)?.etas ?? (etas ? [] : null);
-          const mins = list?.map((e) => Math.max(0, Math.round((Date.parse(e.eta) - now) / 60000)));
           return (
               <Pressable
                 key={`${r.co}-${r.route}-${r.dir}`}
@@ -102,13 +103,9 @@ export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boole
                 <View style={{ alignItems: 'flex-end' }}>
                   {list === null ? (
                     <Text style={{ color: t.muted }}>…</Text>
-                  ) : mins && mins.length ? (
+                  ) : list.length ? (
                     <>
-                      <Text style={{ color: t.accent, ...tabular }}>
-                        <Text style={{ fontSize: 20, fontWeight: '800' }}>{mins[0] === 0 ? '即將' : mins[0]}</Text>
-                        {mins[0] !== 0 && <Text style={{ fontSize: 13, fontWeight: '700' }}> 分</Text>}
-                      </Text>
-                      {mins.length > 1 && <Text style={{ color: t.muted, fontSize: 12 }}>{mins.slice(1).join('、')} 分</Text>}
+                      <EtaInline ats={list.map((e) => Date.parse(e.eta))} now={now} />
                       {list[0]?.scheduled && <ScheduledTag />}
                     </>
                   ) : (

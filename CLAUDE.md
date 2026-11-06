@@ -213,6 +213,15 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     定位邏輯 `useNearbyStops`（網頁 `components/home/Nearby.tsx`、App `components/Nearby.tsx`）。
   - 收藏（`lib/favorites.ts`，localStorage，try/catch）：路線頁標題列星號收藏路線（某方向），打開站撳「收藏呢個站」；
     收藏頁同首頁直接顯示收藏咗嘅站嘅下一班（`/api/eta`，同方向；App `components/FavItem.tsx`）。
+- **設定**（網頁 `components/home/Settings.tsx`、App `src/app/(tabs)/settings.tsx`）：**每項都要真係有作用**，唔好加擺樣嘅設定。
+  core `prefs.ts` 嘅 `Prefs`（`cleanPrefs` 清走唔認得嘅值），網頁 `lib/prefs.ts`（localStorage `hknt.prefs`）、App `src/lib/prefs.ts`（AsyncStorage，同格式）；
+  `usePrefs()` 即時更新，effect／callback 入面用 `getPrefs()`（網頁 hydration 時 usePrefs 先俾預設值）。
+  - 深色模式（跟系統／淺色／深色）：網頁寫 `<html data-theme>`（layout 嘅 `THEME_SCRIPT` 載入前先寫，唔閃；CSS 深色變數同時跟
+    `prefers-color-scheme` + `:root:not([data-theme="light"])` 同 `:root[data-theme="dark"]`，地圖用 `useDark()`）；App 用 `Appearance.setColorScheme`。
+  - 交通工具優先（巴士／港鐵）：「路線」分頁預設同分類次序（`orderedModes`）；港鐵到站做好之後首頁下班車先顯示港鐵站。
+  - 到站時間顯示（分鐘／鐘數）：core `etaParts`、`etaRest`、`minutesLabel(at, now, fmt)`；一行內嘅用 `EtaInline`（兩邊都有），站點列表 `StopRow` 大細字對調。
+  - 附近車站範圍（300／600／1000 米，`/api/nearby?r=`，最多 1000）；自動定位開關（首頁、附近、路線頁）；首頁大卡預設分頁（上次／下班車／收藏）。
+  - 資料：重設常用工具、清除最近睇過、清除所有收藏（要確認）。
 - 地圖走線、時間線、巴士圖示用公司代表色（城巴 #FFD800、九巴 #D01A1E，`lib/company.ts`）；地圖走線底加深色外框，
   因為黃色喺地圖馬路上唔顯眼。聯營線：走線用路線檔嘅公司，每架巴士用自己公司嘅顏色。特別班只用標籤區分。
 - 路線列表：雙向路線列出兩個目的地，各自撳入 `?dir=O|I`（唔好要用戶入咗頁先轉方向）。「只限 XX」標示：全部係特別班先用紅色。

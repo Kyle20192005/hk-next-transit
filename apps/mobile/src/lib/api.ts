@@ -65,7 +65,7 @@ export const api = {
   /** 喺度搭得：呢個位置可以搭嘅所有路線同下一兩班 */
   here: (lat: number, lng: number) => get<{ routes: HereRoute[]; radius: number }>(`/api/here?lat=${lat}&lng=${lng}`),
   news: (pos: { lat: number; lng: number } | null) => get<{ items: NewsItem[] }>(`/api/news${pos ? `?lat=${pos.lat.toFixed(4)}&lng=${pos.lng.toFixed(4)}` : ''}`),
-  nearby: (lat: number, lng: number) => get<{ stops: NearStop[]; area?: { n: string; en: string | null } | null }>(`/api/nearby?lat=${lat}&lng=${lng}`),
+  nearby: (lat: number, lng: number, r = 600) => get<{ stops: NearStop[]; area?: { n: string; en: string | null } | null }>(`/api/nearby?lat=${lat}&lng=${lng}&r=${r}`),
   /** 一個站所有路線嘅下一班 */
   stopEtas: (co: Co, stop: string) =>
     get<{ routes: { route: string; dir: 'O' | 'I'; etas: { eta: string; company: Company; scheduled: boolean }[] }[] }>(

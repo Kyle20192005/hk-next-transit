@@ -8,6 +8,7 @@ import {
   groupFavorites,
   groupStopHeads,
   minutesLabel,
+  radiusLabel,
   type DepartureRow,
   type Eta,
   type FavGroup,
@@ -18,6 +19,7 @@ import Icon from '@/components/Icon';
 import type { Co } from '@/lib/data';
 import { useFavorites, type Favorite } from '@/lib/favorites';
 import { warmRoute } from '@/lib/prefetch';
+import { usePrefs } from '@/lib/prefs';
 import type { NearbyState, NearStop } from './Nearby';
 import { groupKey } from './nextcard-key';
 
@@ -49,15 +51,18 @@ export default function NextCard({
   notice?: { text: string; onClick: () => void };
 }) {
   const favs = useFavorites();
+  const { homeCard } = usePrefs();
   const [tab, setTab] = useState<Tab>('next');
+  // 設定「首頁大卡預設」：上次睇開（記住）、下班車、收藏
   useEffect(() => {
+    if (homeCard !== 'last') return setTab(homeCard);
     try {
       const t = localStorage.getItem(TAB_KEY);
       if (t === 'next' || t === 'favs') setTab(t);
     } catch {
       /* 用預設 */
     }
-  }, []);
+  }, [homeCard]);
   const pick = (t: Tab) => {
     setTab(t);
     try {
@@ -105,6 +110,7 @@ function NearbyPane({ state, onLocate, onMore }: { state: NearbyState; onLocate:
   const heads = state.kind === 'ok' ? groupStopHeads(state.stops).slice(0, LOAD_HEADS) : [];
   const data = useHeadRows(heads);
   const shown = useRef(new Set<string>());
+  const { nearbyRadius: radius } = usePrefs();
   if (state.kind !== 'ok') {
     return (
       <Message
@@ -114,7 +120,7 @@ function NearbyPane({ state, onLocate, onMore }: { state: NearbyState; onLocate:
       />
     );
   }
-  if (!heads.length) return <Message text="600 米內冇巴士站" />;
+  if (!heads.length) return <Message text={`${radiusLabel(radius)}內冇巴士站`} />;
   // 冇班次嘅站頭唔出卡。全部載入完先出（逐張加會推走畫面）；出咗嘅卡之後冇車都保留，唔好令卡跳位
   const ready = heads.every((h) => data[h.key]);
   if (!ready && !shown.current.size) return <Message text="載入中…" />;
@@ -292,6 +298,7 @@ function usePoll(active: boolean, key: string, run: () => Promise<void>, onError
 
 /** 一張到站卡：左右兩邊色條（第一班嘅公司色），每行 標籤、往邊、分鐘 */
 function RowsCard({ rows, now, empty = '暫時冇班次' }: { rows: DepartureRow[] | null; now: number; empty?: string }) {
+  const { etaFormat } = usePrefs();
   const accent = rows?.[0]?.badge.bg ?? 'var(--line)';
   return (
     <div className="nc-card" style={{ ['--nc-accent' as string]: accent }}>
@@ -310,7 +317,7 @@ function RowsCard({ rows, now, empty = '暫時冇班次' }: { rows: DepartureRow
           <span className="nc-dest">往{r.dest}</span>
           <span className="nc-min">
             {r.scheduled && <span className="scheduled">原定</span>}
-            {r.noService ? <span className="muted nc-none">冇班次</span> : r.at === null ? <Icon name="chevron-right" size={18} className="muted" /> : minutesLabel(r.at, now)}
+            {r.noService ? <span className="muted nc-none">冇班次</span> : r.at === null ? <Icon name="chevron-right" size={18} className="muted" /> : minutesLabel(r.at, now, etaFormat)}
           </span>
         </Link>
       ))}

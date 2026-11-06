@@ -3,6 +3,7 @@ import { pickArea } from '@hknt/core';
 import { getAllStops, getIndex, getPlaces } from '@/lib/data';
 import { CORS } from '@/lib/cors';
 
+/** 預設 600 米；設定可以揀 300／600／1000（`?r=`，最多 1000） */
 const MAX_DISTANCE_M = 600;
 const MAX_STOPS = 15;
 
@@ -16,6 +17,8 @@ function metres(lat1: number, lng1: number, lat2: number, lng2: number) {
 export async function GET(req: NextRequest) {
   const lat = Number(req.nextUrl.searchParams.get('lat'));
   const lng = Number(req.nextUrl.searchParams.get('lng'));
+  const rParam = Number(req.nextUrl.searchParams.get('r'));
+  const maxDist = rParam > 0 ? Math.min(1000, Math.max(100, rParam)) : MAX_DISTANCE_M;
   // 只接受香港範圍
   if (!(lat > 22.1 && lat < 22.6 && lng > 113.8 && lng < 114.5)) {
     return NextResponse.json({ error: '位置唔喺香港範圍' }, { status: 400, headers: CORS });
@@ -24,7 +27,7 @@ export async function GET(req: NextRequest) {
   const companiesOf = new Map(index.routes.map((r) => [`${r.co ?? 'ctb'}/${r.route}`, r.companies ?? ['CTB']]));
   const stops = all
     .map((s) => ({ ...s, distance: Math.round(metres(lat, lng, s.lat, s.lng)) }))
-    .filter((s) => s.distance <= MAX_DISTANCE_M)
+    .filter((s) => s.distance <= maxDist)
     .sort((a, b) => a.distance - b.distance)
     .slice(0, MAX_STOPS)
     .map((s) => ({

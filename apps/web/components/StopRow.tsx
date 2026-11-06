@@ -9,6 +9,7 @@ import HereDrawer from './HereDrawer';
 import type { Co } from '@/lib/data';
 import Icon from './Icon';
 import type { Favorite } from '@/lib/favorites';
+import { usePrefs } from '@/lib/prefs';
 
 /**
  * 時間線上嘅巴士。兩站之間嘅前半段畫喺上一個站嗰行（站點圓點以下），後半段畫喺下一個站嗰行（圓點以上）。
@@ -80,6 +81,8 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
   const next = list?.find((x) => isMine(x.e)) ?? null;
   const rest = list?.filter((x) => x !== next) ?? [];
   const minsOf = (e: Eta) => Math.max(0, Math.round((Date.parse(e.eta!) - now) / 60000));
+  // 設定「到站時間顯示」：鐘數模式大字係鐘數，旁邊細字先係分鐘
+  const clock = usePrefs().etaFormat === 'clock';
 
   return (
     <li className={`stop${open ? ' open' : ''}${terminus ? ' terminus' : ''}`} ref={ref}>
@@ -125,14 +128,14 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
           {next && (
             <div className="eta-next">
               <span className="eta-big">
-                {minsOf(next.e) === 0 ? '即將到站' : (
+                {minsOf(next.e) === 0 ? '即將到站' : clock ? next.e.eta!.slice(11, 16) : (
                   <>
                     {minsOf(next.e)}
                     <small>分鐘</small>
                   </>
                 )}
               </span>
-              <span className="eta-time">{next.e.eta!.slice(11, 16)}</span>
+              <span className="eta-time">{clock ? (minsOf(next.e) === 0 ? next.e.eta!.slice(11, 16) : `${minsOf(next.e)} 分鐘`) : next.e.eta!.slice(11, 16)}</span>
               <EtaTags e={next.e} multiCompany={multiCompany} />
               {next.where && <span className="where">{next.where}</span>}
             </div>
@@ -144,8 +147,8 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                 const other = !isMine(e);
                 return (
                   <li key={i} className={other ? 'eta-row-other' : undefined}>
-                    <span className="eta-min">{minsOf(e) === 0 ? '即將' : `${minsOf(e)} 分`}</span>
-                    <span className="eta-time">{e.eta!.slice(11, 16)}</span>
+                    <span className="eta-min">{minsOf(e) === 0 ? '即將' : clock ? e.eta!.slice(11, 16) : `${minsOf(e)} 分`}</span>
+                    <span className="eta-time">{clock ? (minsOf(e) === 0 ? e.eta!.slice(11, 16) : `${minsOf(e)} 分`) : e.eta!.slice(11, 16)}</span>
                     {/* 第三欄：公司、原定、走法、位置包埋一格，太長喺格入面斷行，唔會走去分鐘下面 */}
                     <span className="eta-meta">
                       <EtaTags e={e} multiCompany={multiCompany} />

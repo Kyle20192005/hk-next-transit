@@ -1,11 +1,13 @@
 'use client';
+import { getPrefs, usePrefs } from '@/lib/prefs';
 import Link from 'next/link';
 import CompanyTag from '@/components/CompanyTag';
 import type { Co } from '@/lib/data';
 import { useCallback, useEffect, useState } from 'react';
-import { formatDistance, type Company } from '@hknt/core';
+import { formatDistance, radiusLabel, type Company } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
+import EtaInline from '@/components/EtaInline';
 
 export interface NearStop {
   id: string;
@@ -26,7 +28,7 @@ const REFRESH_MS = 30_000;
 
 export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[]; lat: number; lng: number; area: { n: string; en: string | null } | null };
 
-/** 定位 + 搵 600 米內嘅站（首頁同附近頁共用）；auto = 一開就定位 */
+/** 定位 + 搵附近嘅站（範圍跟設定，預設 600 米；首頁同附近頁共用）；auto = 一開就定位（設定關咗自動定位就唔會） */
 export function useNearbyStops(auto = false) {
   const [state, setState] = useState<NearbyState>({ kind: 'idle' });
 
@@ -39,7 +41,7 @@ export function useNearbyStops(auto = false) {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const res = await fetch(`/api/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
+          const res = await fetch(`/api/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}&r=${getPrefs().nearbyRadius}`);
           const body = await res.json();
           if (!res.ok) throw new Error(body.error ?? res.statusText);
           setState({ kind: 'ok', stops: body.stops, lat: pos.coords.latitude, lng: pos.coords.longitude, area: body.area ?? null });
@@ -57,7 +59,7 @@ export function useNearbyStops(auto = false) {
   }, []);
 
   useEffect(() => {
-    if (!auto) return;
+    if (!auto || !getPrefs().autoLocate) return;
     const id = setTimeout(locate, 0);
     return () => clearTimeout(id);
   }, [auto, locate]);
@@ -65,9 +67,10 @@ export function useNearbyStops(auto = false) {
   return { state, locate };
 }
 
-/** 附近車站（由首頁或者巴士路線頁撳入嚟，唔係分頁）：定位搵 600 米內嘅站，顯示每條路線下一班車 */
+/** 附近車站（由首頁或者巴士路線頁撳入嚟，唔係分頁）：定位搵附近（設定範圍）嘅站，顯示每條路線下一班車 */
 export default function Nearby({ onBack }: { onBack: () => void }) {
   const { state, locate } = useNearbyStops(true);
+  const { nearbyRadius: radius } = usePrefs();
 
   const head = (
     <header className="app-bar">
@@ -76,7 +79,7 @@ export default function Nearby({ onBack }: { onBack: () => void }) {
       </button>
       <div className="app-title">
         <h1>附近車站</h1>
-        {state.kind === 'ok' && <span className="app-sub">{state.stops.length ? `600 米內 ${state.stops.length} 個車站` : '600 米內冇車站'}</span>}
+        {state.kind === 'ok' && <span className="app-sub">{state.stops.length ? `${radiusLabel(radius)}內 ${state.stops.length} 個車站` : `${radiusLabel(radius)}內冇車站`}</span>}
       </div>
       {state.kind === 'ok' && (
         <button className="bar-btn" onClick={locate} aria-label="重新定位">
@@ -94,7 +97,7 @@ export default function Nearby({ onBack }: { onBack: () => void }) {
           <span className="empty-icon">
             <Icon name="pin" size={32} />
           </span>
-          <p>搵你附近 600 米內嘅巴士站，同埋每條路線下一班車。</p>
+          <p>搵你附近 {radiusLabel(radius)}內嘅巴士站，同埋每條路線下一班車。</p>
           {state.kind === 'error' && <p className="error">{state.message}</p>}
           <button className="primary-btn" onClick={locate} disabled={state.kind === 'locating'}>
             <Icon name="locate" size={20} />
@@ -160,7 +163,6 @@ export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boole
         <ul className="nearby-routes">
           {stop.routes.map((r) => {
             const list = etaOf(r.route, r.dir);
-            const mins = list?.map((e) => Math.max(0, Math.round((Date.parse(e.eta) - now) / 60000)));
             return (
               <li key={`${r.co}-${r.route}-${r.dir}`}>
                 <Link href={`/${r.co}/${r.route}?dir=${r.dir}&stop=${stop.id}`} className="nearby-route" onPointerDown={() => warmRoute(r.co, r.route, { dir: r.dir, stopId: stop.id })}>
@@ -172,11 +174,9 @@ export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boole
                   <span className="nearby-eta">
                     {list === null ? (
                       <span className="muted">…</span>
-                    ) : mins && mins.length ? (
+                    ) : list.length ? (
                       <>
-                        <b>{mins[0] === 0 ? '即將' : mins[0]}</b>
-                        {mins[0] !== 0 && <small> 分</small>}
-                        {mins.length > 1 && <small className="muted"> · {mins.slice(1).join('、')} 分</small>}
+                        <EtaInline ats={list.map((e) => Date.parse(e.eta))} now={now} />
                         {list[0]?.scheduled && <span className="scheduled"> 原定</span>}
                       </>
                     ) : (

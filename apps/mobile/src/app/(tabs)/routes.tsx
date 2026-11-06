@@ -2,13 +2,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Logo } from '@/components/Logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { TRANSPORT_MODES, type RouteIndex, type TransportMode } from '@hknt/core';
+import { TRANSPORT_MODES, orderedModes, radiusLabel, type RouteIndex, type TransportMode } from '@hknt/core';
 import { api, type Co } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { AppBar, ComingSoon, CompanyTag } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { Keypad } from '@/components/Keypad';
 import { preloadRoute, warmRoute } from '@/lib/prefetch';
+import { usePrefs } from '@/lib/prefs';
 
 type Route = RouteIndex['routes'][number];
 
@@ -26,11 +27,18 @@ export default function RoutesTab() {
   const [place, setPlace] = useState<string | null>(null);
   // 交通工具：暫時只有巴士做好；首頁捷徑會帶 ?mode= 過嚟
   const params = useLocalSearchParams<{ mode?: string }>();
-  const [mode, setMode] = useState<TransportMode>('bus');
+  // 設定「交通工具優先」：預設揀邊款、分類次序
+  const { priority } = usePrefs();
+  const [mode, setMode] = useState<TransportMode>(priority === 'rail' ? 'rail' : 'bus');
   const [seenParam, setSeenParam] = useState<string | undefined>(undefined);
   if (params.mode !== seenParam) {
     setSeenParam(params.mode);
     if (TRANSPORT_MODES.some((m) => m.id === params.mode)) setMode(params.mode as TransportMode);
+  }
+  const [seenPriority, setSeenPriority] = useState(priority);
+  if (priority !== seenPriority) {
+    setSeenPriority(priority);
+    setMode(priority === 'rail' ? 'rail' : 'bus');
   }
   const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
   const list = useRef<FlatList<Route>>(null);
@@ -81,7 +89,7 @@ export default function RoutesTab() {
         </View>
         {/* 交通工具分類（同網頁一樣）：喺搜尋欄上面；揀咗未做嘅，搜尋欄同鍵盤都收埋 */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16, marginTop: -4, marginBottom: -2 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-          {TRANSPORT_MODES.map((m) => {
+          {orderedModes(priority).map((m) => {
             const on = mode === m.id;
             return (
               <Pressable key={m.id} onPress={() => setMode(m.id)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: on ? t.onBrand : t.onBrandSoft }}>
@@ -202,6 +210,7 @@ function RouteCard({ r }: { r: Route }) {
 /** 巴士路線頁頂：「附近巴士站」捷徑（同網頁一樣） */
 function NearbyShortcut() {
   const t = useTheme();
+  const { nearbyRadius } = usePrefs();
   return (
     <Pressable
       onPress={() => router.push('/nearby')}
@@ -213,7 +222,7 @@ function NearbyShortcut() {
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ fontSize: 16, fontWeight: '700', color: t.text }}>附近巴士站</Text>
-        <Text style={{ fontSize: 13, color: t.muted }}>搵你附近 600 米內嘅站同每條線下一班車</Text>
+        <Text style={{ fontSize: 13, color: t.muted }}>搵你附近 {radiusLabel(nearbyRadius)}內嘅站同每條線下一班車</Text>
       </View>
       <Icon name="chevron-right" size={18} color={t.muted} />
     </Pressable>

@@ -46,6 +46,7 @@ import { StopRow, type RowBus } from '@/components/StopRow';
 import { RouteMap, type MapBus, type MapLine, type MapStop } from '@/components/RouteMap';
 import { TimetableSheet } from '@/components/TimetableSheet';
 import { VariantPicker, type VariantItem } from '@/components/VariantPicker';
+import { getPrefs } from '@/lib/prefs';
 
 const ETA_REFRESH_MS = 30_000;
 const BUSES_REFRESH_MS = 20_000;
@@ -438,7 +439,9 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
     [stops, openStop],
   );
   // 開頁：已經有權限就自動搵（由「附近」撳入嚟就唔使打開）；未問過就第一次問
+  // 設定關咗「自動定位」就唔搵，等用戶自己撳「定位」
   useEffect(() => {
+    if (!getPrefs().autoLocate) return;
     const id = setTimeout(() => void findNearest(!stopParam, true), 0);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps

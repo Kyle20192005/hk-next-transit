@@ -63,3 +63,14 @@ export function RecordRecent({ target }: { target: Omit<RecentRoute, 'at'> }) {
   }, [co, route, dir, dest]);
   return null;
 }
+
+/** 清除最近睇過（設定頁） */
+export function clearRecent() {
+  memory = [];
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* 今次瀏覽仍然有效 */
+  }
+  window.dispatchEvent(new Event(EVENT));
+}

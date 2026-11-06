@@ -1,10 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { COMPANIES, DEFAULT_TOOLS, filterNews, formatDistance, groupStopHeads, toolById, type NewsFilter, type ToolId } from '@hknt/core';
+import { COMPANIES, DEFAULT_TOOLS, filterNews, formatDistance, groupStopHeads, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
+import { usePrefs } from '@/lib/prefs';
 import { loadTools, useNews } from '@/lib/news';
 import { ToolIcon } from './ToolEditor';
 import { useNearbyStops } from './Nearby';
@@ -22,6 +23,7 @@ const NEWS_SHOWN = 3;
  */
 export default function HomeTab({ go, onEditTools }: { go: (to: ToolId, pos?: { lat: number; lng: number } | null) => void; onEditTools: () => void }) {
   const recent = useRecent();
+  const prefs = usePrefs();
   const { state, locate } = useNearbyStops(true);
   const pos = state.kind === 'ok' ? { lat: state.lat, lng: state.lng } : null;
   const news = useNews(pos);
@@ -59,7 +61,11 @@ export default function HomeTab({ go, onEditTools }: { go: (to: ToolId, pos?: { 
               {state.message} · 再試
             </button>
           ) : state.kind === 'ok' ? (
-            '600 米內冇巴士站'
+            `${radiusLabel(prefs.nearbyRadius)}內冇巴士站`
+          ) : state.kind === 'idle' ? (
+            <button className="hero-retry" onClick={locate}>
+              撳呢度定位，搵附近巴士站
+            </button>
           ) : (
             '搵緊你附近嘅巴士站'
           )

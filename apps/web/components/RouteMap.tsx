@@ -1,4 +1,5 @@
 'use client';
+import { useDark } from '@/lib/prefs';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from './Icon';
@@ -43,16 +44,6 @@ type Props = {
   osm?: boolean;
 };
 
-function useDarkMode(): boolean {
-  const [dark, setDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const on = () => setDark(mq.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
-  return dark;
-}
 
 /** 走線方向：細 V 形（向右，MapLibre 沿線擺放時會跟走線方向轉） */
 function chevronImage(color: string): ImageData {
@@ -74,7 +65,7 @@ function chevronImage(color: string): ImageData {
 
 export default function RouteMap({ lines, stops, multiCompany = false, company }: Props) {
   const el = useRef<HTMLDivElement>(null);
-  const dark = useDarkMode();
+  const dark = useDark();
   const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => {

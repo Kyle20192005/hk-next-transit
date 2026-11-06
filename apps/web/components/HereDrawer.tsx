@@ -6,6 +6,7 @@ import CompanyTag from './CompanyTag';
 import Icon from './Icon';
 import { warmRoute } from '@/lib/prefetch';
 import type { Co } from '@/lib/data';
+import EtaInline from './EtaInline';
 
 interface HereRoute {
   co: Co;
@@ -88,7 +89,6 @@ export default function HereDrawer({ lat, lng, name, current }: { lat: number; l
               <ul className="here-list">
                 {/* 而家睇緊嘅線固定排第一，其餘照 API 次序（下一班先後） */}
                 {[...data.routes].sort((a, b) => Number(isCurrent(b)) - Number(isCurrent(a))).map((r) => {
-                  const mins = r.etas.map((e) => Math.max(0, Math.round((Date.parse(e.eta) - now) / 60000)));
                   return (
                     <li key={`${r.co}-${r.route}-${r.dir}`}>
                       <Link
@@ -116,11 +116,9 @@ export default function HereDrawer({ lat, lng, name, current }: { lat: number; l
                           )}
                         </span>
                         <span className="nearby-eta">
-                          {mins.length ? (
+                          {r.etas.length ? (
                             <>
-                              <b>{mins[0] === 0 ? '即將' : mins[0]}</b>
-                              {mins[0] !== 0 && <small> 分</small>}
-                              {mins.length > 1 && <small className="muted"> · {mins.slice(1).join('、')}</small>}
+                              <EtaInline ats={r.etas.map((e) => Date.parse(e.eta))} now={now} />
                               {r.etas[0]?.scheduled && <span className="scheduled"> 原定</span>}
                             </>
                           ) : (

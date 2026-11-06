@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { THEME_SCRIPT } from '@/lib/prefs';
 
 export const metadata: Metadata = {
   applicationName: '下一程',
@@ -12,7 +13,11 @@ export const viewport: Viewport = { width: 'device-width', initialScale: 1, them
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-HK">
+    <html lang="zh-HK" suppressHydrationWarning>
+      <head>
+        {/* 深色模式設定：載入前先寫 data-theme，唔會閃 */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>
         {children}
       </body>

@@ -1,4 +1,5 @@
 'use client';
+import { getPrefs } from '@/lib/prefs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BusStabilizer, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
@@ -107,7 +108,9 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
   };
   // 開頁自動搵最近嘅站（第一次瀏覽器會問一次權限）；由「附近」撳入嚟（指定咗站）就唔使打開
   // 用戶拒絕過（denied）就唔再問
+  // 設定關咗「自動定位」就唔搵，等用戶自己撳「重新定位」
   useEffect(() => {
+    if (!getPrefs().autoLocate) return;
     let cancelled = false;
     const run = () => !cancelled && findNearest(initialOpen === null);
     if (navigator.permissions?.query) {

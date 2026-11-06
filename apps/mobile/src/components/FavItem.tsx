@@ -8,6 +8,7 @@ import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { warmRoute } from '@/lib/prefetch';
 import { CompanyTag, ScheduledTag } from './ui';
 import { Icon } from './Icon';
+import { EtaInline } from './EtaInline';
 
 const REFRESH_MS = 30_000;
 
@@ -71,15 +72,10 @@ function FavEtas({ f }: { f: Favorite }) {
 
   if (etas === null) return <Text style={{ color: t.muted }}>…</Text>;
   if (!etas.length) return <Text style={{ color: t.muted, fontSize: 13 }}>冇班次</Text>;
-  const mins = etas.slice(0, 3).map((e) => Math.max(0, Math.round((Date.parse(e.eta!) - now) / 60000)));
   return (
     <View style={{ alignItems: 'flex-end' }}>
-      <Text style={{ color: t.accent, ...tabular }}>
-        <Text style={{ fontSize: 24, fontWeight: '800' }}>{mins[0] === 0 ? '即將' : mins[0]}</Text>
-        {mins[0] !== 0 && <Text style={{ fontSize: 13, fontWeight: '700' }}> 分</Text>}
-      </Text>
+      <EtaInline ats={etas.slice(0, 3).map((e) => Date.parse(e.eta!))} now={now} size={24} />
       {etas[0]?.scheduled && <ScheduledTag />}
-      {mins.length > 1 && <Text style={{ color: t.muted, fontSize: 12, ...tabular }}>{mins.slice(1).join('、')} 分</Text>}
     </View>
   );
 }

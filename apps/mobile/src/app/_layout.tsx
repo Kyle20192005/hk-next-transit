@@ -4,6 +4,10 @@ import { LaunchOverlay } from '@/components/LaunchOverlay';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '@/lib/theme';
+import { loadPrefs } from '@/lib/prefs';
+
+// 設定（深色模式等）越早讀越好
+loadPrefs();
 
 // 開 App 嘅載入畫面（黃底 logo，app.json 嘅 expo-splash-screen）：由 LaunchOverlay 接手做動畫，原生嗰層唔使淡出
 SplashScreen.setOptions({ duration: 0, fade: false });

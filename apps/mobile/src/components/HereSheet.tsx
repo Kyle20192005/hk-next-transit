@@ -8,6 +8,7 @@ import { radius, shadowLg, tabular, useTheme } from '@/lib/theme';
 import { Icon } from './Icon';
 import { CompanyTag, ScheduledTag } from './ui';
 import { warmRoute } from '@/lib/prefetch';
+import { EtaInline } from './EtaInline';
 
 const REFRESH_MS = 30_000;
 
@@ -94,7 +95,6 @@ function HereSheet({ target, onClose }: { target: HereTarget; onClose: () => voi
             keyExtractor={(r) => `${r.co}-${r.route}-${r.dir}`}
             ListEmptyComponent={<Text style={{ margin: 20, color: t.muted }}>搵唔到其他路線</Text>}
             renderItem={({ item: r }) => {
-              const mins = r.etas.map((e) => Math.max(0, Math.round((Date.parse(e.eta) - now) / 60000)));
               return (
                 <Pressable
                   onPressIn={() => warmRoute(r.co, r.route, { dir: r.dir, stopId: r.stopId })}
@@ -124,13 +124,9 @@ function HereSheet({ target, onClose }: { target: HereTarget; onClose: () => voi
                     )}
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    {mins.length ? (
+                    {r.etas.length ? (
                       <>
-                        <Text style={{ color: t.accent, ...tabular }}>
-                          <Text style={{ fontSize: 20, fontWeight: '800' }}>{mins[0] === 0 ? '即將' : mins[0]}</Text>
-                          {mins[0] !== 0 && <Text style={{ fontSize: 13, fontWeight: '700' }}> 分</Text>}
-                        </Text>
-                        {mins.length > 1 && <Text style={{ fontSize: 12, color: t.muted, ...tabular }}>{mins.slice(1).join('、')} 分</Text>}
+                        <EtaInline ats={r.etas.map((e) => Date.parse(e.eta))} now={now} />
                         {r.etas[0]?.scheduled && <ScheduledTag />}
                       </>
                     ) : (

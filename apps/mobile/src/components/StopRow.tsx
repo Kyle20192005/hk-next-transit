@@ -6,6 +6,7 @@ import { useFavorite, type Favorite } from '@/lib/favorites';
 import { BusGlyph, Icon } from './Icon';
 import { CompanyTag, Pill, ScheduledTag } from './ui';
 import { HereButton, type HereTarget } from './HereSheet';
+import { usePrefs } from '@/lib/prefs';
 
 /** 時間線上嘅巴士：half = below 由圓點去到呢行底，above 由呢行頂去到圓點（同網頁版一樣） */
 export interface RowBus {
@@ -60,6 +61,8 @@ export const StopRow = memo(function StopRow(p: Props) {
   const next = list?.find((x) => isMine(x.e)) ?? null;
   const rest = list?.filter((x) => x !== next) ?? [];
   const minsOf = (e: Eta) => Math.max(0, Math.round((Date.parse(e.eta!) - p.now) / 60000));
+  // 設定「到站時間顯示」：鐘數模式大字係鐘數，旁邊細字先係分鐘
+  const clock = usePrefs().etaFormat === 'clock';
 
   return (
     <View onLayout={(e) => setHeight(e.nativeEvent.layout.height)} style={{ backgroundColor: p.open ? t.brandSoft : 'transparent' }}>
@@ -159,6 +162,8 @@ export const StopRow = memo(function StopRow(p: Props) {
                 <Text style={{ color: t.accent, ...tabular }}>
                   {minsOf(next.e) === 0 ? (
                     <Text style={{ fontSize: 32, fontWeight: '800' }}>即將到站</Text>
+                  ) : clock ? (
+                    <Text style={{ fontSize: 40, fontWeight: '800', letterSpacing: -0.8 }}>{next.e.eta!.slice(11, 16)}</Text>
                   ) : (
                     <>
                       <Text style={{ fontSize: 40, fontWeight: '800', letterSpacing: -0.8 }}>{minsOf(next.e)}</Text>
@@ -166,7 +171,7 @@ export const StopRow = memo(function StopRow(p: Props) {
                     </>
                   )}
                 </Text>
-                <Text style={{ color: t.muted, fontSize: 15, ...tabular }}>{next.e.eta!.slice(11, 16)}</Text>
+                <Text style={{ color: t.muted, fontSize: 15, ...tabular }}>{clock && minsOf(next.e) > 0 ? `${minsOf(next.e)} 分鐘` : next.e.eta!.slice(11, 16)}</Text>
                 <EtaTags e={next.e} multiCompany={p.multiCompany} />
               </View>
             </View>
@@ -179,8 +184,8 @@ export const StopRow = memo(function StopRow(p: Props) {
                 const other = !isMine(e);
                 return (
                   <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, opacity: other ? 0.5 : 1 }}>
-                    <Text style={{ width: 52, fontSize: 17, fontWeight: '700', color: t.text, ...tabular }}>{minsOf(e) === 0 ? '即將' : `${minsOf(e)} 分`}</Text>
-                    <Text style={{ width: 44, fontSize: 13, color: t.muted, ...tabular }}>{e.eta!.slice(11, 16)}</Text>
+                    <Text style={{ width: 52, fontSize: 17, fontWeight: '700', color: t.text, ...tabular }}>{minsOf(e) === 0 ? '即將' : clock ? e.eta!.slice(11, 16) : `${minsOf(e)} 分`}</Text>
+                    <Text style={{ width: 44, fontSize: 13, color: t.muted, ...tabular }}>{clock && minsOf(e) > 0 ? `${minsOf(e)} 分` : e.eta!.slice(11, 16)}</Text>
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
                       <EtaTags e={e} multiCompany={p.multiCompany} />
                       {other && v?.name && <Pill label={`${v.special ? shortName({ name: v.name }) : '正常路線'}${v.confidence === 'likely' ? '（推斷）' : ''}`} special={v.special} />}

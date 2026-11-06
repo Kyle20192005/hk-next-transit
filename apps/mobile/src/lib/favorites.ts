@@ -75,3 +75,9 @@ export function useFavorite(target: Omit<Favorite, 'at'>): [boolean, () => void]
 export function removeFavorite(f: Favorite) {
   write(list.filter((x) => favKey(x) !== favKey(f)));
 }
+
+/** 清除所有收藏（設定頁） */
+export function clearFavorites() {
+  load();
+  write([]);
+}

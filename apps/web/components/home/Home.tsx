@@ -13,6 +13,7 @@ import Settings from './Settings';
 import News from './News';
 import { toolById, type ToolId } from '@hknt/core';
 import ToolEditor from './ToolEditor';
+import { usePrefs } from '@/lib/prefs';
 
 type Tab = 'home' | 'routes' | 'nav' | 'favs' | 'settings';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -34,6 +35,9 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   // 唔係分頁嘅頁：附近車站、交通消息（有返回掣）
   const [view, setView] = useState<null | { kind: 'nearby' } | { kind: 'tools' } | { kind: 'news'; pos: { lat: number; lng: number } | null }>(null);
   const [mode, setMode] = useState<TransportMode>('bus');
+  // 設定「交通工具優先」：路線分頁預設揀邊款
+  const { priority } = usePrefs();
+  useEffect(() => setMode(priority === 'rail' ? 'rail' : 'bus'), [priority]);
   const favCount = useFavorites().length;
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
-import { COMPANIES, filterNews, formatDistance, groupStopHeads, toolById, type NewsFilter, type ToolId } from '@hknt/core';
+import { COMPANIES, filterNews, formatDistance, groupStopHeads, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
 import { Icon } from '@/components/Icon';
 import { HomeHeader } from '@/components/HomeHeader';
 import { useNearbyStops } from '@/components/Nearby';
@@ -11,6 +11,7 @@ import { NewsChips, NewsList } from '@/components/NewsList';
 import { useNews, useTools } from '@/lib/news';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
+import { usePrefs } from '@/lib/prefs';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 
 const RECENT_SHOWN = 5;
@@ -23,6 +24,7 @@ const NEWS_SHOWN = 3;
 export default function HomeTab() {
   const t = useTheme();
   const recent = useRecent();
+  const prefs = usePrefs();
   const { state, locate } = useNearbyStops(true);
   const pos = state.kind === 'ok' ? { lat: state.lat, lng: state.lng } : null;
   const news = useNews(pos);
@@ -167,9 +169,9 @@ export default function HomeTab() {
               </Text>
             </View>
           ) : (
-            <Pressable onPress={state.kind === 'error' ? () => void locate() : undefined}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand, opacity: 0.75, textDecorationLine: state.kind === 'error' ? 'underline' : 'none' }}>
-                {state.kind === 'error' ? `${state.message} · 再試` : state.kind === 'ok' ? '600 米內冇巴士站' : '搵緊你附近嘅巴士站'}
+            <Pressable onPress={state.kind === 'error' || state.kind === 'idle' ? () => void locate() : undefined}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand, opacity: 0.75, textDecorationLine: state.kind === 'error' || state.kind === 'idle' ? 'underline' : 'none' }}>
+                {state.kind === 'error' ? `${state.message} · 再試` : state.kind === 'ok' ? `${radiusLabel(prefs.nearbyRadius)}內冇巴士站` : state.kind === 'idle' ? '撳呢度定位，搵附近巴士站' : '搵緊你附近嘅巴士站'}
               </Text>
             </Pressable>
           )

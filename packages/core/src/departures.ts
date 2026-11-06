@@ -85,11 +85,16 @@ export function busDepartureRows(routes: HereRouteLike[], now: number, limit = 4
 
 const byTime = (a: DepartureRow, b: DepartureRow) => (a.at ?? Infinity) - (b.at ?? Infinity);
 
-/** 「2 分鐘」／「即將」；冇時間就空白 */
-export function minutesLabel(at: number | null, now: number): string {
+/** 「2 分鐘」／「即將」（clock：「18:32」）；冇時間就空白 */
+export function minutesLabel(at: number | null, now: number, fmt: 'minutes' | 'clock' = 'minutes'): string {
   if (at === null) return '';
   const m = Math.max(0, Math.round((at - now) / 60000));
-  return m === 0 ? '即將' : `${m} 分鐘`;
+  if (m === 0) return '即將';
+  if (fmt === 'clock') {
+    const d = new Date(at + 8 * 3600 * 1000);
+    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  }
+  return `${m} 分鐘`;
 }
 
 /** 收藏（同網頁、App 嘅 Favorite 格式一樣） */

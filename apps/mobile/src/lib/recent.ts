@@ -56,3 +56,11 @@ export function addRecent(r: Omit<RecentRoute, 'at'>) {
 export function useRecent(): RecentRoute[] {
   return useSyncExternalStore(subscribe, () => list, () => list);
 }
+
+/** 清除最近睇過（設定頁） */
+export function clearRecent() {
+  load();
+  list = [];
+  emit();
+  AsyncStorage.removeItem(KEY).catch(() => {});
+}

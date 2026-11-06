@@ -1,8 +1,9 @@
 'use client';
+import { usePrefs } from '@/lib/prefs';
 import Link from 'next/link';
 import CompanyTag from '@/components/CompanyTag';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { TRANSPORT_MODES, type RouteIndex, type TransportMode } from '@hknt/core';
+import { TRANSPORT_MODES, orderedModes, radiusLabel, type RouteIndex, type TransportMode } from '@hknt/core';
 import ComingSoon from './ComingSoon';
 import Keypad from './Keypad';
 import Logo from '@/components/Logo';
@@ -37,6 +38,7 @@ export default function RouteBrowser({
   const [place, setPlace] = useState<string | null>(null); // 地點搜尋（null = 用緊號碼鍵盤）
   const [shown, setShown] = useState(PAGE);
   const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
+  const { priority, nearbyRadius } = usePrefs();
   const listRef = useRef<HTMLUListElement>(null);
   const sentinel = useRef<HTMLLIElement>(null);
   const placeInput = useRef<HTMLInputElement>(null);
@@ -121,7 +123,7 @@ export default function RouteBrowser({
         </div>
         {/* 交通工具分類：喺搜尋欄上面；揀咗未做嘅，搜尋欄同鍵盤都收埋 */}
         <div className="mode-chips" role="tablist" aria-label="交通工具">
-          {TRANSPORT_MODES.map((m) => (
+          {orderedModes(priority).map((m) => (
             <button key={m.id} role="tab" aria-selected={mode === m.id} className="mode-chip" onClick={() => onMode(m.id)}>
               {m.label}
             </button>
@@ -176,7 +178,7 @@ export default function RouteBrowser({
               </span>
               <span className="nearby-shortcut-text">
                 <strong>附近巴士站</strong>
-                <small className="muted">搵你附近 600 米內嘅站同每條線下一班車</small>
+                <small className="muted">搵你附近 {radiusLabel(nearbyRadius)}內嘅站同每條線下一班車</small>
               </span>
               <Icon name="chevron-right" size={18} className="muted" />
             </button>

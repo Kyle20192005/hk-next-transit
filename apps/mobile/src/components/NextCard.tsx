@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { busDepartureRows, favDepartureRows, formatDistance, groupFavorites, groupStopHeads, minutesLabel, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
+import { busDepartureRows, favDepartureRows, formatDistance, groupFavorites, groupStopHeads, minutesLabel, radiusLabel, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
 import { api, type Co, type NearStop } from '@/lib/api';
 import { useFavorites, type Favorite } from '@/lib/favorites';
 import { warmRoute } from '@/lib/prefetch';
@@ -11,6 +11,7 @@ import Svg, { Path } from 'react-native-svg';
 import { Icon, type IconName } from './Icon';
 import type { NearbyState } from './Nearby';
 import { ScheduledTag } from './ui';
+import { usePrefs } from '@/lib/prefs';
 
 const MAX_CARDS = 5;
 /** 載入幾多個站頭（有啲冇車，要多攞幾個先夠 5 張） */
@@ -29,11 +30,17 @@ export function NextCard({ nearby, onLocate, notice }: { nearby: NearbyState; on
   const t = useTheme();
   const favs = useFavorites();
   const [tab, setTab] = useState<Tab>('next');
+  // 設定「首頁大卡預設」：上次睇開（記住）、下班車、收藏
+  const { homeCard } = usePrefs();
   useEffect(() => {
+    if (homeCard !== 'last') {
+      const id = setTimeout(() => setTab(homeCard), 0);
+      return () => clearTimeout(id);
+    }
     AsyncStorage.getItem(TAB_KEY)
       .then((v) => (v === 'next' || v === 'favs') && setTab(v))
       .catch(() => {});
-  }, []);
+  }, [homeCard]);
   const pick = (v: Tab) => {
     setTab(v);
     AsyncStorage.setItem(TAB_KEY, v).catch(() => {});
@@ -84,6 +91,7 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
   const t = useTheme();
   const heads = state.kind === 'ok' ? groupStopHeads(state.stops).slice(0, LOAD_HEADS) : [];
   const data = useHeadRows(heads);
+  const { nearbyRadius } = usePrefs();
   const [shown] = useState(() => new Set<string>());
   if (state.kind !== 'ok') {
     return (
@@ -94,7 +102,7 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
       />
     );
   }
-  if (!heads.length) return <Message text="600 米內冇巴士站" />;
+  if (!heads.length) return <Message text={`${radiusLabel(nearbyRadius)}內冇巴士站`} />;
   // 冇班次嘅站頭唔出卡。全部載入完先出（逐張加會推走畫面）；出咗嘅卡之後冇車都保留（同網頁一樣）
   const ready = heads.every((h) => data[h.key]);
   if (!ready && !shown.size) return <Message text="載入中…" />;
@@ -257,6 +265,7 @@ function FavCard({ group, active }: { group: FavGroup<Favorite>; active: boolean
 /** 一張到站卡：左右兩邊色條（第一班嘅公司色），每行 標籤、往邊、分鐘 */
 function RowsCard({ rows, now }: { rows: DepartureRow[] | null; now: number }) {
   const t = useTheme();
+  const { etaFormat } = usePrefs();
   const accent = rows?.[0]?.badge.bg ?? t.line;
   return (
     <View style={{ minHeight: 172, justifyContent: 'center', paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: t.line, borderLeftWidth: 8, borderRightWidth: 8, borderLeftColor: accent, borderRightColor: accent, backgroundColor: t.card }}>
@@ -282,7 +291,7 @@ function RowsCard({ rows, now }: { rows: DepartureRow[] | null; now: number }) {
           ) : r.at === null ? (
             <Icon name="chevron-right" size={18} color={t.muted} />
           ) : (
-            <Text style={{ fontSize: 18, fontWeight: '800', color: t.text, ...tabular }}>{minutesLabel(r.at, now)}</Text>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: t.text, ...tabular }}>{minutesLabel(r.at, now, etaFormat)}</Text>
           )}
         </Pressable>
       ))}

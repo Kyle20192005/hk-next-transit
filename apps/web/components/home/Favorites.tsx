@@ -6,6 +6,7 @@ import CompanyTag from '@/components/CompanyTag';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import { favKey, removeFavorite, useFavorites, type Favorite } from '@/lib/favorites';
+import EtaInline from '@/components/EtaInline';
 
 const REFRESH_MS = 30_000;
 
@@ -95,13 +96,10 @@ function FavEtas({ f }: { f: Favorite }) {
 
   if (etas === null) return <span className="fav-eta muted">…</span>;
   if (!etas.length) return <span className="fav-eta muted">冇班次</span>;
-  const mins = etas.slice(0, 3).map((e) => Math.max(0, Math.round((Date.parse(e.eta!) - now) / 60000)));
   return (
     <span className="fav-eta">
-      <b>{mins[0] === 0 ? '即將' : mins[0]}</b>
-      {mins[0] !== 0 && <small> 分</small>}
+      <EtaInline ats={etas.slice(0, 3).map((e) => Date.parse(e.eta!))} now={now} restClass="muted fav-more" sep="" />
       {etas[0]?.scheduled && <span className="scheduled">原定</span>}
-      {mins.length > 1 && <span className="muted fav-more">{mins.slice(1).join('、')} 分</span>}
     </span>
   );
 }
