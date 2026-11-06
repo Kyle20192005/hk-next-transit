@@ -31,23 +31,41 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
-  // 向上捲：頂部「下一程」嗰行（.home-topbar）同黃色區係同一塊，sticky 黐住頂；大字同搜尋欄喺佢下面捲走，
-  // 佢自己就變成 header（無縫，唔淡入）。只有右邊搜尋掣：搜尋欄捲到佢下面先出（直接改 style，唔 setState）
+  // 向上捲（連貫變形，全部跟捲動距離計，只郁 transform／opacity）：
+  // 頂部「下一程」嗰行（.home-topbar）同黃色區連埋，sticky 黐住頂，捲完就係 header。
+  // 捲嘅時候：大字地區名慢一拍下沉、縮細、淡出（--pl）；去到一半 header 右邊彈出地區膠囊（--pp）；
+  // 搜尋欄捲到 header 底時由左向右收窄，收入右邊搜尋掣，個掣同時放大出現（--ps）。
+  // 用 CSS 變數 + requestAnimationFrame，唔 setState，每格都順
   const scroller = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
-  const topBtn = useRef<HTMLButtonElement>(null);
+  const locRef = useRef<HTMLDivElement>(null);
   const topbar = useRef<HTMLDivElement>(null);
+  const frame = useRef(0);
   const onScroll = () => {
-    const el = scroller.current;
-    const f = searchRef.current;
-    const btn = topBtn.current;
-    const tb = topbar.current;
-    if (!el || !f || !btn || !tb) return;
-    // 搜尋欄底部去到頂部欄底部時 = 1
-    const p = Math.min(1, Math.max(0, (el.scrollTop - (f.offsetTop + f.offsetHeight - tb.offsetHeight - 40)) / 40));
-    btn.style.opacity = String(p);
-    btn.style.pointerEvents = p > 0.5 ? 'auto' : 'none';
+    if (frame.current) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      const el = scroller.current;
+      const f = searchRef.current;
+      const loc = locRef.current;
+      const tb = topbar.current;
+      if (!el || !f || !loc || !tb) return;
+      const top = el.getBoundingClientRect().top;
+      const y = el.scrollTop;
+      const at = (n: HTMLElement) => n.getBoundingClientRect().top - top + y; // 喺捲動內容入面嘅位置
+      const barH = tb.offsetHeight;
+      const clamp = (v: number) => Math.min(1, Math.max(0, v));
+      const locEnd = Math.max(1, at(loc) + loc.offsetHeight - barH);
+      const pl = clamp(y / locEnd);
+      const pp = clamp((pl - 0.55) / 0.45);
+      const ps = clamp((y - (at(f) - barH - 10)) / (f.offsetHeight + 10));
+      el.style.setProperty('--pl', pl.toFixed(3));
+      el.style.setProperty('--pp', pp.toFixed(3));
+      el.style.setProperty('--ps', ps.toFixed(3));
+      el.dataset.searchHidden = ps > 0.5 ? '1' : '0';
+    });
   };
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
   // 有位置就預設睇附近
@@ -70,13 +88,20 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
         <Logo size={24} />
         <h1>下一程</h1>
         <span className="app-sub">NextLeg</span>
-        <button className="bar-btn home-topbar-search" ref={topBtn} onClick={() => go('nav')} aria-label="導航：想去邊度？">
+        {/* 地區膠囊：大字縮細淡出到一半先彈出，好似大字飛咗入嚟 */}
+        {(area || head) && (
+          <span className="home-topbar-loc" aria-hidden="true">
+            <Icon name="navigate" size={13} />
+            {area ? area.n : head?.name}
+          </span>
+        )}
+        <button className="bar-btn home-topbar-search" onClick={() => go('nav')} aria-label="導航：想去邊度？">
           <Icon name="search" />
         </button>
       </div>
       <header className="app-bar home-hero">
         {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
-        <div className="hero-loc" aria-live="polite">
+        <div className="hero-loc" aria-live="polite" ref={locRef}>
           <span className="hero-name">{area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}</span>
           {area?.en && <span className="hero-en">{area.en}</span>}
           <span className="hero-sub">

@@ -186,7 +186,10 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     下面一行「最近巴士站：X · N 米」（**向上捲**：頂部「logo 下一程 NextLeg」嗰行同黃色區係連埋嘅一塊，
     **sticky 黐住頂**（網頁 `.home-topbar` position sticky、App `stickyHeaderIndices={[0]}`），大字同搜尋欄喺佢下面捲走，捲完佢就係 header：
     無縫、冇淡入。頂部欄下面長期有一截 18px 圓角黃色（喺黃色區上面睇唔到，捲走後變 header 圓角底），所以黃色區頂要留 ≥ 18px 唔好遮字；
-    右邊搜尋掣喺搜尋欄捲到佢下面先出（網頁直接改 style、App 原生動畫）。內容最少一版高，黃色區一定捲得走；頂部欄上面墊黃色，iPhone 拉落唔露灰）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
+    **捲動變形**（全部跟捲動距離計、只郁 transform／opacity）：大字地區名慢一拍下沉、縮細、淡出（網頁 `--pl`）；
+    去到一半 header 右邊彈出地區膠囊（`.home-topbar-loc`，`--pp`）；搜尋欄捲到 header 底時由左向右收窄（網頁 clip-path、App scaleX
+    transformOrigin right）收入右邊搜尋掣，個掣放大轉入嚟（`--ps`）。網頁 HomeTab 用 requestAnimationFrame 設 CSS 變數（唔 setState），
+    App `Animated` interpolate + `useNativeDriver`，位置靠 onLayout 量。內容最少一版高，黃色區一定捲得走；頂部欄上面墊黃色，iPhone 拉落唔露灰）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
     （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
     `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
     最近睇過（`lib/recent.ts`，最多 8 條）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。

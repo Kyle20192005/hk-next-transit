@@ -39,13 +39,35 @@ export default function HomeTab() {
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
-  // 向上捲（同網頁一樣）：頂部「下一程」嗰行同黃色區係連埋嘅一塊，用 stickyHeaderIndices 黐住頂；
-  // 大字同搜尋欄喺佢下面捲走，佢自己就變成 header（無縫，冇淡入）。只有右邊搜尋掣：搜尋欄捲到佢下面先出（原生動畫）
+  // 向上捲（同網頁一樣嘅連貫變形，全部跟捲動距離計，原生動畫只郁 transform／opacity）：
+  // 頂部「下一程」嗰行同黃色區連埋，stickyHeaderIndices 黐住頂，捲完就係 header。
+  // 大字地區名慢一拍下沉、縮細、淡出；去到一半 header 右邊彈出地區膠囊；搜尋欄捲到 header 底時向右收窄、收入搜尋掣，個掣放大轉入嚟
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
   const [scrollY] = useState(() => new Animated.Value(0));
-  const [searchBottom, setSearchBottom] = useState(200);
-  const btnOpacity = scrollY.interpolate({ inputRange: [searchBottom - 40, searchBottom], outputRange: [0, 1], extrapolate: 'clamp' });
+  const [locBox, setLocBox] = useState({ y: 40, h: 110 });
+  const [searchBox, setSearchBox] = useState({ y: 170, h: 50 });
+  const locEnd = Math.max(1, locBox.y + locBox.h);
+  const clampI = (input: number[], output: number[]) => scrollY.interpolate({ inputRange: input, outputRange: output, extrapolate: 'clamp' });
+  const locStyle = {
+    opacity: clampI([0, locEnd * 0.8], [1, 0]),
+    transform: [{ translateY: clampI([0, locEnd], [0, 56]) }, { scale: clampI([0, locEnd], [1, 0.68]) }],
+  };
+  const pillStyle = {
+    opacity: clampI([locEnd * 0.55, locEnd], [0, 1]),
+    transform: [{ translateY: clampI([locEnd * 0.55, locEnd], [14, 0]) }, { scale: clampI([locEnd * 0.55, locEnd], [0.7, 1]) }],
+  };
+  const s0 = searchBox.y - 10;
+  const s1 = searchBox.y + searchBox.h;
+  const searchStyle = {
+    opacity: clampI([s0, s1], [1, 0.1]),
+    transformOrigin: 'right',
+    transform: [{ translateY: clampI([s0, s1], [0, -6]) }, { scaleX: clampI([s0, s1], [1, 0.18]) }],
+  };
+  const btnStyle = {
+    opacity: clampI([s0, s1], [0, 1]),
+    transform: [{ scale: clampI([s0, s1], [0.4, 1]) }, { rotate: clampI([s0, s1], [-90, 0]).interpolate({ inputRange: [-90, 0], outputRange: ['-90deg', '0deg'] }) }],
+  };
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
   const openNews = () => router.push({ pathname: '/news', params: pos ? { lat: String(pos.lat), lng: String(pos.lng) } : {} });
@@ -75,7 +97,17 @@ export default function HomeTab() {
         <Logo size={22} />
         <Text style={{ fontSize: 18, fontWeight: '800', color: t.onBrand }}>下一程</Text>
         <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>NextLeg</Text>
-        <Animated.View style={{ marginLeft: 'auto', opacity: btnOpacity }}>
+        {/* 地區膠囊：大字縮細淡出到一半先彈出，好似大字飛咗入嚟 */}
+        <View style={{ flex: 1 }} />
+        {(area || head) && (
+          <Animated.View style={[{ flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 160, paddingVertical: 5, paddingLeft: 8, paddingRight: 10, borderRadius: 999, backgroundColor: t.onBrandSoft }, pillStyle]}>
+            <Icon name="navigate" size={13} color={t.onBrand} />
+            <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: t.onBrand }}>
+              {area ? area.n : head?.name}
+            </Text>
+          </Animated.View>
+        )}
+        <Animated.View style={[{ marginLeft: 6 }, btnStyle]}>
           <Pressable onPress={() => go('nav')} accessibilityLabel="導航：想去邊度？" hitSlop={6} style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: t.onBrandSoft }}>
             <Icon name="search" size={22} color={t.onBrand} />
           </Pressable>
@@ -83,7 +115,7 @@ export default function HomeTab() {
       </View>
       <AppBar style={{ gap: 10, paddingTop: 14, paddingBottom: 18 }}>
         {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
-        <View style={{ alignItems: 'center', paddingTop: 4, paddingBottom: 2 }}>
+        <Animated.View onLayout={(e) => setLocBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })} style={[{ alignItems: 'center', paddingTop: 4, paddingBottom: 2 }, locStyle]}>
           <Text numberOfLines={1} style={{ fontSize: 38, fontWeight: '900', color: t.onBrand, letterSpacing: 0.5 }}>
             {area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}
           </Text>
@@ -102,8 +134,8 @@ export default function HomeTab() {
               </Text>
             </Pressable>
           )}
-        </View>
-        <View onLayout={(e) => setSearchBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 50, paddingRight: 6, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
+        </Animated.View>
+        <Animated.View onLayout={(e) => setSearchBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })} style={[{ flexDirection: 'row', alignItems: 'center', minHeight: 50, paddingRight: 6, borderRadius: radius.m, backgroundColor: t.card, ...shadow }, searchStyle]}>
           <Pressable onPress={() => go('nav')} accessibilityRole="search" accessibilityLabel="導航：想去邊度？" style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14, alignSelf: 'stretch' }}>
             <Icon name="search" size={20} color={t.muted} />
             <Text style={{ fontSize: 17, color: t.muted }}>想去邊度？</Text>
@@ -112,7 +144,7 @@ export default function HomeTab() {
             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: nearNews.length ? '#E5484D' : '#1E9E5A' }} />
             <Text style={{ fontSize: 14, fontWeight: '800', color: t.text }}>交通消息</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </AppBar>
 
       <View style={{ minHeight: screenH, padding: 12, paddingBottom: 24, gap: 18 }}>
