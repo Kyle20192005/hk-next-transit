@@ -115,7 +115,43 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
       </header>
 
       <div className="home-feed">
-        <section className="feed-section">
+        {/* 闊螢幕分兩欄（左：大卡、最近睇過；右：常用工具、交通消息）；手機一欄，用 order 排返：工具、大卡、消息、最近 */}
+        <div className="home-col home-col-main">
+        <NextCard
+          nearby={state}
+          onLocate={locate}
+          onMore={() => go('nearby', pos)}
+          onFavs={() => go('favs')}
+          notice={nearNews[0] ? { text: nearNews[0].title, onClick: () => go('news', pos) } : undefined}
+        />
+        {recent.length > 0 && (
+          <section className="feed-section feed-recent">
+            <div className="feed-head">
+              <h2>最近睇過</h2>
+            </div>
+            <ul className="recent-list card">
+              {recent.slice(0, RECENT_SHOWN).map((r) => {
+                const c = COMPANIES[r.companies[0] ?? 'CTB'];
+                return (
+                  <li key={`${r.co}-${r.route}-${r.dir}`}>
+                    <Link href={`/${r.co}/${r.route}?dir=${r.dir}`} className="recent-row" onPointerDown={() => warmRoute(r.co, r.route, { dir: r.dir })}>
+                      <span className="nc-badge" style={{ background: c.bg, color: c.ink }}>
+                        {r.route}
+                      </span>
+                      <span className="route-to">
+                        <small>往</small> {r.dest}
+                      </span>
+                      <Icon name="chevron-right" size={18} className="muted" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+        </div>
+        <div className="home-col home-col-side">
+        <section className="feed-section feed-tools">
           <div className="feed-head">
             <h2>常用工具</h2>
             <button className="icon-btn" onClick={() => setEditing((e) => !e)} aria-label={editing ? '完成' : '揀常用工具'}>
@@ -153,16 +189,7 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
             </div>
           )}
         </section>
-
-        <NextCard
-          nearby={state}
-          onLocate={locate}
-          onMore={() => go('nearby', pos)}
-          onFavs={() => go('favs')}
-          notice={nearNews[0] ? { text: nearNews[0].title, onClick: () => go('news', pos) } : undefined}
-        />
-
-        <section className="feed-section">
+        <section className="feed-section feed-news">
           <div className="feed-head">
             <h2>交通消息</h2>
             <button className="text-btn" onClick={() => go('news', pos)}>
@@ -176,32 +203,7 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
             <NewsList items={filterNews(filter === 'all' ? live : news.filter((n) => !n.closed), filter).slice(0, NEWS_SHOWN)} empty={filter === 'nearby' ? '附近冇特別交通消息' : '暫時冇特別交通消息'} />
           )}
         </section>
-
-        {recent.length > 0 && (
-          <section className="feed-section">
-            <div className="feed-head">
-              <h2>最近睇過</h2>
-            </div>
-            <ul className="recent-list card">
-              {recent.slice(0, RECENT_SHOWN).map((r) => {
-                const c = COMPANIES[r.companies[0] ?? 'CTB'];
-                return (
-                  <li key={`${r.co}-${r.route}-${r.dir}`}>
-                    <Link href={`/${r.co}/${r.route}?dir=${r.dir}`} className="recent-row" onPointerDown={() => warmRoute(r.co, r.route, { dir: r.dir })}>
-                      <span className="nc-badge" style={{ background: c.bg, color: c.ink }}>
-                        {r.route}
-                      </span>
-                      <span className="route-to">
-                        <small>往</small> {r.dest}
-                      </span>
-                      <Icon name="chevron-right" size={18} className="muted" />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
+        </div>
       </div>
       </div>
     </div>

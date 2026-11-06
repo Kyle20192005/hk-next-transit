@@ -245,7 +245,7 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .nc-loc-icon { flex: none; color: #2f6fd6; }
 .nc-track { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 2px 16px 4px; scroll-padding: 0 16px; }
 .nc-track::-webkit-scrollbar { display: none; }
-.nc-slot { flex: none; width: 88%; scroll-snap-align: start; }
+.nc-slot { flex: none; width: min(88%, 440px); scroll-snap-align: start; } /* 闊螢幕一次見到幾張 */
 .nc-track > .nc-slot:only-child { width: 100%; }
 .nc-card { min-height: 172px; display: flex; flex-direction: column; justify-content: center; padding: 6px 0; border-radius: 14px; border: 1px solid var(--line); border-left: 8px solid var(--nc-accent); border-right: 8px solid var(--nc-accent); background: var(--card); box-shadow: 0 2px 6px rgb(0 0 0 / 0.08); }
 .nc-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; color: var(--text); text-decoration: none; }
@@ -594,4 +594,22 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
   .route-list:has(> li.route-item) { grid-template-columns: 1fr 1fr 1fr; }
   .route-dir:hover, .route-item .route-id:hover, .nearby-route:hover { background: var(--surface-2); }
   .bar-btn:hover, .swap:hover { background: rgba(0, 0, 0, 0.14); }
+}
+
+/* 首頁闊螢幕：內容同黃色區一樣限 1100px 置中；平板一欄，電腦兩欄（左大卡、右常用工具同交通消息，最近睇過喺下面） */
+@media (min-width: 768px) {
+  .home-scroll > .home-feed { width: 100%; max-width: 1100px; margin: 0 auto; padding: 20px 16px 32px; }
+  .home-minibar { border-radius: 0; padding-left: max(16px, calc((100% - 1100px) / 2 + 16px)); padding-right: max(12px, calc((100% - 1100px) / 2 + 12px)); }
+  .home-hero .hero-search { width: 100%; max-width: 720px; align-self: center; }
+}
+/* 手機：兩欄外框唔存在（display: contents），用 order 排：工具、大卡、消息、最近 */
+.home-col { display: contents; }
+.home-col > * { flex-shrink: 0; }
+.feed-tools { order: 1; }
+.home-feed .next-card { order: 2; }
+.feed-news { order: 3; }
+.feed-recent { order: 4; }
+@media (min-width: 1024px) {
+  .home-scroll > .home-feed { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; gap: 24px; }
+  .home-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 }
