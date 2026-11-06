@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { COMPANIES, MAX_TOOLS, TOOLS, filterNews, formatDistance, groupStopHeads, tint, toggleTool, type NewsFilter, type ToolId } from '@hknt/core';
+import { COMPANIES, filterNews, formatDistance, groupStopHeads, toolById, type NewsFilter, type ToolId } from '@hknt/core';
 import { Icon } from '@/components/Icon';
 import { HomeHeader } from '@/components/HomeHeader';
 import { useNearbyStops } from '@/components/Nearby';
 import { NextCard } from '@/components/NextCard';
+import { ToolTile } from '@/components/ToolTile';
 import { NewsChips, NewsList } from '@/components/NewsList';
 import { useNews, useTools } from '@/lib/news';
 import { warmRoute } from '@/lib/prefetch';
@@ -25,8 +26,7 @@ export default function HomeTab() {
   const { state, locate } = useNearbyStops(true);
   const pos = state.kind === 'ok' ? { lat: state.lat, lng: state.lng } : null;
   const news = useNews(pos);
-  const [tools, setTools] = useTools();
-  const [editing, setEditing] = useState(false);
+  const tools = useTools();
   const [filter, setFilter] = useState<NewsFilter>('all');
   const hasPos = !!pos;
   useEffect(() => {
@@ -45,7 +45,9 @@ export default function HomeTab() {
   const live = news?.filter((n) => !n.closed) ?? [];
   const openNews = () => router.push({ pathname: '/news', params: pos ? { lat: String(pos.lat), lng: String(pos.lng) } : {} });
   const go = (id: ToolId) => {
-    if (id === 'routes') router.navigate('/routes');
+    const mode = toolById(id).mode;
+    // 交通工具捷徑：入「路線」分頁揀好嗰款
+    if (mode) router.navigate({ pathname: '/routes', params: { mode } });
     else if (id === 'nearby') router.push('/nearby');
     else if (id === 'favs') router.navigate('/favorites');
     else if (id === 'news') openNews();
@@ -65,54 +67,17 @@ export default function HomeTab() {
         <Section
           title="常用工具"
           action={
-            <Pressable onPress={() => setEditing((e) => !e)} hitSlop={8} accessibilityLabel={editing ? '完成' : '揀常用工具'}>
-              {editing ? <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>完成</Text> : <Icon name="settings" size={20} color={t.muted} />}
+            <Pressable onPress={() => router.push('/tools')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center' }} accessibilityLabel="自訂常用工具">
+              <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>自訂</Text>
+              <Icon name="chevron-right" size={16} color={t.accent} />
             </Pressable>
           }
         >
-          {editing ? (
-            <View style={{ padding: 14, gap: 10, borderRadius: radius.l, backgroundColor: t.card, ...shadow }}>
-              <Text style={{ fontSize: 14, color: t.muted }}>揀最多 {MAX_TOOLS} 個，次序跟揀嘅先後</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {TOOLS.map((x) => {
-                  const on = tools.includes(x.id);
-                  return (
-                    <Pressable key={x.id} onPress={() => setTools(toggleTool(tools, x.id))} accessibilityState={{ selected: on }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1.5, borderColor: on ? t.accent : t.line, backgroundColor: on ? t.brandSoft : t.card }}>
-                      <Icon name={x.icon} size={18} color={on ? t.text : t.muted} />
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: on ? t.text : t.muted }}>{x.label}</Text>
-                      {on && (
-                        <View style={{ width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: t.accent }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: t.card }}>{tools.indexOf(x.id) + 1}</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          ) : (
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {tools.map((id) => {
-                const x = TOOLS.find((y) => y.id === id)!;
-                return (
-                  <Pressable key={id} onPress={() => go(id)} accessibilityRole="button" accessibilityLabel={x.label} style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 6, paddingTop: 12, paddingBottom: 10, borderRadius: 18, backgroundColor: t.card, transform: [{ scale: pressed ? 0.97 : 1 }], ...shadow })}>
-                    <View style={{ width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: tint(x.color, 0.12) }}>
-                      <Icon name={x.icon} size={28} color={x.color} />
-                      {id === 'news' && nearNews.length > 0 && (
-                        <View style={{ position: 'absolute', top: -4, right: -6, minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E5484D', borderWidth: 2, borderColor: t.card }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{nearNews.length}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: t.text }}>
-                      {x.label}
-                    </Text>
-                    {x.soon && <Text style={{ marginTop: -4, fontSize: 11, fontWeight: '700', color: t.muted }}>即將推出</Text>}
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {tools.map((id) => (
+              <ToolTile key={id} id={id} onPress={() => go(id)} badge={id === 'news' ? nearNews.length : 0} />
+            ))}
+          </View>
         </Section>
 
         <NextCard nearby={state} onLocate={() => void locate()} notice={nearNews[0] ? { text: nearNews[0].title, onPress: openNews } : undefined} />

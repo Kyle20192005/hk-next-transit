@@ -11,7 +11,8 @@ import Favorites from './Favorites';
 import Navigation from './Navigation';
 import Settings from './Settings';
 import News from './News';
-import type { ToolId } from '@hknt/core';
+import { toolById, type ToolId } from '@hknt/core';
+import ToolEditor from './ToolEditor';
 
 type Tab = 'home' | 'routes' | 'nav' | 'favs' | 'settings';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -31,7 +32,7 @@ const TAB_KEY = 'hknt.tab';
 export default function Home({ routes, updated }: { routes: RouteIndex['routes']; updated: string | null }) {
   const [tab, setTab] = useState<Tab>('home');
   // 唔係分頁嘅頁：附近車站、交通消息（有返回掣）
-  const [view, setView] = useState<null | { kind: 'nearby' } | { kind: 'news'; pos: { lat: number; lng: number } | null }>(null);
+  const [view, setView] = useState<null | { kind: 'nearby' } | { kind: 'tools' } | { kind: 'news'; pos: { lat: number; lng: number } | null }>(null);
   const [mode, setMode] = useState<TransportMode>('bus');
   const favCount = useFavorites().length;
 
@@ -60,14 +61,22 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
           <Nearby onBack={() => setView(null)} />
         ) : view?.kind === 'news' ? (
           <News pos={view.pos} onBack={() => setView(null)} />
+        ) : view?.kind === 'tools' ? (
+          <ToolEditor onBack={() => setView(null)} />
         ) : (
           <>
             {tab === 'home' && (
               <HomeTab
+                onEditTools={() => setView({ kind: 'tools' })}
                 go={(to: ToolId, pos) => {
-                  if (to === 'nearby') setView({ kind: 'nearby' });
+                  const m = toolById(to).mode;
+                  if (m) {
+                    // 交通工具捷徑：入「路線」分頁揀好嗰款
+                    setMode(m);
+                    pick('routes');
+                  } else if (to === 'nearby') setView({ kind: 'nearby' });
                   else if (to === 'news') setView({ kind: 'news', pos: pos ?? null });
-                  else pick(to);
+                  else pick(to as Tab);
                 }}
               />
             )}

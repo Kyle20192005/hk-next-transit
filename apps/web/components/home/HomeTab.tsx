@@ -1,11 +1,12 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { COMPANIES, MAX_TOOLS, TOOLS, filterNews, formatDistance, groupStopHeads, tint, toggleTool as toggle, type NewsFilter, type ToolId } from '@hknt/core';
+import { COMPANIES, DEFAULT_TOOLS, filterNews, formatDistance, groupStopHeads, toolById, type NewsFilter, type ToolId } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
-import { loadTools, saveTools, useNews } from '@/lib/news';
+import { loadTools, useNews } from '@/lib/news';
+import { ToolIcon } from './ToolEditor';
 import { useNearbyStops } from './Nearby';
 import NextCard from './NextCard';
 import HomeHeader from './HomeHeader';
@@ -19,14 +20,13 @@ const NEWS_SHOWN = 3;
  * 黃色區大字顯示最近嘅站頭、「想去邊度？」（導航）同交通消息燈號；常用工具（可以揀）；大卡（下班車／收藏）；
  * 交通消息（全部／附近／港鐵）；最近睇過。App 版 apps/mobile/src/app/(tabs)/index.tsx。
  */
-export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; lng: number } | null) => void }) {
+export default function HomeTab({ go, onEditTools }: { go: (to: ToolId, pos?: { lat: number; lng: number } | null) => void; onEditTools: () => void }) {
   const recent = useRecent();
   const { state, locate } = useNearbyStops(true);
   const pos = state.kind === 'ok' ? { lat: state.lat, lng: state.lng } : null;
   const news = useNews(pos);
   const [filter, setFilter] = useState<NewsFilter>('all');
-  const [tools, setTools] = useState<ToolId[]>(['routes', 'nearby', 'favs', 'news']);
-  const [editing, setEditing] = useState(false);
+  const [tools, setTools] = useState<ToolId[]>(DEFAULT_TOOLS);
   useEffect(() => setTools(loadTools()), []);
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
@@ -39,12 +39,6 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
     if (pos) setFilter((f) => (f === 'all' ? 'nearby' : f));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!pos]);
-
-  const toggleTool = (id: ToolId) => {
-    const next = toggle(tools, id);
-    setTools(next);
-    saveTools(next);
-  };
 
   return (
     <div className="home-tab">
@@ -118,40 +112,19 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
         <section className="feed-section feed-tools">
           <div className="feed-head">
             <h2>常用工具</h2>
-            <button className="icon-btn" onClick={() => setEditing((e) => !e)} aria-label={editing ? '完成' : '揀常用工具'}>
-              {editing ? <span className="text-btn">完成</span> : <Icon name="settings" size={20} />}
+            <button className="text-btn" onClick={onEditTools}>
+              自訂 <Icon name="chevron-right" size={16} />
             </button>
           </div>
-          {editing ? (
-            <div className="tool-editor card">
-              <p className="muted">揀最多 {MAX_TOOLS} 個，次序跟揀嘅先後</p>
-              <div className="tool-picks">
-                {TOOLS.map((t) => (
-                  <button key={t.id} className="tool-pick" aria-pressed={tools.includes(t.id)} onClick={() => toggleTool(t.id)}>
-                    <Icon name={t.icon} size={18} />
-                    {t.label}
-                    {tools.includes(t.id) && <span className="tool-order">{tools.indexOf(t.id) + 1}</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="tool-grid">
-              {tools.map((id) => {
-                const t = TOOLS.find((x) => x.id === id)!;
-                return (
-                  <button key={id} className="tool-tile" onClick={() => go(id, pos)}>
-                    <span className="tool-icon" style={{ color: t.color, background: tint(t.color, 0.12) }}>
-                      <Icon name={t.icon} size={28} />
-                      {id === 'news' && nearNews.length > 0 && <span className="tool-badge">{nearNews.length}</span>}
-                    </span>
-                    <span className="tool-label">{t.label}</span>
-                    {t.soon && <span className="tool-soon">即將推出</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <div className="tool-grid">
+            {tools.map((id) => (
+              <button key={id} className="tool-tile" onClick={() => go(id, pos)}>
+                <ToolIcon id={id} badge={id === 'news' ? nearNews.length : 0} />
+                <span className="tool-label">{toolById(id).label}</span>
+                {toolById(id).soon && <span className="tool-soon">即將推出</span>}
+              </button>
+            ))}
+          </div>
         </section>
         <section className="feed-section feed-news">
           <div className="feed-head">

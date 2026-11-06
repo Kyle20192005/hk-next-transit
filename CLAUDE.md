@@ -191,8 +191,10 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     位置用 offsetLeft／offsetTop（網頁，子元素唔好 position，否則唔係以 header 計）或 onLayout（App）。網頁 rAF 直接改 style 唔 setState；
     App `Animated` + `useNativeDriver`。電腦版冇頂部一行（分頁列就係 header，`.home.tab-home .tab-bar::after` 圓角底），冇目標位：
     大字同搜尋欄喺頂部碰到邊之前淡出、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
-    （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
-    `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
+    （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，分「交通工具」（巴士、港鐵、小巴、電車、渡輪，撳入「路線」分頁揀好嗰款，未做標「即將推出」）同「實用功能」兩組；
+    揀最多 4 個，記喺 localStorage／AsyncStorage `hknt.tools`；交通消息工具有附近消息數目紅點）。「自訂」入「自訂常用工具」頁（參考港鐵 App：
+    網頁 `ToolEditor.tsx`（Home 入面嘅 view）、App `src/app/tools.tsx`）：頂部黃色區揀咗嘅（紅「−」），下面分組全部工具（藍「+」），撳兩個已揀嘅對調位置（`swapTools`），撳「儲存」先生效；
+    App 首頁同呢頁共用 `useTools` 嘅同一份狀態；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
     最近睇過（`lib/recent.ts`，最多 8 條）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。
     網頁闊螢幕：內容限 1100px 置中（設定頁 720px）；頂部欄由分頁列做（`.hh-bar` 收埋）；到站卡有左右箭嘴（只限有滑鼠）、圓點撳得；≥ 1024px 兩條獨立直欄（`.home-col-main` 大卡 + 最近睇過、`.home-col-side` 常用工具 + 交通消息），
     手機 `.home-col { display: contents }` 再用 `order` 排返「工具、大卡、消息、最近」。到站卡每張最闊 440px，闊螢幕一次見幾張。

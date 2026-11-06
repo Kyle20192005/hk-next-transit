@@ -22,11 +22,13 @@ describe('newsTitle', () => {
 
 describe('toggleTool', () => {
   it('最多 4 個、最少 1 個，加嘅放最後', async () => {
-    const { toggleTool, cleanTools } = await import('./news');
+    const { toggleTool, cleanTools, swapTools } = await import('./news');
+    expect(swapTools(['routes', 'nearby', 'favs'], 'routes', 'favs')).toEqual(['favs', 'nearby', 'routes']);
     expect(toggleTool(['routes', 'nearby', 'favs', 'news'], 'nav')).toEqual(['routes', 'nearby', 'favs', 'news']);
     expect(toggleTool(['routes', 'nearby'], 'nav')).toEqual(['routes', 'nearby', 'nav']);
     expect(toggleTool(['routes'], 'routes')).toEqual(['routes']);
     expect(cleanTools(['bogus', 'favs'])).toEqual(['favs']);
+    expect(cleanTools(['favs', 'favs', 'rail'])).toEqual(['favs', 'rail']);
     expect(cleanTools(null)).toEqual(['routes', 'nearby', 'favs', 'news']);
   });
 });

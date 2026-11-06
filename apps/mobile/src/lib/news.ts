@@ -29,17 +29,31 @@ export function useNews(pos: { lat: number; lng: number } | null): NewsItem[] | 
 
 const TOOLS_KEY = 'hknt.tools';
 
-/** 首頁常用工具：AsyncStorage（同網頁 localStorage 一樣格式） */
-export function useTools(): [ToolId[], (t: ToolId[]) => void] {
-  const [tools, setTools] = useState<ToolId[]>(DEFAULT_TOOLS);
+/** 首頁常用工具：AsyncStorage（同網頁 localStorage 一樣格式）。首頁同「自訂常用工具」頁共用一份，儲存後首頁即刻更新 */
+let current: ToolId[] = DEFAULT_TOOLS;
+let loaded = false;
+const listeners = new Set<(t: ToolId[]) => void>();
+function setAll(t: ToolId[]) {
+  current = t;
+  listeners.forEach((f) => f(t));
+}
+export function saveTools(t: ToolId[]) {
+  setAll(t);
+  AsyncStorage.setItem(TOOLS_KEY, JSON.stringify(t)).catch(() => {});
+}
+export function useTools(): ToolId[] {
+  const [tools, setTools] = useState<ToolId[]>(current);
   useEffect(() => {
-    AsyncStorage.getItem(TOOLS_KEY)
-      .then((raw) => raw && setTools(cleanTools(JSON.parse(raw))))
-      .catch(() => {});
+    listeners.add(setTools);
+    if (!loaded) {
+      loaded = true;
+      AsyncStorage.getItem(TOOLS_KEY)
+        .then((raw) => raw && setAll(cleanTools(JSON.parse(raw))))
+        .catch(() => {});
+    }
+    return () => {
+      listeners.delete(setTools);
+    };
   }, []);
-  const save = (t: ToolId[]) => {
-    setTools(t);
-    AsyncStorage.setItem(TOOLS_KEY, JSON.stringify(t)).catch(() => {});
-  };
-  return [tools, save];
+  return tools;
 }

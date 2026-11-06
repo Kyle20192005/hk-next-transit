@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="[co]/[route]" />
         <Stack.Screen name="nearby" />
         <Stack.Screen name="news" />
+        <Stack.Screen name="tools" />
       </Stack>
       <LaunchOverlay />
     </SafeAreaProvider>
