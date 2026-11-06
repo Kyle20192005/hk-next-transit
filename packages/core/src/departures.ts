@@ -10,10 +10,12 @@ export interface DepartureRow {
   /** 左邊標籤：巴士 = 路線號碼（公司色）；港鐵將來 = 綫名（綫色） */
   badge: { text: string; bg: string; ink: string };
   dest: string;
-  /** 到站時間（毫秒） */
-  at: number;
+  /** 到站時間（毫秒）；null = 冇時間（例如只收藏咗路線、冇收藏站） */
+  at: number | null;
   /** 原定班次（時間表，唔係實時） */
   scheduled?: boolean;
+  /** 收藏咗嘅站暫時冇班次（at = null 但唔係淨係收藏路線） */
+  noService?: boolean;
   /** 港鐵月台（將來用） */
   platform?: string;
   /** 撳落去開邊度 */
@@ -78,11 +80,71 @@ export function busDepartureRows(routes: HereRouteLike[], now: number, limit = 4
       link: { co: r.co, route: r.route, dir: r.dir, stop: r.stopId },
     });
   }
-  return rows.sort((a, b) => a.at - b.at).slice(0, limit);
+  return rows.sort(byTime).slice(0, limit);
 }
 
-/** 「2 分鐘」／「即將」 */
-export function minutesLabel(at: number, now: number): string {
+const byTime = (a: DepartureRow, b: DepartureRow) => (a.at ?? Infinity) - (b.at ?? Infinity);
+
+/** 「2 分鐘」／「即將」；冇時間就空白 */
+export function minutesLabel(at: number | null, now: number): string {
+  if (at === null) return '';
   const m = Math.max(0, Math.round((at - now) / 60000));
   return m === 0 ? '即將' : `${m} 分鐘`;
+}
+
+/** 收藏（同網頁、App 嘅 Favorite 格式一樣） */
+export interface FavLike {
+  co: string;
+  route: string;
+  dir: 'O' | 'I';
+  dest: string;
+  companies: Company[];
+  stopId?: string;
+  stopName?: string;
+}
+
+export interface FavGroup<F> {
+  key: string;
+  /** 站名；只收藏路線嘅一組係「收藏路線」 */
+  name: string;
+  /** 呢組係收藏咗嘅站（有到站時間） */
+  isStop: boolean;
+  favs: F[];
+}
+
+/**
+ * 首頁「收藏」分頁嘅卡：收藏咗嘅站按站分組（一個站一張卡，次序跟收藏次序），
+ * 淨係收藏咗路線（冇站）嘅另外一張「收藏路線」放最後。
+ */
+export function groupFavorites<F extends FavLike>(favs: F[]): FavGroup<F>[] {
+  const groups: FavGroup<F>[] = [];
+  for (const f of favs) {
+    if (!f.stopId) continue;
+    const key = `${f.co}-${f.stopId}`;
+    const g = groups.find((x) => x.key === key);
+    if (g) g.favs.push(f);
+    else groups.push({ key, name: f.stopName ?? f.stopId, isStop: true, favs: [f] });
+  }
+  const routes = favs.filter((f) => !f.stopId);
+  if (routes.length) groups.push({ key: 'routes', name: '收藏路線', isStop: false, favs: routes });
+  return groups;
+}
+
+/** 收藏卡嘅行：每個收藏一行，有到站時間嘅按時間排先；etas 係嗰個收藏嘅班次（同方向） */
+export function favDepartureRows<F extends FavLike>(items: { fav: F; etas: { eta: string | null; company: Company; scheduled?: boolean }[] | null }[], now: number): DepartureRow[] {
+  return items
+    .map(({ fav, etas }) => {
+      const e = etas?.find((x) => x.eta && Date.parse(x.eta) >= now - 30_000);
+      const c = COMPANIES[e?.company ?? fav.companies[0] ?? 'CTB'] ?? COMPANIES.CTB;
+      return {
+        key: `${fav.co}-${fav.route}-${fav.dir}-${fav.stopId ?? ''}`,
+        badge: { text: fav.route, bg: c.bg, ink: c.ink },
+        dest: fav.dest,
+        at: e?.eta ? Date.parse(e.eta) : null,
+        scheduled: e?.scheduled,
+        noService: !!fav.stopId && !e,
+        link: { co: fav.co, route: fav.route, dir: fav.dir, stop: fav.stopId },
+      } satisfies DepartureRow;
+    })
+    .sort(byTime);
 }

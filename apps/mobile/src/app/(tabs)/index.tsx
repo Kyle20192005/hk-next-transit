@@ -3,27 +3,23 @@ import type { ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { TRANSPORT_MODES, type TransportMode } from '@hknt/core';
 import { AppBar, CompanyTag, SoonBadge } from '@/components/ui';
-import { FavItem } from '@/components/FavItem';
 import { Icon, type IconName } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
 import { useNearbyStops } from '@/components/Nearby';
-import { DepartureCards } from '@/components/DepartureCards';
-import { favKey, useFavorites } from '@/lib/favorites';
+import { NextCard } from '@/components/NextCard';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 
 const MODE_ICON: Record<TransportMode, IconName> = { bus: 'bus', rail: 'train', minibus: 'minibus', ferry: 'ferry', tram: 'tram' };
-const FAV_SHOWN = 3;
 const RECENT_SHOWN = 5;
 
 /**
- * 首頁（NextLeg 嘅入口，同網頁 components/home/HomeTab.tsx 一樣）：導航搜尋欄 + 捷徑（交通工具、收藏、附近、最近睇過）。
+ * 首頁（NextLeg 嘅入口，同網頁 components/home/HomeTab.tsx 一樣）：導航搜尋欄、大卡（下班車／收藏）、交通工具捷徑、最近睇過。
  * 一開就自動定位顯示附近嘅車（第一次會問權限）。
  */
 export default function HomeTab() {
   const t = useTheme();
-  const favs = useFavorites();
   const recent = useRecent();
   const { state, locate } = useNearbyStops(true);
 
@@ -48,6 +44,8 @@ export default function HomeTab() {
       </AppBar>
 
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24, gap: 18 }}>
+        <NextCard nearby={state} onLocate={() => void locate()} />
+
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           {TRANSPORT_MODES.map((m) => (
             <Pressable key={m.id} onPress={() => router.navigate({ pathname: '/routes', params: { mode: m.id } })} accessibilityRole="button" accessibilityLabel={m.ready ? m.label : `${m.label}（即將推出）`} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
@@ -64,32 +62,6 @@ export default function HomeTab() {
             </Pressable>
           ))}
         </View>
-
-        <Section title="收藏" action={favs.length > FAV_SHOWN ? { label: `全部 ${favs.length}`, onPress: () => router.navigate('/favorites') } : undefined}>
-          {favs.length ? (
-            <View style={{ gap: 10 }}>
-              {favs.slice(0, FAV_SHOWN).map((f) => (
-                <FavItem key={favKey(f)} f={f} />
-              ))}
-            </View>
-          ) : (
-            <Hint>喺路線頁撳星號收藏路線，或者打開一個站撳「收藏呢個站」，就會喺度直接見到下一班車。</Hint>
-          )}
-        </Section>
-
-        <Section title="附近" action={state.kind === 'ok' && state.stops.length > 0 ? { label: '更多', onPress: () => router.push('/nearby') } : undefined}>
-          {state.kind === 'ok' ? (
-            state.stops.length ? (
-              <DepartureCards stops={state.stops} />
-            ) : (
-              <Hint>600 米內冇巴士站</Hint>
-            )
-          ) : (
-            <Hint action={state.kind === 'locating' ? undefined : { label: state.kind === 'error' ? '再試' : '定位', onPress: () => void locate() }}>
-              {state.kind === 'error' ? <Text style={{ color: t.special }}>{state.message}</Text> : state.kind === 'locating' ? '定位中…' : '搵你附近嘅巴士站同下一班車'}
-            </Hint>
-          )}
-        </Section>
 
         {recent.length > 0 && (
           <Section title="最近睇過">
@@ -134,21 +106,6 @@ function Section({ title, action, children }: { title: string; action?: { label:
         )}
       </View>
       {children}
-    </View>
-  );
-}
-
-function Hint({ children, action }: { children: ReactNode; action?: { label: string; onPress: () => void } }) {
-  const t = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 16, borderRadius: radius.l, backgroundColor: t.card, ...shadow }}>
-      <Text style={{ flex: 1, fontSize: 14, lineHeight: 22, color: t.muted }}>{children}</Text>
-      {action && (
-        <Pressable onPress={action.onPress} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Icon name="locate" size={18} color={t.accent} />
-          <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>{action.label}</Text>
-        </Pressable>
-      )}
     </View>
   );
 }

@@ -223,21 +223,42 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .recent-row .route-id { width: 92px; flex: none; }
 .recent-row .route-to { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .recent-row .route-to small { color: var(--muted); font-weight: 500; }
-/* 首頁附近：到站卡（似港鐵「下班車」），打橫掃 */
-.dep-cards { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 -12px; padding: 2px 12px 8px; scroll-padding: 0 12px; }
-.dep-cards::-webkit-scrollbar { display: none; }
-.dep-card { flex: none; width: 86%; max-width: 380px; scroll-snap-align: start; display: flex; flex-direction: column; overflow: hidden; border-left: 6px solid var(--dep-accent); }
-.dep-head { display: flex; align-items: center; gap: 6px; padding: 12px 14px 6px; min-width: 0; }
-.dep-head svg { flex: none; color: var(--accent); }
-.dep-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
-.dep-head .muted { flex: none; font-size: 0.8125rem; }
-.dep-rows { display: flex; flex-direction: column; padding: 0 0 6px; min-height: 172px; }
-.dep-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; color: var(--text); text-decoration: none; }
-.dep-row:active { background: var(--surface-2, rgb(0 0 0 / 0.04)); }
-.dep-badge { flex: none; min-width: 48px; padding: 3px 8px; border-radius: 8px; text-align: center; font-weight: 800; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
-.dep-dest { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; font-weight: 600; }
-.dep-min { flex: none; display: flex; align-items: center; gap: 6px; font-size: 1.0625rem; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
-.dep-empty { padding: 10px 14px; font-size: 0.9375rem; }
+/* 首頁大卡（似港鐵 App「下班車」小工具）：頂部兩個分頁，入面打橫掃嘅到站卡 */
+.next-card { background: var(--card); border-radius: var(--radius-l, 18px); box-shadow: var(--shadow); overflow: hidden; }
+.nc-tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); }
+.nc-tab { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border: 0; background: var(--surface-2); color: var(--muted); font: inherit; font-size: 1.0625rem; font-weight: 800; cursor: pointer; }
+.nc-tab[aria-selected="true"] { background: var(--card); color: var(--text); }
+.nc-tab[aria-selected="true"] svg { color: var(--accent); }
+/* 文件夾分頁：揀咗嗰個白色連住下面，冇揀嗰個灰色、靠近揀咗嗰邊有圓角 */
+.nc-tab:first-child[aria-selected="true"] { border-top-right-radius: 18px; }
+.nc-tab:last-child[aria-selected="true"] { border-top-left-radius: 18px; }
+.nc-tab:first-child[aria-selected="false"] { border-bottom-right-radius: 18px; }
+.nc-tab:last-child[aria-selected="false"] { border-bottom-left-radius: 18px; }
+.nc-tabs:has(.nc-tab:first-child[aria-selected="true"]) { background: linear-gradient(to right, var(--card) 50%, var(--surface-2) 50%); }
+.nc-tabs:has(.nc-tab:last-child[aria-selected="true"]) { background: linear-gradient(to right, var(--surface-2) 50%, var(--card) 50%); }
+.nc-body { padding: 12px 0 10px; }
+.nc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 10px 16px; }
+.nc-loc { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.nc-loc strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.0625rem; }
+.nc-loc .muted { flex: none; font-size: 0.8125rem; }
+.nc-loc-icon { flex: none; color: #2f6fd6; }
+.nc-track { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 2px 16px 4px; scroll-padding: 0 16px; }
+.nc-track::-webkit-scrollbar { display: none; }
+.nc-slot { flex: none; width: 88%; scroll-snap-align: start; }
+.nc-track > .nc-slot:only-child { width: 100%; }
+.nc-card { min-height: 172px; display: flex; flex-direction: column; justify-content: center; padding: 6px 0; border-radius: 14px; border: 1px solid var(--line); border-left: 8px solid var(--nc-accent); border-right: 8px solid var(--nc-accent); background: var(--card); box-shadow: 0 2px 6px rgb(0 0 0 / 0.08); }
+.nc-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; color: var(--text); text-decoration: none; }
+.nc-row:active { background: var(--surface-2); }
+.nc-badge { flex: none; min-width: 50px; padding: 3px 8px; border-radius: 8px; text-align: center; font-weight: 800; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.nc-dest { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.0625rem; font-weight: 600; }
+.nc-min { flex: none; display: flex; align-items: center; gap: 6px; font-size: 1.125rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.nc-none { font-size: 0.9375rem; font-weight: 600; }
+.nc-empty { padding: 10px 14px; text-align: center; }
+.nc-dots { display: flex; justify-content: center; gap: 6px; padding-top: 8px; }
+.nc-dots span { width: 6px; height: 6px; border-radius: 3px; background: var(--line); transition: width 0.2s; }
+.nc-dots span.on { width: 16px; background: var(--accent); }
+.nc-message { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px 6px; font-size: 0.9375rem; line-height: 1.6; }
+.nc-message .error { color: var(--special); }
 /* 巴士路線頁：附近巴士站捷徑 */
 .nearby-shortcut-item { list-style: none; }
 .nearby-shortcut { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
