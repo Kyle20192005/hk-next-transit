@@ -108,7 +108,22 @@ export function toggleTool(tools: ToolId[], id: ToolId): ToolId[] {
   const next = tools.includes(id) ? tools.filter((t) => t !== id) : tools.length < MAX_TOOLS ? [...tools, id] : tools;
   return next.length ? next : tools;
 }
-/** 對調兩個已揀工具嘅位置（自訂排序） */
+/** 將第 from 個工具搬去第 to 個位（拖拉排序），其他順移 */
+export function moveTool(tools: ToolId[], from: number, to: number): ToolId[] {
+  if (from === to || from < 0 || from >= tools.length) return tools;
+  const next = [...tools];
+  const [x] = next.splice(from, 1);
+  next.splice(Math.max(0, Math.min(to, next.length)), 0, x!);
+  return next;
+}
+/** 拖拉中：第 from 個拖到第 to 個位時，第 i 個要移幾多格（-1、0、+1） */
+export function dragShift(i: number, from: number, to: number): number {
+  if (i === from) return 0;
+  if (from < to && i > from && i <= to) return -1;
+  if (from > to && i >= to && i < from) return 1;
+  return 0;
+}
+/** 對調兩個已揀工具嘅位置 */
 export function swapTools(tools: ToolId[], a: ToolId, b: ToolId): ToolId[] {
   const i = tools.indexOf(a);
   const j = tools.indexOf(b);

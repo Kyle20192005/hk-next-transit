@@ -334,7 +334,11 @@ svg[data-duo] [fill="currentColor"] { fill-opacity: 1; }
 .tool-slot { min-height: 96px; border: 2px dashed color-mix(in srgb, var(--on-brand) 25%, transparent); border-radius: 18px; }
 .tool-tile:disabled { cursor: default; }
 .tool-tile:disabled:active { transform: none; }
-.tool-tile.lifted { box-shadow: 0 0 0 3px var(--on-brand), var(--shadow); transform: translateY(-3px); }
+.tool-drag { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.tool-edit-picked .tool-cell { transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.tool-edit-picked .tool-cell.lifted, .tool-edit-picked.settle .tool-cell { z-index: 2; transition: none; }
+.tool-edit-picked .tool-cell.lifted .tool-tile { cursor: grabbing; transform: scale(1.06); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22); }
+.tool-edit-picked.dragging .tool-mark { opacity: 0; transition: opacity 0.15s; }
 .tool-cell.picked .tool-tile { opacity: 0.45; }
 .tool-mark { position: absolute; top: -8px; right: -6px; width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; color: #fff; box-shadow: 0 0 0 2px var(--card); pointer-events: none; }
 .tool-mark svg { stroke-width: 3; }
