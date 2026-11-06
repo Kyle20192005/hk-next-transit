@@ -47,15 +47,19 @@ export default function HomeTab() {
   const [scrollY] = useState(() => new Animated.Value(0));
   const [locBox, setLocBox] = useState({ y: 40, h: 110 });
   const [searchBox, setSearchBox] = useState({ y: 170, h: 50 });
-  const locEnd = Math.max(1, locBox.y + locBox.h);
+  // 大字要喺頂部碰到頂部欄（連下面 18px 圓角）之前完全淡出，唔好俾頂部欄切開一半（同網頁一樣）：
+  // 佢跟 PARALLAX 比例向下沉，頂部去到頂部欄嘅捲動距離 = 空位 ÷ (1 − PARALLAX)
+  const PARALLAX = 0.6;
+  const locEnd = Math.max(16, (Math.max(8, locBox.y - 18) / (1 - PARALLAX)) * 0.9);
   const clampI = (input: number[], output: number[]) => scrollY.interpolate({ inputRange: input, outputRange: output, extrapolate: 'clamp' });
   const locStyle = {
-    opacity: clampI([0, locEnd * 0.8], [1, 0]),
-    transform: [{ translateY: clampI([0, locEnd], [0, 56]) }, { scale: clampI([0, locEnd], [1, 0.68]) }],
+    opacity: clampI([0, locEnd], [1, 0]),
+    transformOrigin: 'top',
+    transform: [{ translateY: clampI([0, locEnd], [0, locEnd * PARALLAX]) }, { scale: clampI([0, locEnd], [1, 0.82]) }],
   };
   const pillStyle = {
-    opacity: clampI([locEnd * 0.55, locEnd], [0, 1]),
-    transform: [{ translateY: clampI([locEnd * 0.55, locEnd], [14, 0]) }, { scale: clampI([locEnd * 0.55, locEnd], [0.7, 1]) }],
+    opacity: clampI([locEnd * 0.6, locEnd * 1.5], [0, 1]),
+    transform: [{ translateY: clampI([locEnd * 0.6, locEnd * 1.5], [14, 0]) }, { scale: clampI([locEnd * 0.6, locEnd * 1.5], [0.7, 1]) }],
   };
   const s0 = searchBox.y - 10;
   const s1 = searchBox.y + searchBox.h;

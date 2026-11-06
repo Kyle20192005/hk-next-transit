@@ -186,7 +186,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     下面一行「最近巴士站：X · N 米」（**向上捲**：頂部「logo 下一程 NextLeg」嗰行同黃色區係連埋嘅一塊，
     **sticky 黐住頂**（網頁 `.home-topbar` position sticky、App `stickyHeaderIndices={[0]}`），大字同搜尋欄喺佢下面捲走，捲完佢就係 header：
     無縫、冇淡入。頂部欄下面長期有一截 18px 圓角黃色（喺黃色區上面睇唔到，捲走後變 header 圓角底），所以黃色區頂要留 ≥ 18px 唔好遮字；
-    **捲動變形**（全部跟捲動距離計、只郁 transform／opacity）：大字地區名慢一拍下沉、縮細、淡出（網頁 `--pl`）；
+    **捲動變形**（全部跟捲動距離計、只郁 transform／opacity）：大字地區名慢一拍下沉（PARALLAX 0.6）、縮細、淡出（網頁 `--pl`／`--ly`），
+    **頂部碰到頂部欄（連 18px 圓角）之前一定要完全淡出**（淡出距離 = 空位 ÷ (1 − PARALLAX)），唔好俾頂部欄切開一半；
     去到一半 header 右邊彈出地區膠囊（`.home-topbar-loc`，`--pp`）；搜尋欄捲到 header 底時由左向右收窄（網頁 clip-path、App scaleX
     transformOrigin right）收入右邊搜尋掣，個掣放大轉入嚟（`--ps`）。網頁 HomeTab 用 requestAnimationFrame 設 CSS 變數（唔 setState），
     App `Animated` interpolate + `useNativeDriver`，位置靠 onLayout 量。內容最少一版高，黃色區一定捲得走；頂部欄上面墊黃色，iPhone 拉落唔露灰）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號

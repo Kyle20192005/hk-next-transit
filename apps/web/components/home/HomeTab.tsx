@@ -41,6 +41,7 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
   const locRef = useRef<HTMLDivElement>(null);
   const topbar = useRef<HTMLDivElement>(null);
   const frame = useRef(0);
+  const PARALLAX = 0.6;
   const onScroll = () => {
     if (frame.current) return;
     frame.current = requestAnimationFrame(() => {
@@ -55,9 +56,13 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
       const at = (n: HTMLElement) => n.getBoundingClientRect().top - top + y; // 喺捲動內容入面嘅位置
       const barH = tb.offsetHeight;
       const clamp = (v: number) => Math.min(1, Math.max(0, v));
-      const locEnd = Math.max(1, at(loc) + loc.offsetHeight - barH);
+      // 大字要喺頂部碰到頂部欄（連下面 18px 圓角）之前完全淡出，唔好俾頂部欄切開一半：
+      // 佢跟 PARALLAX 嘅比例向下沉，所以頂部去到頂部欄嘅捲動距離 = 空位 ÷ (1 − PARALLAX)
+      const gap = Math.max(8, at(loc) - barH - 18);
+      const locEnd = Math.max(16, (gap / (1 - PARALLAX)) * 0.9);
       const pl = clamp(y / locEnd);
-      const pp = clamp((pl - 0.55) / 0.45);
+      const pp = clamp((y - locEnd * 0.6) / (locEnd * 0.9));
+      el.style.setProperty('--ly', `${(Math.min(y, locEnd) * PARALLAX).toFixed(1)}px`);
       const ps = clamp((y - (at(f) - barH - 10)) / (f.offsetHeight + 10));
       el.style.setProperty('--pl', pl.toFixed(3));
       el.style.setProperty('--pp', pp.toFixed(3));
