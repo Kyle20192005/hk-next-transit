@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type UIEvent } from 'react';
 import { COMPANIES, MAX_TOOLS, TOOLS, filterNews, formatDistance, groupStopHeads, tint, toggleTool as toggle, type NewsFilter, type ToolId } from '@hknt/core';
 import Icon from '@/components/Icon';
 import Logo from '@/components/Logo';
@@ -31,6 +31,13 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
+  const placeName = area ? area.n : head ? head.name : null;
+  // 向上捲：大字地區收細，變成路線列表咁一行標題（有遲滯，唔會喺邊界閃）
+  const [compact, setCompact] = useState(false);
+  const onScroll = (e: UIEvent<HTMLDivElement>) => {
+    const y = e.currentTarget.scrollTop;
+    setCompact((c) => (c ? y > 8 : y > 48));
+  };
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
   // 有位置就預設睇附近
@@ -47,14 +54,23 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
 
   return (
     <>
-      <header className="app-bar home-hero">
+      <header className={`app-bar home-hero${compact ? ' compact' : ''}`}>
         <div className="app-title">
-          <Logo size={24} />
-          <h1>下一程</h1>
-          <span className="app-sub">NextLeg</span>
+          <Logo size={compact ? 26 : 24} />
+          {compact && placeName ? (
+            <>
+              <h1>{placeName}</h1>
+              {area?.en && <span className="app-sub">{area.en}</span>}
+            </>
+          ) : (
+            <>
+              <h1>下一程</h1>
+              <span className="app-sub">NextLeg</span>
+            </>
+          )}
         </div>
         {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
-        <div className="hero-loc" aria-live="polite">
+        <div className="hero-loc" aria-live="polite" aria-hidden={compact}>
           <span className="hero-name">{area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}</span>
           {area?.en && <span className="hero-en">{area.en}</span>}
           <span className="hero-sub">
@@ -85,7 +101,7 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
         </div>
       </header>
 
-      <div className="home-feed">
+      <div className="home-feed" onScroll={onScroll}>
         <section className="feed-section">
           <div className="feed-head">
             <h2>常用工具</h2>

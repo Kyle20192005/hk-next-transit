@@ -182,7 +182,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
     黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
     quarter 權重 1.4、屋苑 3.5，村名只喺 1.2 公里內冇其他地區名先用；冇地區數據就用最近站頭名），
-    下面一行「最近巴士站：X · N 米」、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
+    下面一行「最近巴士站：X · N 米」（**向上捲**：大字收埋，標題列變成「logo 地區 English」一行，同路線列表標題一樣大；
+    捲過 48px 收、返到 8px 內先展開，有遲滯唔閃；網頁 `.home-hero.compact` CSS 過渡、App `LayoutAnimation`）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
     （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
     `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
     最近睇過（`lib/recent.ts`，最多 8 條）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。

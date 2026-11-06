@@ -263,6 +263,13 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 /* 首頁黃色區：大字顯示最近嘅站頭（似港鐵 App 嘅「青衣 Tsing Yi」） */
 .home-hero { gap: 10px; padding-bottom: 18px; }
 .home-hero .app-title h1 { font-size: 1.125rem; }
+/* 向上捲：大字地區收埋，標題列變成「logo 地區 English」一行（同路線列表標題一樣大） */
+.home-hero { transition: padding 0.25s ease, gap 0.25s ease; }
+.hero-loc { max-height: 160px; overflow: hidden; transition: max-height 0.28s ease, opacity 0.2s ease, padding 0.28s ease, transform 0.28s ease; transform-origin: top center; }
+.home-hero.compact { gap: 12px; padding-bottom: 16px; }
+.home-hero.compact .hero-loc { max-height: 0; opacity: 0; padding: 0; transform: scale(0.8); }
+.home-hero.compact .app-title h1 { font-size: 1.5rem; }
+.home-hero .app-title h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hero-loc { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; text-align: center; }
 .hero-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 2.375rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; }
 .hero-en { margin-top: -2px; font-size: 1.125rem; font-weight: 800; letter-spacing: 0.01em; opacity: 0.85; }

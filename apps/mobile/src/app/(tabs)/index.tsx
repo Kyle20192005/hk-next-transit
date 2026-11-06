@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { LayoutAnimation, Pressable, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { COMPANIES, MAX_TOOLS, TOOLS, filterNews, formatDistance, groupStopHeads, tint, toggleTool, type NewsFilter, type ToolId } from '@hknt/core';
 import { AppBar } from '@/components/ui';
 import { Icon } from '@/components/Icon';
@@ -38,6 +38,17 @@ export default function HomeTab() {
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
+  const placeName = area ? area.n : head ? head.name : null;
+  // 向上捲：大字地區收細，變成路線列表咁一行標題（同網頁一樣；有遲滯，唔會喺邊界閃）
+  const [compact, setCompact] = useState(false);
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const next = compact ? y > 8 : y > 48;
+    if (next !== compact) {
+      LayoutAnimation.configureNext(LayoutAnimation.create(240, 'easeInEaseOut', 'opacity'));
+      setCompact(next);
+    }
+  };
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
   const openNews = () => router.push({ pathname: '/news', params: pos ? { lat: String(pos.lat), lng: String(pos.lng) } : {} });
@@ -54,11 +65,14 @@ export default function HomeTab() {
     <View style={{ flex: 1 }}>
       <AppBar style={{ gap: 10, paddingBottom: 18 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Logo size={22} />
-          <Text style={{ fontSize: 18, fontWeight: '800', color: t.onBrand }}>下一程</Text>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>NextLeg</Text>
+          <Logo size={compact ? 26 : 22} />
+          <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: compact ? 24 : 18, fontWeight: '800', color: t.onBrand }}>
+            {compact && placeName ? placeName : '下一程'}
+          </Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>{compact && placeName ? (area?.en ?? '') : 'NextLeg'}</Text>
         </View>
         {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
+        {!compact && (
         <View style={{ alignItems: 'center', paddingTop: 4, paddingBottom: 2 }}>
           <Text numberOfLines={1} style={{ fontSize: 38, fontWeight: '900', color: t.onBrand, letterSpacing: 0.5 }}>
             {area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}
@@ -79,6 +93,7 @@ export default function HomeTab() {
             </Pressable>
           )}
         </View>
+        )}
         <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 50, paddingRight: 6, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
           <Pressable onPress={() => go('nav')} accessibilityRole="search" accessibilityLabel="導航：想去邊度？" style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14, alignSelf: 'stretch' }}>
             <Icon name="search" size={20} color={t.muted} />
@@ -91,7 +106,7 @@ export default function HomeTab() {
         </View>
       </AppBar>
 
-      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24, gap: 18 }}>
+      <ScrollView style={{ flex: 1 }} onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ padding: 12, paddingBottom: 24, gap: 18 }}>
         <Section
           title="常用工具"
           action={
