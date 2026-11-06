@@ -178,7 +178,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   統一 SVG 圖示（`components/Icon.tsx`），**唔好用 emoji 或者文字符號做圖示**（⇅、⌫、🕒 喺唔同系統大細唔同）。
   顏色、圓角、陰影全部用 `globals.css` 嘅 CSS 變數，深色模式只改變數。
 - 底部分頁列（網頁 `components/home/Home.tsx`、App `src/app/(tabs)/_layout.tsx`）：**首頁／路線／導航／收藏／設定**，預設首頁，
-  記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區。
+  記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區，變成一條頂部欄：左邊品牌（`.tab-brand`，logo 下一程 NextLeg）、
+  右邊分頁，對齊 1100px；闊螢幕各分頁自己嘅品牌標題行（`.app-title:has(> .logo)`）同首頁捲動細標題列（`.home-minibar`）收埋，唔好重複。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
     黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
     quarter 權重 1.4、屋苑 3.5，村名只喺 1.2 公里內冇其他地區名先用；冇地區數據就用最近站頭名），

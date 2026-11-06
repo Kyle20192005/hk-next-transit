@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import type { RouteIndex, TransportMode } from '@hknt/core';
 import Icon, { type IconName } from '@/components/Icon';
+import Logo from '@/components/Logo';
 import { useFavorites } from '@/lib/favorites';
 import HomeTab from './HomeTab';
 import RouteBrowser from './RouteBrowser';
@@ -78,6 +79,12 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
         )}
       </div>
       <nav className="tab-bar" role="tablist" aria-label="首頁">
+        {/* 闊螢幕先顯示：頂部欄左邊嘅品牌（手機用各分頁自己嘅標題） */}
+        <span className="tab-brand" aria-hidden="true">
+          <Logo size={26} />
+          <strong>下一程</strong>
+          <span className="app-sub">NextLeg</span>
+        </span>
         {TABS.map((t) => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => pick(t.id)}>
             <span className="tab-icon">
