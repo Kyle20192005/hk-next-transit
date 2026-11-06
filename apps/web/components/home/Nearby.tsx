@@ -24,7 +24,7 @@ interface StopEtas {
 const AUTO_LOAD = 4;
 const REFRESH_MS = 30_000;
 
-export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[] };
+export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[]; lat: number; lng: number };
 
 /** 定位 + 搵 600 米內嘅站（首頁同附近頁共用）；auto = 一開就定位 */
 export function useNearbyStops(auto = false) {
@@ -42,7 +42,7 @@ export function useNearbyStops(auto = false) {
           const res = await fetch(`/api/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
           const body = await res.json();
           if (!res.ok) throw new Error(body.error ?? res.statusText);
-          setState({ kind: 'ok', stops: body.stops });
+          setState({ kind: 'ok', stops: body.stops, lat: pos.coords.latitude, lng: pos.coords.longitude });
         } catch (e) {
           setState({ kind: 'error', message: (e as Error).message });
         }

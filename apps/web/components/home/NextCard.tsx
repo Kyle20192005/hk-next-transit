@@ -32,7 +32,20 @@ type Tab = 'next' | 'favs';
  * 入面一行站名（跟住而家睇緊嗰張卡），下面打橫掃嘅到站卡（左右兩邊色條），每張最多 4 行。
  * 卡入咗畫面先載入。App 版 apps/mobile/src/components/NextCard.tsx。
  */
-export default function NextCard({ nearby, onLocate, onMore, onFavs }: { nearby: NearbyState; onLocate: () => void; onMore: () => void; onFavs: () => void }) {
+export default function NextCard({
+  nearby,
+  onLocate,
+  onMore,
+  onFavs,
+  notice,
+}: {
+  nearby: NearbyState;
+  onLocate: () => void;
+  onMore: () => void;
+  onFavs: () => void;
+  /** 下班車分頁下面嘅提示條（例如附近嘅交通消息） */
+  notice?: { text: string; onClick: () => void };
+}) {
   const favs = useFavorites();
   const [tab, setTab] = useState<Tab>('next');
   useEffect(() => {
@@ -72,7 +85,16 @@ export default function NextCard({ nearby, onLocate, onMore, onFavs }: { nearby:
           收藏
         </button>
       </div>
-      <div className="nc-body">{tab === 'next' ? <NearbyPane state={nearby} onLocate={onLocate} onMore={onMore} /> : <FavPane favs={favs} onAll={onFavs} />}</div>
+      <div className="nc-body">
+        {tab === 'next' ? <NearbyPane state={nearby} onLocate={onLocate} onMore={onMore} /> : <FavPane favs={favs} onAll={onFavs} />}
+        {tab === 'next' && notice && (
+          <button className="nc-notice" onClick={notice.onClick}>
+            <Icon name="warning" size={20} />
+            <span>{notice.text}</span>
+            <Icon name="chevron-right" size={18} />
+          </button>
+        )}
+      </div>
     </section>
   );
 }

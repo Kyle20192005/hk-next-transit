@@ -9,6 +9,8 @@ import Nearby from './Nearby';
 import Favorites from './Favorites';
 import Navigation from './Navigation';
 import Settings from './Settings';
+import News from './News';
+import type { ToolId } from '@hknt/core';
 
 type Tab = 'home' | 'routes' | 'nav' | 'favs' | 'settings';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -27,7 +29,8 @@ const TAB_KEY = 'hknt.tab';
  */
 export default function Home({ routes, updated }: { routes: RouteIndex['routes']; updated: string | null }) {
   const [tab, setTab] = useState<Tab>('home');
-  const [nearby, setNearby] = useState(false);
+  // 唔係分頁嘅頁：附近車站、交通消息（有返回掣）
+  const [view, setView] = useState<null | { kind: 'nearby' } | { kind: 'news'; pos: { lat: number; lng: number } | null }>(null);
   const [mode, setMode] = useState<TransportMode>('bus');
   const favCount = useFavorites().length;
 
@@ -41,7 +44,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   }, []);
   const pick = (t: Tab) => {
     setTab(t);
-    setNearby(false);
+    setView(null);
     try {
       sessionStorage.setItem(TAB_KEY, t);
     } catch {
@@ -52,22 +55,22 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   return (
     <main className="home">
       <div className="home-body">
-        {nearby ? (
-          <Nearby onBack={() => setNearby(false)} />
+        {view?.kind === 'nearby' ? (
+          <Nearby onBack={() => setView(null)} />
+        ) : view?.kind === 'news' ? (
+          <News pos={view.pos} onBack={() => setView(null)} />
         ) : (
           <>
             {tab === 'home' && (
               <HomeTab
-                onMode={(m) => {
-                  setMode(m);
-                  pick('routes');
+                go={(to: ToolId, pos) => {
+                  if (to === 'nearby') setView({ kind: 'nearby' });
+                  else if (to === 'news') setView({ kind: 'news', pos: pos ?? null });
+                  else pick(to);
                 }}
-                onNav={() => pick('nav')}
-                onFavs={() => pick('favs')}
-                onNearby={() => setNearby(true)}
               />
             )}
-            {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} mode={mode} onMode={setMode} onNearby={() => setNearby(true)} />}
+            {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} mode={mode} onMode={setMode} onNearby={() => setView({ kind: 'nearby' })} />}
             {tab === 'nav' && <Navigation />}
             {tab === 'favs' && <Favorites onBrowse={() => pick('routes')} />}
             {tab === 'settings' && <Settings updated={updated} />}

@@ -23,7 +23,7 @@ type Tab = 'next' | 'favs';
  * 首頁大卡（似港鐵 App 嘅「下班車」小工具）：頂部兩個分頁「下班車」（附近）同「收藏」，
  * 入面一行站名（跟住而家睇緊嗰張），下面打橫掃嘅到站卡（左右兩邊色條）。同網頁 components/home/NextCard.tsx 一樣。
  */
-export function NextCard({ nearby, onLocate }: { nearby: NearbyState; onLocate: () => void }) {
+export function NextCard({ nearby, onLocate, notice }: { nearby: NearbyState; onLocate: () => void; notice?: { text: string; onPress: () => void } }) {
   const t = useTheme();
   const favs = useFavorites();
   const [tab, setTab] = useState<Tab>('next');
@@ -61,7 +61,19 @@ export function NextCard({ nearby, onLocate }: { nearby: NearbyState; onLocate: 
           {tabBtn('favs', '收藏', tab === 'favs' ? 'star-fill' : 'star', tab === 'favs' ? t.brand : t.muted)}
         </View>
       </View>
-      <View style={{ paddingTop: 12, paddingBottom: 10 }}>{tab === 'next' ? <NearbyPane state={nearby} onLocate={onLocate} /> : <FavPane favs={favs} />}</View>
+      <View style={{ paddingTop: 12, paddingBottom: 10 }}>
+        {tab === 'next' ? <NearbyPane state={nearby} onLocate={onLocate} /> : <FavPane favs={favs} />}
+        {/* 提示條（附近嘅交通消息），似港鐵「扶手電梯特別安排」 */}
+        {tab === 'next' && notice && (
+          <Pressable onPress={notice.onPress} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, marginBottom: 2, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, backgroundColor: t.brandSoft }}>
+            <Icon name="warning" size={20} color="#D7282F" />
+            <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: '700', color: t.text }}>
+              {notice.text}
+            </Text>
+            <Icon name="chevron-right" size={18} color={t.muted} />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }

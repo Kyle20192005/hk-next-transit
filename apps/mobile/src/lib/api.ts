@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Calendar, Company, Eta, RouteData, RouteIndex } from '@hknt/core';
+import type { Calendar, Company, Eta, NewsItem, RouteData, RouteIndex } from '@hknt/core';
 
 /**
  * 後端 = apps/web 嘅 API。預設用線上網站（手機連唔到電腦嘅 localhost）；
@@ -64,6 +64,7 @@ export const api = {
     get<{ etas: Eta[]; failed?: Company[]; fetchedAt: string }>(`/api/eta?co=${co}&route=${q(route)}&stop=${q(stop)}`),
   /** 喺度搭得：呢個位置可以搭嘅所有路線同下一兩班 */
   here: (lat: number, lng: number) => get<{ routes: HereRoute[]; radius: number }>(`/api/here?lat=${lat}&lng=${lng}`),
+  news: (pos: { lat: number; lng: number } | null) => get<{ items: NewsItem[] }>(`/api/news${pos ? `?lat=${pos.lat.toFixed(4)}&lng=${pos.lng.toFixed(4)}` : ''}`),
   nearby: (lat: number, lng: number) => get<{ stops: NearStop[] }>(`/api/nearby?lat=${lat}&lng=${lng}`),
   /** 一個站所有路線嘅下一班 */
   stopEtas: (co: Co, stop: string) =>

@@ -202,6 +202,8 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .tabular { font-variant-numeric: tabular-nums; }
 /* 首頁 */
 .home-feed { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 18px; }
+/* 內容多過一版時唔好壓扁入面嘅卡（要捲動） */
+.home-feed > * { flex-shrink: 0; }
 .search-field .soon-badge { margin-left: auto; }
 .mode-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .mode-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
@@ -258,6 +260,55 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .nc-dots span.on { width: 16px; background: var(--accent); }
 .nc-message { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px 6px; font-size: 0.9375rem; line-height: 1.6; }
 .nc-message .error { color: var(--special); }
+/* 首頁黃色區：大字顯示最近嘅站頭（似港鐵 App 嘅「青衣 Tsing Yi」） */
+.home-hero { gap: 10px; padding-bottom: 18px; }
+.home-hero .app-title h1 { font-size: 1.125rem; }
+.hero-loc { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; text-align: center; }
+.hero-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 2rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; }
+.hero-sub { display: inline-flex; align-items: center; gap: 4px; font-size: 0.875rem; font-weight: 600; opacity: 0.75; }
+.hero-retry { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.hero-search { padding: 0 6px 0 0; gap: 0; }
+.hero-search-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; align-self: stretch; padding: 0 0 0 14px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.status-chip { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 0.875rem; font-weight: 800; cursor: pointer; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background: #1E9E5A; box-shadow: 0 0 0 3px rgb(30 158 90 / 0.18); }
+.status-dot.warn { background: #E5484D; box-shadow: 0 0 0 3px rgb(229 72 77 / 0.2); }
+.icon-btn { display: grid; place-items: center; min-width: 36px; height: 36px; border: 0; border-radius: 10px; background: none; color: var(--muted); cursor: pointer; }
+/* 常用工具 */
+.tool-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.tool-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px 10px; border: 0; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); color: var(--text); font: inherit; cursor: pointer; }
+.tool-tile:active { transform: scale(0.97); }
+.tool-icon { position: relative; width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; }
+.tool-badge { position: absolute; top: -4px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: 10px; background: #E5484D; color: #fff; font-size: 0.75rem; font-weight: 800; box-shadow: 0 0 0 2px var(--card); }
+.tool-label { font-size: 0.875rem; font-weight: 800; white-space: nowrap; }
+.tool-soon { margin-top: -4px; font-size: 0.6875rem; font-weight: 700; color: var(--muted); }
+.tool-editor { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.tool-editor p { margin: 0; font-size: 0.875rem; }
+.tool-picks { display: flex; flex-wrap: wrap; gap: 8px; }
+.tool-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--card); color: var(--muted); font: inherit; font-size: 0.9375rem; font-weight: 700; cursor: pointer; }
+.tool-pick[aria-pressed="true"] { border-color: var(--accent); color: var(--text); background: var(--brand-soft); }
+.tool-order { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: var(--card); font-size: 0.6875rem; }
+/* 大卡提示條（附近交通消息） */
+.nc-notice { display: flex; align-items: center; gap: 10px; width: calc(100% - 32px); margin: 12px 16px 2px; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--brand-soft); color: var(--text); font: inherit; font-size: 0.9375rem; font-weight: 700; text-align: left; cursor: pointer; }
+.nc-notice svg:first-child { flex: none; color: #D7282F; }
+.nc-notice span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nc-notice svg:last-child { flex: none; color: var(--muted); }
+/* 交通消息 */
+.news-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.news-chip { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 8px 16px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-size: 0.9375rem; font-weight: 700; cursor: pointer; }
+.news-chip[aria-selected="true"] { border-color: #2F6FD6; background: rgb(47 111 214 / 0.1); color: #2F6FD6; }
+.news-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.news-item button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.news-item.closed { opacity: 0.6; }
+.news-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.news-tag { padding: 1px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; }
+.news-tag.live { background: rgb(229 72 77 / 0.12); color: #D7282F; }
+.news-tag.done { background: var(--surface-2); color: var(--muted); }
+.news-tag.near { background: rgb(47 111 214 / 0.12); color: #2F6FD6; }
+.news-tag.mtr { background: rgb(215 40 47 / 0.1); color: #B3202A; }
+.news-tag.bus { background: var(--brand-soft); color: var(--accent); }
+.news-title { font-size: 0.9375rem; font-weight: 700; line-height: 1.5; }
+.news-text { margin: 0; padding: 0 14px 14px; white-space: pre-line; font-size: 0.875rem; line-height: 1.7; color: var(--muted); }
+.news-source { margin: 4px; font-size: 0.75rem; line-height: 1.6; }
 /* 巴士路線頁：附近巴士站捷徑 */
 .nearby-shortcut-item { list-style: none; }
 .nearby-shortcut { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }

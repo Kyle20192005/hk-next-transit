@@ -178,8 +178,15 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   顏色、圓角、陰影全部用 `globals.css` 嘅 CSS 變數，深色模式只改變數。
 - 底部分頁列（網頁 `components/home/Home.tsx`、App `src/app/(tabs)/_layout.tsx`）：**首頁／路線／導航／收藏／設定**，預設首頁，
   記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區。
-  - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`）：NextLeg 入口。黃色區「你想去邊？」（撳去導航，標即將推出）；
-    下面由上至下：**大卡**、交通工具捷徑（每種一隻代表色 core `TRANSPORT_MODES.color`，圖示用嗰隻色、底色 `tint` 淺色；撳去路線分頁並揀咗嗰種，`?mode=`）、最近睇過（`lib/recent.ts`，路線頁開咗就記低，最多 8 條）。
+  - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
+    黃色區大字顯示最近嘅站頭（`groupStopHeads` 第一個；定位中／失敗有提示）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
+    （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
+    `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
+    最近睇過（`lib/recent.ts`，最多 8 條）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。
+  - **交通消息**（`/api/news`）：運輸署特別交通消息（`resource.data.one.gov.hk/td/tc/specialtrafficnews.xml`）+ 事故消息
+    （`td.gov.hk/tc/special_news/trafficnews.xml`，有完結狀態）。冇座標，「附近」= 內文提到用戶 1.5 公里內巴士站名嘅路名／地方名
+    （core `placeTokens`、`mentionsAny`）。文字要 NFKC（運輸署用康熙部首字）。全頁：網頁 `components/home/News.tsx`（Home 入面嘅 view）、
+    App `src/app/news.tsx`（stack，`?lat&lng`）。
   - **大卡**（網頁 `components/home/NextCard.tsx`、App `components/NextCard.tsx`，似港鐵 App「下班車」小工具）：頂部文件夾式兩個分頁
     「下班車」（附近，一開就自動定位）同「收藏」（記住揀咗邊個），中間斜邊似港鐵 App（背景一個 SVG 斜邊，揀右邊時 scaleX(-1) 反轉）。入面一行站名跟住而家睇緊嗰張卡，右邊「更多／全部」；
     下面打橫掃嘅到站卡（左右兩邊色條 = 第一班嘅公司色），每張最多 4 行「標籤、往邊、分鐘」，下面圓點指示。

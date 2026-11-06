@@ -1,89 +1,189 @@
 import { router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { COMPANIES, TRANSPORT_MODES, tint, type TransportMode } from '@hknt/core';
-import { AppBar, SoonBadge } from '@/components/ui';
-import { Icon, type IconName } from '@/components/Icon';
+import { COMPANIES, MAX_TOOLS, TOOLS, filterNews, formatDistance, groupStopHeads, tint, toggleTool, type NewsFilter, type ToolId } from '@hknt/core';
+import { AppBar } from '@/components/ui';
+import { Icon } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
 import { useNearbyStops } from '@/components/Nearby';
 import { NextCard } from '@/components/NextCard';
+import { NewsChips, NewsList } from '@/components/NewsList';
+import { useNews, useTools } from '@/lib/news';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 
-const MODE_ICON: Record<TransportMode, IconName> = { bus: 'bus', rail: 'train', minibus: 'minibus', ferry: 'ferry', tram: 'tram' };
 const RECENT_SHOWN = 5;
+const NEWS_SHOWN = 3;
 
 /**
- * 首頁（NextLeg 嘅入口，同網頁 components/home/HomeTab.tsx 一樣）：導航搜尋欄、大卡（下班車／收藏）、交通工具捷徑、最近睇過。
- * 一開就自動定位顯示附近嘅車（第一次會問權限）。
+ * 首頁（NextLeg 入口，參考港鐵 App，同網頁 components/home/HomeTab.tsx 一樣）：
+ * 黃色區大字顯示最近嘅站頭、「想去邊度？」同交通消息燈號；常用工具（可以揀）；大卡（下班車／收藏）；交通消息；最近睇過。
  */
 export default function HomeTab() {
   const t = useTheme();
   const recent = useRecent();
   const { state, locate } = useNearbyStops(true);
+  const pos = state.kind === 'ok' ? { lat: state.lat, lng: state.lng } : null;
+  const news = useNews(pos);
+  const [tools, setTools] = useTools();
+  const [editing, setEditing] = useState(false);
+  const [filter, setFilter] = useState<NewsFilter>('all');
+  const hasPos = !!pos;
+  useEffect(() => {
+    if (!hasPos) return;
+    const id = setTimeout(() => setFilter((f) => (f === 'all' ? 'nearby' : f)), 0);
+    return () => clearTimeout(id);
+  }, [hasPos]);
+
+  const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
+  const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
+  const live = news?.filter((n) => !n.closed) ?? [];
+  const openNews = () => router.push({ pathname: '/news', params: pos ? { lat: String(pos.lat), lng: String(pos.lng) } : {} });
+  const go = (id: ToolId) => {
+    if (id === 'routes') router.navigate('/routes');
+    else if (id === 'nearby') router.push('/nearby');
+    else if (id === 'favs') router.navigate('/favorites');
+    else if (id === 'news') openNews();
+    else if (id === 'nav') router.navigate('/navigation');
+    else router.navigate('/settings');
+  };
 
   return (
     <View style={{ flex: 1 }}>
-      <AppBar>
+      <AppBar style={{ gap: 10, paddingBottom: 18 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Logo size={26} />
-          <Text style={{ fontSize: 24, fontWeight: '800', color: t.onBrand, letterSpacing: -0.3 }}>下一程</Text>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginLeft: 2, marginTop: 6 }}>NextLeg</Text>
+          <Logo size={22} />
+          <Text style={{ fontSize: 18, fontWeight: '800', color: t.onBrand }}>下一程</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>NextLeg</Text>
         </View>
-        <Pressable
-          onPress={() => router.navigate('/navigation')}
-          accessibilityRole="search"
-          accessibilityLabel="導航：你想去邊？"
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingLeft: 14, paddingRight: 10, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}
-        >
-          <Icon name="navigate" size={20} color={t.muted} />
-          <Text style={{ flex: 1, fontSize: 17, color: t.muted }}>你想去邊？</Text>
-          <SoonBadge label="即將推出" />
-        </Pressable>
+        {/* 大字顯示最近嘅站頭（似港鐵 App 嘅「青衣 Tsing Yi」） */}
+        <View style={{ alignItems: 'center', paddingTop: 4, paddingBottom: 2 }}>
+          <Text numberOfLines={1} style={{ fontSize: 32, fontWeight: '900', color: t.onBrand, letterSpacing: 0.5 }}>
+            {head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}
+          </Text>
+          {head ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.75 }}>
+              <Icon name="navigate" size={14} color={t.onBrand} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>最近嘅巴士站 · {formatDistance(head.distance)}</Text>
+            </View>
+          ) : (
+            <Pressable onPress={state.kind === 'error' ? () => void locate() : undefined}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand, opacity: 0.75, textDecorationLine: state.kind === 'error' ? 'underline' : 'none' }}>
+                {state.kind === 'error' ? `${state.message} · 再試` : state.kind === 'ok' ? '600 米內冇巴士站' : '搵緊你附近嘅巴士站'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 50, paddingRight: 6, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
+          <Pressable onPress={() => go('nav')} accessibilityRole="search" accessibilityLabel="導航：想去邊度？" style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14, alignSelf: 'stretch' }}>
+            <Icon name="search" size={20} color={t.muted} />
+            <Text style={{ fontSize: 17, color: t.muted }}>想去邊度？</Text>
+          </Pressable>
+          <Pressable onPress={openNews} accessibilityLabel={`交通消息：${nearNews.length ? `附近 ${nearNews.length} 條` : '附近冇消息'}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: t.surface2 }}>
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: nearNews.length ? '#E5484D' : '#1E9E5A' }} />
+            <Text style={{ fontSize: 14, fontWeight: '800', color: t.text }}>交通消息</Text>
+          </Pressable>
+        </View>
       </AppBar>
 
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 24, gap: 18 }}>
-        <NextCard nearby={state} onLocate={() => void locate()} />
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          {TRANSPORT_MODES.map((m) => (
-            <Pressable key={m.id} onPress={() => router.navigate({ pathname: '/routes', params: { mode: m.id } })} accessibilityRole="button" accessibilityLabel={m.ready ? m.label : `${m.label}（即將推出）`} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-              {({ pressed }) => (
-                <>
-                  <View style={{ width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: tint(m.color, 0.14), transform: [{ scale: pressed ? 0.95 : 1 }] }}>
-                    <Icon name={MODE_ICON[m.id]} size={26} color={m.color} />
-                  </View>
-                  <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: m.ready ? '700' : '600', color: m.ready ? t.text : t.muted }}>
-                    {m.label}
-                  </Text>
-                </>
-              )}
+        <Section
+          title="常用工具"
+          action={
+            <Pressable onPress={() => setEditing((e) => !e)} hitSlop={8} accessibilityLabel={editing ? '完成' : '揀常用工具'}>
+              {editing ? <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>完成</Text> : <Icon name="settings" size={20} color={t.muted} />}
             </Pressable>
-          ))}
-        </View>
+          }
+        >
+          {editing ? (
+            <View style={{ padding: 14, gap: 10, borderRadius: radius.l, backgroundColor: t.card, ...shadow }}>
+              <Text style={{ fontSize: 14, color: t.muted }}>揀最多 {MAX_TOOLS} 個，次序跟揀嘅先後</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {TOOLS.map((x) => {
+                  const on = tools.includes(x.id);
+                  return (
+                    <Pressable key={x.id} onPress={() => setTools(toggleTool(tools, x.id))} accessibilityState={{ selected: on }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1.5, borderColor: on ? t.accent : t.line, backgroundColor: on ? t.brandSoft : t.card }}>
+                      <Icon name={x.icon} size={18} color={on ? t.text : t.muted} />
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: on ? t.text : t.muted }}>{x.label}</Text>
+                      {on && (
+                        <View style={{ width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: t.accent }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: t.card }}>{tools.indexOf(x.id) + 1}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {tools.map((id) => {
+                const x = TOOLS.find((y) => y.id === id)!;
+                return (
+                  <Pressable key={id} onPress={() => go(id)} accessibilityRole="button" accessibilityLabel={x.label} style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 6, paddingTop: 12, paddingBottom: 10, borderRadius: 18, backgroundColor: t.card, transform: [{ scale: pressed ? 0.97 : 1 }], ...shadow })}>
+                    <View style={{ width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: tint(x.color, 0.12) }}>
+                      <Icon name={x.icon} size={28} color={x.color} />
+                      {id === 'news' && nearNews.length > 0 && (
+                        <View style={{ position: 'absolute', top: -4, right: -6, minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E5484D', borderWidth: 2, borderColor: t.card }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{nearNews.length}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: t.text }}>
+                      {x.label}
+                    </Text>
+                    {x.soon && <Text style={{ marginTop: -4, fontSize: 11, fontWeight: '700', color: t.muted }}>即將推出</Text>}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </Section>
+
+        <NextCard nearby={state} onLocate={() => void locate()} notice={nearNews[0] ? { text: nearNews[0].title, onPress: openNews } : undefined} />
+
+        <Section
+          title="交通消息"
+          action={
+            <Pressable onPress={openNews} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>更多</Text>
+              <Icon name="chevron-right" size={16} color={t.accent} />
+            </Pressable>
+          }
+        >
+          <NewsChips value={filter} onChange={setFilter} hasPos={hasPos} />
+          {news === null ? (
+            <Text style={{ color: t.muted, padding: 8 }}>載入中…</Text>
+          ) : (
+            <NewsList items={filterNews(live, filter).slice(0, NEWS_SHOWN)} empty={filter === 'nearby' ? '附近冇特別交通消息' : '暫時冇特別交通消息'} />
+          )}
+        </Section>
 
         {recent.length > 0 && (
           <Section title="最近睇過">
             <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
-              {recent.slice(0, RECENT_SHOWN).map((r, i) => (
-                <Pressable
-                  key={`${r.co}-${r.route}-${r.dir}`}
-                  onPressIn={() => warmRoute(r.co, r.route, { dir: r.dir })}
-                  onPress={() => router.push({ pathname: '/[co]/[route]', params: { co: r.co, route: r.route, dir: r.dir } })}
-                  accessibilityRole="link"
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: t.line }}
-                >
-                  <View style={{ minWidth: 56, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: 'center', backgroundColor: COMPANIES[r.companies[0] ?? 'CTB'].bg }}>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: COMPANIES[r.companies[0] ?? 'CTB'].ink, ...tabular }}>{r.route}</Text>
-                  </View>
-                  <Text numberOfLines={1} style={{ flex: 1, fontSize: 16, fontWeight: '600', color: t.text }}>
-                    <Text style={{ fontSize: 13, fontWeight: '500', color: t.muted }}>往 </Text>
-                    {r.dest}
-                  </Text>
-                  <Icon name="chevron-right" size={18} color={t.muted} />
-                </Pressable>
-              ))}
+              {recent.slice(0, RECENT_SHOWN).map((r, i) => {
+                const c = COMPANIES[r.companies[0] ?? 'CTB'];
+                return (
+                  <Pressable
+                    key={`${r.co}-${r.route}-${r.dir}`}
+                    onPressIn={() => warmRoute(r.co, r.route, { dir: r.dir })}
+                    onPress={() => router.push({ pathname: '/[co]/[route]', params: { co: r.co, route: r.route, dir: r.dir } })}
+                    accessibilityRole="link"
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: t.line }}
+                  >
+                    <View style={{ minWidth: 56, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: 'center', backgroundColor: c.bg }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink, ...tabular }}>{r.route}</Text>
+                    </View>
+                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 16, fontWeight: '600', color: t.text }}>
+                      <Text style={{ fontSize: 13, fontWeight: '500', color: t.muted }}>往 </Text>
+                      {r.dest}
+                    </Text>
+                    <Icon name="chevron-right" size={18} color={t.muted} />
+                  </Pressable>
+                );
+              })}
             </View>
           </Section>
         )}
@@ -92,17 +192,13 @@ export default function HomeTab() {
   );
 }
 
-function Section({ title, action, children }: { title: string; action?: { label: string; onPress: () => void }; children: ReactNode }) {
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   const t = useTheme();
   return (
-    <View style={{ gap: 8 }}>
+    <View style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 }}>
         <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>{title}</Text>
-        {action && (
-          <Pressable onPress={action.onPress} hitSlop={8}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>{action.label}</Text>
-          </Pressable>
-        )}
+        {action}
       </View>
       {children}
     </View>
