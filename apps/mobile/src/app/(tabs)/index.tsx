@@ -37,6 +37,7 @@ export default function HomeTab() {
   }, [hasPos]);
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
+  const area = state.kind === 'ok' ? state.area : null;
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
   const openNews = () => router.push({ pathname: '/news', params: pos ? { lat: String(pos.lat), lng: String(pos.lng) } : {} });
@@ -57,19 +58,22 @@ export default function HomeTab() {
           <Text style={{ fontSize: 18, fontWeight: '800', color: t.onBrand }}>下一程</Text>
           <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>NextLeg</Text>
         </View>
-        {/* 大字顯示最近嘅站頭（似港鐵 App 嘅「青衣 Tsing Yi」） */}
+        {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
         <View style={{ alignItems: 'center', paddingTop: 4, paddingBottom: 2 }}>
-          <Text numberOfLines={1} style={{ fontSize: 32, fontWeight: '900', color: t.onBrand, letterSpacing: 0.5 }}>
-            {head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}
+          <Text numberOfLines={1} style={{ fontSize: 38, fontWeight: '900', color: t.onBrand, letterSpacing: 0.5 }}>
+            {area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}
           </Text>
+          {area?.en && <Text style={{ marginTop: -2, fontSize: 18, fontWeight: '800', color: t.onBrand, opacity: 0.85 }}>{area.en}</Text>}
           {head ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.75 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, opacity: 0.75 }}>
               <Icon name="navigate" size={14} color={t.onBrand} />
-              <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>最近嘅巴士站 · {formatDistance(head.distance)}</Text>
+              <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
+                最近巴士站：{head.name} · {formatDistance(head.distance)}
+              </Text>
             </View>
           ) : (
             <Pressable onPress={state.kind === 'error' ? () => void locate() : undefined}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand, opacity: 0.75, textDecorationLine: state.kind === 'error' ? 'underline' : 'none' }}>
+              <Text style={{ marginTop: 4, fontSize: 14, fontWeight: '600', color: t.onBrand, opacity: 0.75, textDecorationLine: state.kind === 'error' ? 'underline' : 'none' }}>
                 {state.kind === 'error' ? `${state.message} · 再試` : state.kind === 'ok' ? '600 米內冇巴士站' : '搵緊你附近嘅巴士站'}
               </Text>
             </Pressable>

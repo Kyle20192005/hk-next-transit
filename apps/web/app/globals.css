@@ -264,8 +264,9 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .home-hero { gap: 10px; padding-bottom: 18px; }
 .home-hero .app-title h1 { font-size: 1.125rem; }
 .hero-loc { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; text-align: center; }
-.hero-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 2rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; }
-.hero-sub { display: inline-flex; align-items: center; gap: 4px; font-size: 0.875rem; font-weight: 600; opacity: 0.75; }
+.hero-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 2.375rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; }
+.hero-en { margin-top: -2px; font-size: 1.125rem; font-weight: 800; letter-spacing: 0.01em; opacity: 0.85; }
+.hero-sub { margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; font-size: 0.875rem; font-weight: 600; opacity: 0.75; }
 .hero-retry { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .hero-search { padding: 0 6px 0 0; gap: 0; }
 .hero-search-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; align-self: stretch; padding: 0 0 0 14px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }

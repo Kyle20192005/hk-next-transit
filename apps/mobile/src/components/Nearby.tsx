@@ -11,7 +11,7 @@ import { Icon } from './Icon';
 
 const REFRESH_MS = 30_000;
 
-export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[]; lat: number; lng: number };
+export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[]; lat: number; lng: number; area: { n: string; en: string | null } | null };
 
 /** 定位 + 搵 600 米內嘅站（首頁同附近頁共用）；auto = 一開就定位（第一次會問權限） */
 export function useNearbyStops(auto = false) {
@@ -27,7 +27,7 @@ export function useNearbyStops(auto = false) {
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const body = await api.nearby(pos.coords.latitude, pos.coords.longitude);
-      setState({ kind: 'ok', stops: body.stops, lat: pos.coords.latitude, lng: pos.coords.longitude });
+      setState({ kind: 'ok', stops: body.stops, lat: pos.coords.latitude, lng: pos.coords.longitude, area: body.area ?? null });
     } catch (e) {
       setState({ kind: 'error', message: (e as Error).message || '攞唔到位置，請再試' });
     }

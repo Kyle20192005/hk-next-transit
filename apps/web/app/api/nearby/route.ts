@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAllStops, getIndex } from '@/lib/data';
+import { pickArea } from '@hknt/core';
+import { getAllStops, getIndex, getPlaces } from '@/lib/data';
 import { CORS } from '@/lib/cors';
 
 const MAX_DISTANCE_M = 600;
@@ -11,7 +12,7 @@ function metres(lat1: number, lng1: number, lat2: number, lng2: number) {
   return Math.hypot(dx, dy);
 }
 
-/** GET /api/nearby?lat=22.28&lng=114.15：附近（600 米內）最近嘅巴士站（城巴、九巴）同經過嘅路線 */
+/** GET /api/nearby?lat=22.28&lng=114.15：附近（600 米內）最近嘅巴士站（所有公司）同經過嘅路線，同埋地區名 `area` */
 export async function GET(req: NextRequest) {
   const lat = Number(req.nextUrl.searchParams.get('lat'));
   const lng = Number(req.nextUrl.searchParams.get('lng'));
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
   if (!(lat > 22.1 && lat < 22.6 && lng > 113.8 && lng < 114.5)) {
     return NextResponse.json({ error: '位置唔喺香港範圍' }, { status: 400, headers: CORS });
   }
-  const [all, index] = await Promise.all([getAllStops(), getIndex()]);
+  const [all, index, places] = await Promise.all([getAllStops(), getIndex(), getPlaces().catch(() => [])]);
   const companiesOf = new Map(index.routes.map((r) => [`${r.co ?? 'ctb'}/${r.route}`, r.companies ?? ['CTB']]));
   const stops = all
     .map((s) => ({ ...s, distance: Math.round(metres(lat, lng, s.lat, s.lng)) }))
@@ -35,7 +36,9 @@ export async function GET(req: NextRequest) {
       distance: s.distance,
       routes: s.r.map(([co, route, dir, dest]) => ({ co, route, dir, dest, companies: companiesOf.get(`${co}/${route}`) ?? [] })),
     }));
-  return NextResponse.json({ stops }, { headers: { ...CORS, 'Cache-Control': 'no-store' } });
+  // 地區名（首頁大字，例如「青衣」「香港仔」）；冇地區數據就 null，前端用站頭名
+  const area = pickArea(places, lat, lng);
+  return NextResponse.json({ stops, area }, { headers: { ...CORS, 'Cache-Control': 'no-store' } });
 }
 
 export function OPTIONS() {

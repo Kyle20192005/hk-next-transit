@@ -28,6 +28,9 @@ NLB = 'https://rt.data.gov.hk/v2/transport/nlb'
 MTRB_CSV = 'https://opendata.mtr.com.hk/data'
 # OpenStreetMap：港鐵巴士 network relation，再加冇入 network 嘅接駁巴士 route_master（K12、K14）
 OSM_API = 'https://api.openstreetmap.org/api/0.6'
+# 地區名（首頁大字「青衣」「香港仔」「雞地」）：OSM place 節點，經 Overpass 攞；幾個鏡像輪流試，全部失敗就用 repo 入面嘅 places_seed.json
+OVERPASS = ['https://overpass.kumi.systems/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter']
+OSM_PLACES_QUERY = '[out:json][timeout:100];node(22.15,113.82,22.57,114.45)[place~"^(suburb|quarter|neighbourhood|town|village)$"];out;'
 OSM_MTRB_NETWORK = 6482279
 OSM_MTRB_EXTRA_MASTERS = [8024265, 8024263]
 # 站到站平均行車時間（秒），由 HK-Bus-ETA/hk-bus-time-between-stops 計算，每小時更新
@@ -142,6 +145,30 @@ def fetch_osm_mtrb():
     print('OSM 港鐵巴士走線', len(routes), '條')
 
 
+def fetch_osm_places():
+    """地區名：OSM place 節點（中文名、英文名、種類、座標）。第三方：攞唔到就用 places_seed.json，唔好令 pipeline 失敗"""
+    path = os.path.join(CACHE, 'osm_places.json')
+    if done(path):
+        return
+    import urllib.parse
+    for url in OVERPASS:
+        try:
+            req = urllib.request.Request(url, data=urllib.parse.urlencode({'data': OSM_PLACES_QUERY}).encode(), headers=UA)
+            with urllib.request.urlopen(req, timeout=180) as r:
+                data = json.loads(r.read())
+            places = [{'n': t.get('name:zh-Hant') or t.get('name:zh-HK') or t.get('name:zh') or t.get('name'), 'en': t.get('name:en'),
+                       't': t['place'], 'lat': e['lat'], 'lng': e['lon']} for e in data['elements'] for t in [e.get('tags', {})]]
+            places = [p for p in places if p['n']]
+            if len(places) < 500:
+                raise RuntimeError(f'太少：{len(places)}')
+            json.dump({'places': places}, open(path, 'w'), ensure_ascii=False)
+            print('OSM 地區名', len(places), '個')
+            return
+        except Exception as e:
+            print('OSM 地區名下載失敗', url, e)
+    print('OSM 地區名全部鏡像失敗，build 時用 places_seed.json')
+
+
 def fetch_journey_times():
     path = os.path.join(CACHE, 'journey_times.json')
     if done(path):
@@ -175,7 +202,7 @@ def fetch_ctb():
 if __name__ == '__main__':
     os.makedirs(CACHE, exist_ok=True)
     t = time.time()
-    ths = [threading.Thread(target=f) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_osm_mtrb, fetch_journey_times)]
+    ths = [threading.Thread(target=f) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_osm_mtrb, fetch_osm_places, fetch_journey_times)]
     for th in ths: th.start()
     for th in ths: th.join()
     print(f'完成 {time.time() - t:.0f}s')

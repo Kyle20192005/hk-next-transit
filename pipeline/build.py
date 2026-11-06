@@ -529,6 +529,8 @@ def main():
             for sid, rs in sorted(ob.items())
         ]
     json.dump({'stops': all_stops}, open(f'{OUT}/stops.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+    from places import build_places
+    build_places(all_stops, OUT)
     generated = dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')
     json.dump({'generatedAt': generated, 'routes': sorted(index_all, key=route_key)},
               open(f'{OUT}/index.json', 'w', encoding='utf-8'), ensure_ascii=False)

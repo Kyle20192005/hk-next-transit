@@ -1,7 +1,7 @@
 import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Calendar, RouteData, RouteIndex } from '@hknt/core';
+import type { Calendar, Place, RouteData, RouteIndex } from '@hknt/core';
 
 /**
  * 讀 pipeline 輸出嘅數據。
@@ -131,6 +131,11 @@ export async function getAllStops(): Promise<AnyStopEntry[]> {
   const all = await load<{ stops: AnyStopEntry[] }>('stops.json');
   if (all) return all.stops;
   return (await getCtbStops()).map((s) => ({ ...s, co: 'ctb' as const, r: s.r.map((x) => ['ctb', ...x] as AnyStopEntry['r'][number]) }));
+}
+
+/** 地區名（OSM，pipeline places.py）；舊數據冇就係空 */
+export async function getPlaces(): Promise<Place[]> {
+  return (await load<{ places: Place[] }>('places.json'))?.places ?? [];
 }
 
 export async function getCalendar(): Promise<Calendar> {

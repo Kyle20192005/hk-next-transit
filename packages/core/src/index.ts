@@ -18,3 +18,4 @@ export * from './transport';
 export * from './version';
 export * from './departures';
 export * from './news';
+export * from './area';

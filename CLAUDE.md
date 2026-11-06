@@ -105,6 +105,7 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 | 每個走法嘅時間表 | 運輸署 GTFS（`frequencies.txt`、`calendar*.txt`） |
 | 地圖走線 | CSDI「巴士路線」WFS（`FB_ROUTE_LINE`）；港鐵巴士用 OpenStreetMap |
 | 地圖底圖 | 網頁：OpenFreeMap 向量地圖（OpenStreetMap 數據）；App：iPhone Apple 地圖、Android Google 地圖 |
+| 地區名（首頁大字） | OpenStreetMap place 節點（Overpass，`fetch.py` 嘅 `fetch_osm_places`，幾個鏡像輪流試；全部失敗用 `pipeline/places_seed.json`）→ `places.py` 篩走深圳（離巴士站 > 800 米、簡體字、「社區」）→ `out/places.json` |
 | 站到站行車時間（實測平均） | [hk-bus-time-between-stops](https://github.com/HK-Bus-ETA/hk-bus-time-between-stops)（`timeinterval.hkbuseta.com/times/all.json`），第三方、實驗性質 |
 
 App 入面一律用**城巴站 ID**。政府站 ID 只喺 pipeline 內部用。
@@ -179,7 +180,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 底部分頁列（網頁 `components/home/Home.tsx`、App `src/app/(tabs)/_layout.tsx`）：**首頁／路線／導航／收藏／設定**，預設首頁，
   記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
-    黃色區大字顯示最近嘅站頭（`groupStopHeads` 第一個；定位中／失敗有提示）、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
+    黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`；冇地區數據就用最近站頭名），
+    下面一行「最近巴士站：X · N 米」、「想去邊度？」（撳去導航）同右邊「交通消息」燈號
     （附近有未完結消息紅點，否則綠點）；**常用工具**（core `TOOLS`，揀最多 4 個 `toggleTool`，記喺 localStorage／AsyncStorage
     `hknt.tools`；交通消息工具有附近消息數目紅點）；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
     最近睇過（`lib/recent.ts`，最多 8 條）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。

@@ -30,6 +30,7 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
   useEffect(() => setTools(loadTools()), []);
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
+  const area = state.kind === 'ok' ? state.area : null;
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
   // 有位置就預設睇附近
@@ -52,12 +53,14 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
           <h1>下一程</h1>
           <span className="app-sub">NextLeg</span>
         </div>
+        {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
         <div className="hero-loc" aria-live="polite">
-          <span className="hero-name">{head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}</span>
+          <span className="hero-name">{area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}</span>
+          {area?.en && <span className="hero-en">{area.en}</span>}
           <span className="hero-sub">
             {head ? (
               <>
-                <Icon name="navigate" size={14} /> 最近嘅巴士站 · {formatDistance(head.distance)}
+                <Icon name="navigate" size={14} /> 最近巴士站：{head.name} · {formatDistance(head.distance)}
               </>
             ) : state.kind === 'error' ? (
               <button className="hero-retry" onClick={locate}>
