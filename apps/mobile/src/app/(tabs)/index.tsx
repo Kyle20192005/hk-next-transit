@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Animated, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
 import { COMPANIES, filterNews, formatDistance, groupStopHeads, toolById, type NewsFilter, type ToolId } from '@hknt/core';
 import { Icon } from '@/components/Icon';
 import { HomeHeader } from '@/components/HomeHeader';
@@ -41,6 +41,24 @@ export default function HomeTab() {
   const { height: screenH } = useWindowDimensions();
   const [scrollY] = useState(() => new Animated.Value(0));
   const [headerH, setHeaderH] = useState(300);
+  // 停喺收縮一半：自動捲去收埋或者展開（跟捲動方向，似 iPhone 大標題）
+  const scroller = useRef<ScrollViewInstance>(null);
+  const range = useRef(0);
+  const dragStart = useRef(0);
+  const [setRange] = useState(() => (d: number) => {
+    range.current = d;
+  });
+  const snap = (y: number, dir: number) => {
+    const D = range.current;
+    if (D <= 0 || y <= 0 || y >= D - 1) return;
+    scroller.current?.scrollTo({ y: dir < 0 ? 0 : D, animated: true });
+  };
+  const onEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const v = e.nativeEvent.velocity?.y ?? 0;
+    // 有慣性嘅話等慣性停咗（onMomentumScrollEnd）先決定
+    if (Math.abs(v) < 0.05) snap(y, y >= dragStart.current ? 1 : -1);
+  };
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
   const openNews = () => router.push({ pathname: '/news', params: pos ? { lat: String(pos.lat), lng: String(pos.lng) } : {} });
@@ -60,7 +78,11 @@ export default function HomeTab() {
       <Animated.ScrollView
         style={{ flex: 1 }}
         scrollEventThrottle={16}
+        ref={scroller}
         contentContainerStyle={{ paddingTop: headerH }}
+        onScrollBeginDrag={(e) => (dragStart.current = e.nativeEvent.contentOffset.y)}
+        onScrollEndDrag={onEndDrag}
+        onMomentumScrollEnd={(e) => snap(e.nativeEvent.contentOffset.y, e.nativeEvent.contentOffset.y >= dragStart.current ? 1 : -1)}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
       >
       <View style={{ minHeight: screenH, padding: 12, paddingBottom: 24, gap: 18 }}>
@@ -131,6 +153,7 @@ export default function HomeTab() {
       <HomeHeader
         scrollY={scrollY}
         onHeight={setHeaderH}
+        onRange={setRange}
         name={area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}
         en={area?.en}
         pill={area ? area.n : head ? head.name : null}

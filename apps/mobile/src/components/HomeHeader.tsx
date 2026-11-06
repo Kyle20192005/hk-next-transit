@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, shadow, useTheme } from '@/lib/theme';
@@ -23,6 +23,7 @@ const box = (e: LayoutChangeEvent): Box => {
 export function HomeHeader({
   scrollY,
   onHeight,
+  onRange,
   name,
   en,
   sub,
@@ -33,6 +34,8 @@ export function HomeHeader({
   scrollY: Animated.Value;
   /** header 高度（捲動內容頂要留咁多位） */
   onHeight: (h: number) => void;
+  /** 收縮距離（捲幾多就收埋），首頁用嚟停喺一半時自動捲去收埋／展開 */
+  onRange?: (d: number) => void;
   name: string;
   en?: string | null;
   sub: ReactNode;
@@ -52,6 +55,7 @@ export function HomeHeader({
 
   // 收縮距離：收到頂部一行上下留一樣嘅位（PAD），膠囊同搜尋掣就喺 header 正中
   const D = Math.max(1, H - (bar.y + bar.h + PAD));
+  useEffect(() => onRange?.(D), [D, onRange]);
   const ease = Easing.inOut(Easing.cubic);
   /** 由 from 變到 to（捲 0 → D），e = 用頭尾慢嘅節奏 */
   const lerp = (to: number, e = true, from = 0) => scrollY.interpolate({ inputRange: [0, D], outputRange: [from, to], extrapolate: 'clamp', ...(e ? { easing: ease } : {}) });

@@ -135,16 +135,53 @@ export default function HomeHeader({
         s.style.pointerEvents = d > s.offsetTop * 0.5 ? 'none' : 'auto';
       }
     };
+    // 停喺收縮一半：自動捲去收埋或者展開（跟最後捲動方向，似 iPhone 大標題）。手指仲撳住唔郁；只限有頂部一行（手機）
+    let lastY = sc.scrollTop;
+    let dir = 0;
+    let touching = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const snap = () => {
+      const r = root.current;
+      const b = bar.current;
+      if (touching || !r || !b || !b.offsetParent) return;
+      const D = r.offsetHeight - (b.offsetTop + b.offsetHeight + PAD);
+      const y = sc.scrollTop;
+      if (D <= 0 || y <= 0 || y >= D - 1) return;
+      sc.scrollTo({ top: dir < 0 ? 0 : D, behavior: 'smooth' });
+    };
+    const later = () => {
+      clearTimeout(timer);
+      timer = setTimeout(snap, 140);
+    };
     const onScroll = () => {
       if (!frame.current) frame.current = requestAnimationFrame(apply);
+      const y = sc.scrollTop;
+      if (y !== lastY) dir = y > lastY ? 1 : -1;
+      lastY = y;
+      later();
+    };
+    const onTouchStart = () => {
+      touching = true;
+      clearTimeout(timer);
+    };
+    const onTouchEnd = () => {
+      touching = false;
+      later();
     };
     apply();
     sc.addEventListener('scroll', onScroll, { passive: true });
+    sc.addEventListener('touchstart', onTouchStart, { passive: true });
+    sc.addEventListener('touchend', onTouchEnd, { passive: true });
+    sc.addEventListener('touchcancel', onTouchEnd, { passive: true });
     window.addEventListener('resize', onScroll);
     return () => {
       sc.removeEventListener('scroll', onScroll);
+      sc.removeEventListener('touchstart', onTouchStart);
+      sc.removeEventListener('touchend', onTouchEnd);
+      sc.removeEventListener('touchcancel', onTouchEnd);
       window.removeEventListener('resize', onScroll);
       cancelAnimationFrame(frame.current);
+      clearTimeout(timer);
     };
   }, [scroller, name, pill, height]);
 
