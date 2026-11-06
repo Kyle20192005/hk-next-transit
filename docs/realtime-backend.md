@@ -166,18 +166,22 @@ create table data_versions (version text primary key, generated_at timestamptz, 
 實時衍生數據（tracker 寫入）：
 
 ```sql
--- 過站紀錄：一架車幾點過邊個站（最有價值嘅數據）
-create table stop_passages (
+-- 行程紀錄：每班車一行，過站時間存做陣列（最有價值嘅數據）
+-- 唔好每次過站一行：全港平日約 6 萬班、143 萬次過站，每次一行一日約 172MB（90 日 15.5GB）；
+-- 每班一行一日約 16MB（90 日 1.5GB），而且 tracker 只 poll 有人睇嘅線，實際少好多。
+create table trips (
   id bigserial primary key,
   co text, route text, variant_id text, dir text,
-  stop_seq int, stop_id text,
-  bus_key text,                 -- 虛擬車輛 ID
-  passed_at timestamptz,        -- 估計過站時間
-  source text                   -- 'eta-disappear' | 'gps' | 'schedule'
+  service_date date,               -- 服務日（過咗午夜嘅班次算前一日）
+  bus_key text,                    -- 虛擬車輛 ID（港鐵巴士用真 busId）
+  first_stop_seq int,              -- 陣列第一格對應走法第幾個站（中途先開始追蹤嘅班次）
+  passed_at timestamptz[],         -- 每個站嘅估計過站時間；未知用 null
+  source text,                     -- 'eta-disappear' | 'gps' | 'schedule'
+  updated_at timestamptz
 );
-create index on stop_passages (co, route, variant_id, passed_at);
+create index on trips (co, route, variant_id, service_date);
 
--- 每段實際行車時間（aggregator 由 stop_passages 計，按星期、鐘頭）
+-- 每段實際行車時間（aggregator 由 trips 計，按星期、鐘頭）：約幾十萬行、50–100MB
 create table segment_times (
   from_stop text, to_stop text, weekday int, hour int,
   median_s int, p80_s int, samples int, updated_at timestamptz,
@@ -185,13 +189,24 @@ create table segment_times (
 );
 ```
 
+容量估算（2026-11-06，用政府時間表計）：
+
+| 數據 | 大小 |
+|---|---|
+| 路線、站、時間表、走線（JSON 41MB，Postgres 壓縮後） | 約 15–25MB |
+| `trips`（全港全部記錄；實際只記有人睇嘅線） | 約 16MB／日，90 日約 1.5GB |
+| `segment_times` | 約 50–100MB |
+| Postgres 記憶體（shared_buffers 256MB） | 平時約 150–300MB |
+
+結論：同其他服務放同一部 VPS 就得，40GB 硬碟夠用好耐；每晚 `pg_dump` 壓縮備份去 VPS 以外。
+
 - **唔存**每個原始 ETA（估算一日三千幾萬行）；如果要除錯，最多存 24 小時，用分區表每日 drop。
-- `stop_passages` 保留 90 日，之後只留 `segment_times` 統計。
+- `trips` 保留 90 日（按月分區，舊分區直接 drop），之後只留 `segment_times` 統計。
 - pipeline 嘅 `segment_times()` 之後改為：自己嘅實測樣本夠（例如 ≥ 20）就用自己嘅，唔夠先用 hk-bus-time-between-stops。
 
 ### 4.4 權限
 
-- 前端（網頁、App）只用 **anon key**：Realtime 只可以訂閱 `route:*` 頻道、只讀；Postgres 表開 RLS，`routes`、`stops`、`calendar`、`segment_times` 只讀，`stop_passages` 唔開放。
+- 前端（網頁、App）只用 **anon key**：Realtime 只可以訂閱 `route:*` 頻道、只讀；Postgres 表開 RLS，`routes`、`stops`、`calendar`、`segment_times` 只讀，`trips` 唔開放。
 - tracker、pipeline 用 **service role key**，只放喺伺服器環境變數，唔入 repo。
 - Supabase Studio 唔好直接開放上網（用 Dokploy 內網或者加 IP 限制）。
 
@@ -263,11 +278,11 @@ create table segment_times (
 
 ### 階段 2：記憶同過站紀錄
 - [ ] 虛擬車輛 ID（跨輪配對同一架車）
-- [ ] 用實測車速推位置；過站偵測寫入 `stop_passages`
+- [ ] 用實測車速推位置；過站偵測寫入 `trips`
 - [ ] 驗收：抽 5 條線，比較推算位置同實際到站時間，誤差要細過而家
 
 ### 階段 3：自己嘅行車時間
-- [ ] aggregator 每小時由 `stop_passages` 計 `segment_times`
+- [ ] aggregator 每小時由 `trips` 計 `segment_times`
 - [ ] tracker 同 pipeline 優先用自己嘅實測
 - [ ] 驗收：樣本夠嘅段，用自己數據計嘅「+N 分」同實際到站時間比較，誤差要細過 hk-bus-time-between-stops
 
@@ -278,7 +293,7 @@ create table segment_times (
 
 ### 之後
 - 到站時間（`etas` 事件）都經 tracker 推送
-- 「呢條線平時準唔準」、繁忙時間預多幾耐（由 `stop_passages` 計）
+- 「呢條線平時準唔準」、繁忙時間預多幾耐（由 `trips` 計）
 - 導航：用 `segment_times` 估計每程時間同轉車等候
 
 ## 6. 風險同對策
@@ -289,7 +304,7 @@ create table segment_times (
 | tracker 死咗或者重啟 | 前端自動退返 `/api/buses`；Dokploy 自動重啟；狀態下一輪重建 |
 | 自架 Supabase 記憶體唔夠 | 階段 0 先確認規格；Realtime 頻道數同 Presence 數有監察 |
 | App 背景斷線 | 返前台重新訂閱 + `/snapshot` |
-| 數據庫越嚟越大 | 唔存原始 ETA；`stop_passages` 90 日分區；只長期保留統計 |
+| 數據庫越嚟越大 | 唔存原始 ETA；`trips` 90 日分區；只長期保留統計 |
 | 預熱估錯浪費上游請求 | 只喺撳落／候選 ≤ 3 先做；每客戶端 3 條、全局上限；60 秒冇人訂閱就停；優先級低過真正有人睇嘅線 |
 | Redis 冇咗 | 只放短命數據；tracker 自動退返記憶體 cache，只係慢少少 |
 | 一個 VPS 單點故障 | 網頁照放 Vercel、靜態數據過渡期照放 GitHub；實時部分有輪詢後備 |
