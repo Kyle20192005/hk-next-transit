@@ -2,7 +2,8 @@
 import Link from 'next/link';
 import CompanyTag from '@/components/CompanyTag';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { RouteIndex } from '@hknt/core';
+import { TRANSPORT_MODES, type RouteIndex, type TransportMode } from '@hknt/core';
+import ComingSoon from './ComingSoon';
 import Keypad from './Keypad';
 import Logo from '@/components/Logo';
 import Icon from '@/components/Icon';
@@ -21,6 +22,8 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
   const [code, setCode] = useState(''); // 路線號碼（鍵盤）
   const [place, setPlace] = useState<string | null>(null); // 地點搜尋（null = 用緊號碼鍵盤）
   const [shown, setShown] = useState(PAGE);
+  const [mode, setMode] = useState<TransportMode>('bus'); // 交通工具：暫時只有巴士做好
+  const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
   const listRef = useRef<HTMLUListElement>(null);
   const sentinel = useRef<HTMLLIElement>(null);
   const placeInput = useRef<HTMLInputElement>(null);
@@ -103,7 +106,15 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
           <h1>下一程</h1>
           <span className="app-sub">NextLeg</span>
         </div>
-        {place === null ? (
+        {/* 交通工具分類：喺搜尋欄上面；揀咗未做嘅，搜尋欄同鍵盤都收埋 */}
+        <div className="mode-chips" role="tablist" aria-label="交通工具">
+          {TRANSPORT_MODES.map((m) => (
+            <button key={m.id} role="tab" aria-selected={mode === m.id} className="mode-chip" onClick={() => setMode(m.id)}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {!modeInfo.ready ? null : place === null ? (
           <button className="search-field" onClick={usePlace} aria-label="搜尋路線">
             <Icon name="search" size={20} className="search-icon" />
             <span className={code ? 'search-code' : 'search-placeholder'}>{code || '輸入路線號碼'}</span>
@@ -139,6 +150,10 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
         )}
       </header>
 
+      {!modeInfo.ready ? (
+        <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
+      ) : (
+      <>
       <ul className="route-list" ref={listRef}>
         {matches.slice(0, shown).map((r) => {
           const co = r.co ?? 'ctb';
@@ -171,6 +186,8 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
           onPlace={usePlace}
           canBack={code.length > 0}
         />
+      )}
+      </>
       )}
     </>
   );

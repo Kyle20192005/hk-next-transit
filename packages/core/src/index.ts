@@ -14,3 +14,5 @@ export * from './nlb';
 export * from './mtrb';
 export * from './company';
 export * from './map-style';
+export * from './transport';
+export * from './version';

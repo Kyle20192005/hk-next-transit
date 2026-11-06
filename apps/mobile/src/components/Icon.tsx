@@ -17,7 +17,9 @@ export type IconName =
   | 'info'
   | 'route'
   | 'bus'
-  | 'warning';
+  | 'warning'
+  | 'navigate'
+  | 'settings';
 
 export function Icon({ name, size = 22, color }: { name: IconName; size?: number; color: string }) {
   const p = { stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' };
@@ -43,6 +45,16 @@ export function Icon({ name, size = 22, color }: { name: IconName; size?: number
           <>
             <Circle {...p} cx={12} cy={12} r={8.5} />
             <Path {...p} d="M12 7.5V12l3 2" />
+          </>
+        );
+      case 'navigate':
+        return <Path {...p} d="M4.5 11.2 19.5 4.5l-6.7 15-1.9-6.4-6.4-1.9Z" />;
+      case 'settings':
+        return (
+          <>
+            <Path {...p} d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+            <Circle {...p} cx={15} cy={7} r={2.2} />
+            <Circle {...p} cx={9} cy={17} r={2.2} />
           </>
         );
       case 'pin':

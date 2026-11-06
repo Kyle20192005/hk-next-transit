@@ -147,6 +147,12 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - `/api/buses` 每個站嘅城巴 ETA cache 10 秒；前端每 20 秒問一次，位置每 5 秒按時間推前。
 - 只用 hk-bus-time-between-stops 公開嘅數據，**唔好抄佢嘅程式碼**（GPL-3.0）。頁面要註明出處同「僅供參考」。
 
+## 版本號
+
+大.中.細（由 0.0.1 開始）：細更新（修正、細改動）、中更新（新功能）、大更新（大改版）。用 `pnpm release:patch|minor|major "內容"`
+（`scripts/version.mjs`）：自動計下一個版本號，更新 core `version.ts`（`APP_VERSION`，設定頁顯示）、各 package.json、
+`apps/mobile/app.json`（version；iOS buildNumber、Android versionCode 每次 +1），同埋 `CHANGELOG.md`。每次推上 main 嘅改動都要揀一個。
+
 ## 陷阱
 
 - GTFS 同 JSON_BUS.json 有 UTF-8 BOM，要用 `utf-8-sig` 讀。
@@ -247,9 +253,10 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   `unknown`（「冇時間表資料」，灰色），唔好寫「今日沒有班次」；「班次」掣只計有時間表嘅走法。
 - 賽馬日改路等按事件嘅走法：政府數據冇。
 - ETA `seq` 規律只喺 38 號驗證過。
-- 港鐵、輕鐵、小巴、電車、渡輪、導航（點到點）未做。**已定嘅結構**（2026-11，加第二種交通工具時照做）：
-  底部分頁「導航／路線／附近／收藏」；「路線」頂部一行分類「巴士／港鐵・輕鐵／小巴／渡輪／電車」；
-  附近同收藏包埋所有交通工具；首頁標題「下一程」（「香港交通到站」已經有人用咗）。用戶要求先處理好巴士，未做嘅唔好放佔位。
+- 港鐵、輕鐵、小巴、電車、渡輪、導航（點到點）未做。介面已經預留（2026-11，用戶要求）：底部分頁「導航／路線／附近／收藏／設定」，
+  導航顯示「功能即將推出」；「路線」標題下面、搜尋欄上面一行交通工具分類（core `TRANSPORT_MODES`，`ready: false` 嘅揀咗就收埋搜尋欄同鍵盤，
+  只顯示「功能即將推出」）。網頁 `components/home/{ComingSoon,Navigation,Settings}.tsx`，App `src/app/(tabs)/{navigation,settings}.tsx` + `ui.tsx` 嘅 `ComingSoon`。
+  加新交通工具：喺 `TRANSPORT_MODES` 改 `ready: true` 再接返列表。附近同收藏將來包埋所有交通工具；首頁標題「下一程」。
 - 「附近」：聯營線只列喺城巴站下面（避免同一條線喺相鄰嘅九巴站同城巴站出兩次）。
 - App 未喺實機或者模擬器測試過：確認到 iOS／Android bundle 到（`npx expo export --platform ios --platform android`），
   介面用 Expo web 預覽截圖驗證過（地圖除外）。

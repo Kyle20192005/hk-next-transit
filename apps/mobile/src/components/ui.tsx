@@ -145,3 +145,25 @@ export function Pill({ label, special = false }: { label: string; special?: bool
     </Text>
   );
 }
+
+/** 「即將推出」小標籤 */
+export function SoonBadge({ label = '功能即將推出' }: { label?: string }) {
+  const t = useTheme();
+  return (
+    <View style={{ alignSelf: 'center', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: t.brandSoft }}>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: t.accent }}>{label}</Text>
+    </View>
+  );
+}
+
+/** 未做嘅功能：「功能即將推出」（同網頁 components/home/ComingSoon.tsx 一樣） */
+export function ComingSoon({ icon, title, text }: { icon: IconName; title: string; text?: string }) {
+  const t = useTheme();
+  return (
+    <EmptyState icon={icon}>
+      <Text style={{ fontSize: 18, fontWeight: '700', color: t.text }}>{title}</Text>
+      <SoonBadge />
+      {text && <Text style={{ color: t.muted, textAlign: 'center', lineHeight: 22 }}>{text}</Text>}
+    </EmptyState>
+  );
+}

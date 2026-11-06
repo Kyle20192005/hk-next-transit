@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
 import { Logo } from '@/components/Logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
-import type { RouteIndex } from '@hknt/core';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { TRANSPORT_MODES, type RouteIndex, type TransportMode } from '@hknt/core';
 import { api, type Co } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
-import { AppBar, CompanyTag } from '@/components/ui';
+import { AppBar, ComingSoon, CompanyTag } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { Keypad } from '@/components/Keypad';
 import { preloadRoute, warmRoute } from '@/lib/prefetch';
@@ -24,6 +24,8 @@ export default function RoutesTab() {
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [place, setPlace] = useState<string | null>(null);
+  const [mode, setMode] = useState<TransportMode>('bus'); // 交通工具：暫時只有巴士做好
+  const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
   const list = useRef<FlatList<Route>>(null);
 
   const fetchRoutes = () => api.routes().then((r) => setRoutes(r.routes)).catch((e: Error) => setError(e.message));
@@ -70,6 +72,18 @@ export default function RoutesTab() {
           <Text style={{ fontSize: 24, fontWeight: '800', color: t.onBrand, letterSpacing: -0.3 }}>下一程</Text>
           <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginLeft: 2, marginTop: 6 }}>NextLeg</Text>
         </View>
+        {/* 交通工具分類（同網頁一樣）：喺搜尋欄上面；揀咗未做嘅，搜尋欄同鍵盤都收埋 */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16, marginTop: -4, marginBottom: -2 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+          {TRANSPORT_MODES.map((m) => {
+            const on = mode === m.id;
+            return (
+              <Pressable key={m.id} onPress={() => setMode(m.id)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: on ? t.onBrand : t.onBrandSoft }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: on ? t.brand : t.onBrand }}>{m.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        {modeInfo.ready && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingLeft: 14, paddingRight: 8, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
           <Icon name="search" size={20} color={t.muted} />
           {place === null ? (
@@ -97,9 +111,12 @@ export default function RoutesTab() {
             </Pressable>
           )}
         </View>
+        )}
       </AppBar>
 
-      {error ? (
+      {!modeInfo.ready ? (
+        <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
+      ) : error ? (
         <Pressable onPress={load} style={{ padding: 24, alignItems: 'center' }}>
           <Text style={{ color: t.special }}>載入失敗：{error}</Text>
           <Text style={{ color: t.accent, marginTop: 6, fontWeight: '600' }}>撳一下再試</Text>
@@ -120,7 +137,7 @@ export default function RoutesTab() {
         />
       )}
 
-      {place === null && routes && (
+      {modeInfo.ready && place === null && routes && (
         <Keypad nextChars={nextChars} onKey={(k) => setCode((c) => c + k)} onBack={() => setCode((c) => c.slice(0, -1))} onPlace={() => setPlace('')} canBack={code.length > 0} />
       )}
     </View>

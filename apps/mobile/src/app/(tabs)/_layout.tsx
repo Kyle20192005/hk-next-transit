@@ -5,7 +5,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { useFavorites } from '@/lib/favorites';
 import { useTheme } from '@/lib/theme';
 
-/** 底部分頁列：路線／附近／收藏（同網頁版一樣，揀咗嘅圖示有淡黃底） */
+/** 底部分頁列：導航／路線／附近／收藏／設定（導航未做）（同網頁版一樣，揀咗嘅圖示有淡黃底） */
 export default function TabLayout() {
   const t = useTheme();
   const favCount = useFavorites().length;
@@ -13,10 +13,10 @@ export default function TabLayout() {
   const icon = (name: IconName, focusedName?: IconName) =>
     function TabIcon({ focused, color }: { focused: boolean; color: ColorValue }) {
       return (
-        <View style={{ width: 60, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? t.brandSoft : 'transparent' }}>
+        <View style={{ width: 52, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? t.brandSoft : 'transparent' }}>
           <Icon name={focused && focusedName ? focusedName : name} size={24} color={focused ? t.accent : String(color)} />
           {name === 'star' && favCount > 0 && (
-            <View style={{ position: 'absolute', top: -2, right: 10, minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: t.brand, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ position: 'absolute', top: -2, right: 6, minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: t.brand, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 11, fontWeight: '800', color: t.onBrand }}>{favCount}</Text>
             </View>
           )}
@@ -36,9 +36,11 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: t.bg },
       }}
     >
+      <Tabs.Screen name="navigation" options={{ title: '導航', tabBarIcon: icon('navigate') }} />
       <Tabs.Screen name="index" options={{ title: '路線', tabBarIcon: icon('route') }} />
       <Tabs.Screen name="nearby" options={{ title: '附近', tabBarIcon: icon('pin') }} />
       <Tabs.Screen name="favorites" options={{ title: '收藏', tabBarIcon: icon('star', 'star-fill') }} />
+      <Tabs.Screen name="settings" options={{ title: '設定', tabBarIcon: icon('settings') }} />
     </Tabs>
   );
 }

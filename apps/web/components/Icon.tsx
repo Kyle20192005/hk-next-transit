@@ -18,9 +18,19 @@ export type IconName =
   | 'info'
   | 'route'
   | 'bus'
-  | 'warning';
+  | 'warning'
+  | 'navigate'
+  | 'settings';
 
 const PATHS: Record<IconName, React.ReactNode> = {
+  navigate: <path d="M4.5 11.2 19.5 4.5l-6.7 15-1.9-6.4-6.4-1.9Z" />,
+  settings: (
+    <>
+      <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+      <circle cx="15" cy="7" r="2.2" />
+      <circle cx="9" cy="17" r="2.2" />
+    </>
+  ),
   back: <path d="M15 18l-6-6 6-6" />,
   'chevron-right': <path d="M9 6l6 6-6 6" />,
   'chevron-down': <path d="M6 9l6 6 6-6" />,
