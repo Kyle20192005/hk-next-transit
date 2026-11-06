@@ -86,7 +86,7 @@ export const TOOLS: Tool[] = [
   modeTool('tram', 'tram', 'tram'),
   modeTool('ferry', 'ferry', 'ferry'),
   { id: 'nearby', label: '附近車站', icon: 'pin', color: '#2F6FD6', group: 'feature' },
-  { id: 'favs', label: '收藏', icon: 'star', color: '#F2A900', group: 'feature' },
+  { id: 'favs', label: '收藏', icon: 'star', color: '#E0457B', group: 'feature' },
   { id: 'news', label: '交通消息', icon: 'warning', color: '#D7282F', group: 'feature' },
   { id: 'nav', label: '導航', icon: 'navigate', color: '#7B4FD6', group: 'feature', soon: true },
   { id: 'settings', label: '設定', icon: 'settings', color: '#5E6B7A', group: 'feature' },

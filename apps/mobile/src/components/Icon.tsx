@@ -28,8 +28,9 @@ export type IconName =
   | 'ferry'
   | 'tram';
 
-export function Icon({ name, size = 22, color }: { name: IconName; size?: number; color: string }) {
-  const p = { stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' };
+/** duo：雙色（線條實色 + 同色淺填色），常用工具等大圖示用 */
+export function Icon({ name, size = 22, color, duo = false }: { name: IconName; size?: number; color: string; duo?: boolean }) {
+  const p = { stroke: color, strokeWidth: duo ? 1.9 : 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: duo ? color : 'none', fillOpacity: duo ? 0.2 : 1 };
   const dot = { fill: color, stroke: 'none' };
   const star = 'M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.6Z';
   const body = (() => {

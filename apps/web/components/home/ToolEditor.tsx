@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { MAX_TOOLS, TOOLS, TOOL_GROUPS, swapTools, tint, toggleTool, toolById, type ToolId } from '@hknt/core';
+import { MAX_TOOLS, TOOLS, TOOL_GROUPS, swapTools, toggleTool, toolById, type ToolId } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { loadTools, saveTools } from '@/lib/news';
 
@@ -97,8 +97,8 @@ export default function ToolEditor({ onBack }: { onBack: () => void }) {
 export function ToolIcon({ id, badge }: { id: ToolId; badge?: number }) {
   const t = toolById(id);
   return (
-    <span className="tool-icon" style={{ color: t.color, background: tint(t.color, 0.12) }}>
-      <Icon name={t.icon} size={28} />
+    <span className="tool-icon" style={{ color: t.color }}>
+      <Icon name={t.icon} size={38} duo />
       {!!badge && <span className="tool-badge">{badge}</span>}
     </span>
   );

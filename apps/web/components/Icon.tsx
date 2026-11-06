@@ -143,15 +143,18 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
 };
 
-export default function Icon({ name, size = 22, className }: { name: IconName; size?: number; className?: string }) {
+/** duo：雙色（線條實色 + 同色淺填色），常用工具等大圖示用 */
+export default function Icon({ name, size = 22, className, duo = false }: { name: IconName; size?: number; className?: string; duo?: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
       width={size}
       height={size}
-      fill="none"
+      fill={duo ? 'currentColor' : 'none'}
+      fillOpacity={duo ? 0.2 : undefined}
+      data-duo={duo || undefined}
       stroke="currentColor"
-      strokeWidth={2}
+      strokeWidth={duo ? 1.9 : 2}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}

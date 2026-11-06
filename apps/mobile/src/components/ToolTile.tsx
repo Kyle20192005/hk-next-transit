@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { tint, toolById, type ToolId } from '@hknt/core';
+import { toolById, type ToolId } from '@hknt/core';
 import { radius, shadow, useTheme } from '@/lib/theme';
 import { Icon } from './Icon';
 
@@ -38,8 +38,8 @@ export function ToolTile({
         style={({ pressed }) => ({
           alignItems: 'center',
           gap: 6,
-          paddingTop: 12,
-          paddingBottom: 10,
+          paddingTop: 16,
+          paddingBottom: 12,
           borderRadius: 18,
           backgroundColor: t.card,
           opacity: dim ? 0.45 : 1,
@@ -50,15 +50,16 @@ export function ToolTile({
           ...shadow,
         })}
       >
-        <View style={{ width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: tint(x.color, 0.12) }}>
-          <Icon name={x.icon} size={28} color={x.color} />
+        {/* 圖示直接放喺白卡上（唔再加一層淺色方塊），雙色大圖示似港鐵 App */}
+        <View style={{ height: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={x.icon} size={38} color={x.color} duo />
           {badge > 0 && (
             <View style={{ position: 'absolute', top: -4, right: -6, minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E5484D', borderWidth: 2, borderColor: t.card }}>
               <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{badge}</Text>
             </View>
           )}
         </View>
-        <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: t.text }}>
+        <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: t.text }}>
           {x.label}
         </Text>
         {x.soon && <Text style={{ marginTop: -4, fontSize: 11, fontWeight: '700', color: t.muted }}>即將推出</Text>}
