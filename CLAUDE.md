@@ -187,6 +187,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   App 用 `@maplibre/maplibre-react-native`（`src/components/RouteMap.tsx`），同一套底圖同圖層；調色邏輯喺 core `map-style.ts`
   （`restyleMap`、`firstSymbolLayer`），兩邊共用。App 因為有呢個原生套件，**Expo Go 開唔到**，要開發版本
   （`npx expo run:ios`／`run:android` 或者 EAS build）；箭嘴圖示係 `assets/map/chevron-*.png`。
+  `RouteMap.tsx` 先用 `TurboModuleRegistry.get('MLRNCameraModule')` 睇有冇原生模組，有先 require `RouteMapNative.tsx`，
+  冇（Expo Go）就顯示 `MapPlaceholder`：唔好喺其他檔案直接 import `@maplibre/maplibre-react-native`，否則 Expo Go 成頁爆。
 - 路線頁版面要緊湊（手機 Safari 底部有浮動工具列）：方向用一行「往 X ⇅」，地圖高度 clamp(150px, 26dvh, 280px)。
   打開站時將站名對齊列表頂部。標題、方向、走法、地圖固定，只有站點列表捲動；走法選擇平時收埋，展開時蓋住地圖。
   站點一次只開一個，打開時地圖放大去嗰個站；撳地圖嘅站會打開列表對應嘅站（web 用 `lib/events.ts` 嘅 window event）。
