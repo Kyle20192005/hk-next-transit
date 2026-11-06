@@ -104,7 +104,7 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 | 走法、特別班標記 | 運輸署 GTFS + JSON_BUS.json（`specialType`） |
 | 每個走法嘅時間表 | 運輸署 GTFS（`frequencies.txt`、`calendar*.txt`） |
 | 地圖走線 | CSDI「巴士路線」WFS（`FB_ROUTE_LINE`）；港鐵巴士用 OpenStreetMap |
-| 地圖底圖 | 網頁：OpenFreeMap（OpenStreetMap）；App：地政總署 |
+| 地圖底圖 | OpenFreeMap 向量地圖（OpenStreetMap 數據），網頁同 App 一樣 |
 | 站到站行車時間（實測平均） | [hk-bus-time-between-stops](https://github.com/HK-Bus-ETA/hk-bus-time-between-stops)（`timeinterval.hkbuseta.com/times/all.json`），第三方、實驗性質 |
 
 App 入面一律用**城巴站 ID**。政府站 ID 只喺 pipeline 內部用。
@@ -184,11 +184,13 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   冇黃色馬路唔會撞城巴走線；拎走路牌方格、界線；地名用中文、唔用斜體；深色模式另一套色）。出處由底圖自帶（收埋喺「i」）。
   走線放喺地名下面（`firstSymbolLayer`），方向用沿線擺放嘅細 V 形（symbol-placement line），站點係 circle 圖層，
   打開咗嘅站公司色大點 + 站名膠囊（公司色站號）；巴士係 HTML Marker。觸控機唔顯示 +／− 掣，唔准旋轉。
-  App 暫時仍然用 react-native-maps + 地政總署 `UrlTile`（半透明淡化），要「© 地政總署」。
+  App 用 `@maplibre/maplibre-react-native`（`src/components/RouteMap.tsx`），同一套底圖同圖層；調色邏輯喺 core `map-style.ts`
+  （`restyleMap`、`firstSymbolLayer`），兩邊共用。App 因為有呢個原生套件，**Expo Go 開唔到**，要開發版本
+  （`npx expo run:ios`／`run:android` 或者 EAS build）；箭嘴圖示係 `assets/map/chevron-*.png`。
 - 路線頁版面要緊湊（手機 Safari 底部有浮動工具列）：方向用一行「往 X ⇅」，地圖高度 clamp(150px, 26dvh, 280px)。
   打開站時將站名對齊列表頂部。標題、方向、走法、地圖固定，只有站點列表捲動；走法選擇平時收埋，展開時蓋住地圖。
   站點一次只開一個，打開時地圖放大去嗰個站；撳地圖嘅站會打開列表對應嘅站（web 用 `lib/events.ts` 嘅 window event）。
-- 地圖方向箭嘴：web 由 MapLibre 沿線自動擺放；App 用 core 嘅 `lineArrows`，只喺 300 米以上嘅段放。
+- 地圖方向箭嘴：網頁同 App 都由 MapLibre 沿線自動擺放（symbol-placement line）。
 - 首頁：「路線」用巴士號碼鍵盤（`components/home/Keypad.tsx`，只開可以接落去嘅數字同字母，唔彈系統鍵盤；
   「地點」轉做打字搜起訖點），列表無限捲動（每次 40 條），搜尋欄固定。「附近」用定位
   （`/api/nearby` 搵 600 米內嘅站，`/api/stop-etas` 一次攞一個站所有路線嘅下一班；站點索引 `out/ctb/stops.json` 唔包終點站）。
@@ -225,7 +227,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   公司名同代表色喺 core `company.ts` 共用。圖示用 react-native-svg（`components/Icon.tsx`，同網頁同一套路徑）。
   收藏用 AsyncStorage（同網頁一樣格式）。定位用 expo-location。
 - App 唔好用 `Link asChild` 包 Pressable 做列表行：改用 `Pressable` + `router.push`。
-- App 預覽：`EXPO_PUBLIC_API_BASE=http://localhost:3000 npx expo start --web`（`RouteMap.web.tsx` 係地圖佔位，react-native-maps 冇 web）。
+- App 預覽：`EXPO_PUBLIC_API_BASE=http://localhost:3000 npx expo start --web`（`RouteMap.web.tsx` 係地圖佔位，MapLibre 原生地圖冇 web）。
   改完 code 截圖前要殺咗 server 再用 `--clear` 重開：Metro web 延遲載入嘅 chunk 會繼續送舊 code。
 
 ## 已知未做

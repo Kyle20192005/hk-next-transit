@@ -17,7 +17,6 @@ import {
   formatFare,
   joyYouFare,
   labelEtas,
-  lineArrows,
   pointOnPath,
   secondsFrom,
   serviceWindow,
@@ -43,7 +42,7 @@ import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { Icon } from '@/components/Icon';
 import { BarButton } from '@/components/ui';
 import { StopRow, type RowBus } from '@/components/StopRow';
-import { RouteMap, type MapArrow, type MapBus, type MapLine, type MapStop } from '@/components/RouteMap';
+import { RouteMap, type MapBus, type MapLine, type MapStop } from '@/components/RouteMap';
 import { TimetableSheet } from '@/components/TimetableSheet';
 import { VariantPicker, type VariantItem } from '@/components/VariantPicker';
 
@@ -241,11 +240,6 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
           segments: x.variant.line!.map((seg) => smoothLine(seg.map(([lng, lat]) => [lat, lng] as [number, number])).map(([lat, lng]) => ({ latitude: lat, longitude: lng }))),
         })),
     [sorted, selected],
-  );
-  // 原生地圖唔方便按縮放篩選，只喺 300 米以上嘅段放箭嘴
-  const arrows: MapArrow[] = useMemo(
-    () => (selected?.line ? lineArrows(selected.line.map((seg) => seg.map(([lng, lat]) => [lat, lng] as [number, number])), 300).map((a) => ({ latitude: a.lat, longitude: a.lng, bearing: a.bearing })) : []),
-    [selected],
   );
   const path: LatLng[] = useMemo(() => {
     const sel = mapLines.find((l) => l.selected);
@@ -479,7 +473,6 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
             key={`${dir}-${selected?.id}`}
             lines={mapLines}
             stops={mapStops}
-            arrows={arrows}
             buses={mapBuses}
             color={color}
             company={data.company}

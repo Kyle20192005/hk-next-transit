@@ -13,3 +13,4 @@ export * from './fare';
 export * from './nlb';
 export * from './mtrb';
 export * from './company';
+export * from './map-style';
