@@ -229,7 +229,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   收藏用 AsyncStorage（同網頁一樣格式）。定位用 expo-location。
 - Logo（2026-11）：黃底（#FFC72C）深色「路綫圖 N」（NextLeg）：港鐵路綫圖式 45° 斜綫，左下起點站（空心）、右上下一站（白色實心）。原稿 `docs/brand/`（SVG），
   App 圖示、Android adaptive icon、載入畫面（`expo-splash-screen`：淺色黃底深色圖案、深色模式深底黃色圖案）喺 `apps/mobile/assets/`。
-  Expo Go 唔會顯示自訂載入畫面（只顯示 App 圖示），要開發版本或者正式版先見到。
+  Expo Go 唔會顯示自訂原生載入畫面，所以 `components/LaunchOverlay.tsx` 用 JS 畫多一層一樣嘅畫面（同 imageWidth 120、同背景色），
+  停 0.45 秒再淡出放大（合共不足 1 秒，唔好拖長）；原生載入畫面由佢 `hideAsync`，無縫接駁。
 - App 唔好用 `Link asChild` 包 Pressable 做列表行：改用 `Pressable` + `router.push`。
 - App 預覽：`EXPO_PUBLIC_API_BASE=http://localhost:3000 npx expo start --web`（`RouteMap.web.tsx` 係地圖佔位 `MapPlaceholder`，react-native-maps 冇 web）。
   改完 code 截圖前要殺咗 server 再用 `--clear` 重開：Metro web 延遲載入嘅 chunk 會繼續送舊 code。
