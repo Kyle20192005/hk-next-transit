@@ -1,7 +1,11 @@
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '@/lib/theme';
+
+// 開 App 嘅載入畫面（黃底 logo，app.json 嘅 expo-splash-screen）：App 準備好就自動收埋，淡出 0.3 秒
+SplashScreen.setOptions({ duration: 300, fade: true });
 
 /** 根：分頁（路線／附近／收藏）+ 路線頁。標題列全部自己畫（黃色），唔用系統 header */
 export default function RootLayout() {

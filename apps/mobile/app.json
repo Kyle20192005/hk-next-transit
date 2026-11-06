@@ -30,6 +30,19 @@
         {
           "locationWhenInUsePermission": "用嚟搵你附近嘅巴士站同路線上最近嘅站。"
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFC72C",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#1A1A1A",
+            "image": "./assets/splash-icon-dark.png"
+          }
+        }
       ]
     ],
     "scheme": "hknt",
