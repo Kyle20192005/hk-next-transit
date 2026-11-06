@@ -90,6 +90,7 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .app-bar:has(> .bar-btn) { flex-direction: row; align-items: center; }
 .app-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .app-title h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; }
+.app-title .logo { flex: none; align-self: center; margin-right: -2px; }
 .app-sub { font-size: 0.8125rem; font-weight: 600; opacity: 0.7; }
 .bar-btn, .route-bar .back, .swap {
   flex: none; width: 40px; height: 40px; display: grid; place-items: center;

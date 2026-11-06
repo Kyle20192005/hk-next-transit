@@ -229,6 +229,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   收藏用 AsyncStorage（同網頁一樣格式）。定位用 expo-location。
 - Logo（2026-11）：黃底（#FFC72C）深色「路綫圖 N」（NextLeg）：港鐵路綫圖式 45° 斜綫，左下起點站（空心）、右上下一站（白色實心）。原稿 `docs/brand/`（SVG），
   App 圖示、Android adaptive icon、載入畫面（`expo-splash-screen`：淺色黃底深色圖案、深色模式深底黃色圖案）喺 `apps/mobile/assets/`。
+  主頁標題「下一程」左邊放細 logo（冇底色版：網頁 `components/Logo.tsx`、App `src/components/Logo.tsx`）。網頁分頁圖示 `app/icon.svg`、
+  iPhone 主畫面 `app/apple-icon.png`（Next.js 檔案慣例）。
   Expo Go 唔會顯示自訂原生載入畫面，所以 `components/LaunchOverlay.tsx` 用 JS 畫多一層一樣嘅畫面（同 imageWidth 120、同背景色），
   停 0.45 秒再淡出放大（合共不足 1 秒，唔好拖長）；原生載入畫面由佢 `hideAsync`，無縫接駁。
 - App 唔好用 `Link asChild` 包 Pressable 做列表行：改用 `Pressable` + `router.push`。

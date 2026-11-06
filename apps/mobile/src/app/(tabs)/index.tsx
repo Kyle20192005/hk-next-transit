@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { Logo } from '@/components/Logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import type { RouteIndex } from '@hknt/core';
@@ -64,9 +65,10 @@ export default function RoutesTab() {
   return (
     <View style={{ flex: 1 }}>
       <AppBar>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Logo size={26} />
           <Text style={{ fontSize: 24, fontWeight: '800', color: t.onBrand, letterSpacing: -0.3 }}>下一程</Text>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7 }}>NextLeg</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginLeft: 2, marginTop: 6 }}>NextLeg</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingLeft: 14, paddingRight: 8, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
           <Icon name="search" size={20} color={t.muted} />

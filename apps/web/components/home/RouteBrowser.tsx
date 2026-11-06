@@ -4,6 +4,7 @@ import CompanyTag from '@/components/CompanyTag';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RouteIndex } from '@hknt/core';
 import Keypad from './Keypad';
+import Logo from '@/components/Logo';
 import Icon from '@/components/Icon';
 import { preloadRoute, warmRoute } from '@/lib/prefetch';
 
@@ -98,6 +99,7 @@ export default function RouteBrowser({ routes, updated }: { routes: Routes; upda
     <>
       <header className="app-bar">
         <div className="app-title">
+          <Logo size={26} />
           <h1>下一程</h1>
           <span className="app-sub">NextLeg</span>
         </div>
