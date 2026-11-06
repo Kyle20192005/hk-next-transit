@@ -131,7 +131,7 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
     const markers = stops.map((s, i) => {
       const end = i === 0 || i === stops.length - 1;
       const m = L.circleMarker([s.lat, s.lng], stopStyle(end))
-        .bindTooltip(`${s.index + 1}. ${s.name}`, { direction: 'top', offset: [0, -8], className: 'map-tip' })
+        .bindTooltip(stopTag(s, brand, ink), { direction: 'top', offset: [0, -10], className: 'map-tag', opacity: 1 })
         .on('click', () => window.dispatchEvent(new CustomEvent(OPEN_STOP_EVENT, { detail: s.index })))
         .addTo(map);
       return { stop: s, marker: m, end };
@@ -220,7 +220,9 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
       // 打開站後第一次：調整地圖，同時睇到個站同最近嗰架車
       if (openIdx !== null && fittedFor !== openIdx && target && nearest) {
         fittedFor = openIdx;
-        map.fitBounds(L.latLngBounds([[target.lat, target.lng], nearest]), { padding: [36, 36], maxZoom: 17 });
+        // 左右留多啲位，站名標籤（喺站上面、置中）唔會俾地圖邊切走
+        const side = Math.min(120, map.getSize().x / 4);
+        map.fitBounds(L.latLngBounds([[target.lat, target.lng], nearest]), { paddingTopLeft: [side, 64], paddingBottomRight: [side, 28], maxZoom: 17 });
       }
       if (openIdx === null) fittedFor = null;
     };
@@ -260,6 +262,13 @@ export default function RouteMap({ lines, stops, multiCompany = false, company, 
         )}
     </div>
   );
+}
+
+const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+/** 地圖站名標籤：公司色站號 + 站名（太長就省略） */
+function stopTag(s: MapStop, color: string, ink: string): string {
+  return `<span class="map-tag-num" style="background:${color};color:${ink}">${s.index + 1}</span><span class="map-tag-name">${esc(s.name)}</span>`;
 }
 
 const CO_NAME: Record<string, string> = { CTB: '城巴', KMB: '九巴', NLB: '新大嶼山巴士', MTRB: '港鐵巴士' };
