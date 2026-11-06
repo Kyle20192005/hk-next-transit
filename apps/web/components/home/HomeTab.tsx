@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState, type UIEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { COMPANIES, MAX_TOOLS, TOOLS, filterNews, formatDistance, groupStopHeads, tint, toggleTool as toggle, type NewsFilter, type ToolId } from '@hknt/core';
 import Icon from '@/components/Icon';
 import Logo from '@/components/Logo';
@@ -31,12 +31,24 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
-  const placeName = area ? area.n : head ? head.name : null;
-  // 向上捲：大字地區收細，變成路線列表咁一行標題（有遲滯，唔會喺邊界閃）
-  const [compact, setCompact] = useState(false);
-  const onScroll = (e: UIEvent<HTMLDivElement>) => {
-    const y = e.currentTarget.scrollTop;
-    setCompact((c) => (c ? y > 8 : y > 48));
+  // 向上捲（似 iPhone 大標題）：成個黃色區跟手指捲走，頂部細標題列（App 名）跟住捲動距離慢慢淡入。
+  // 直接改 style（唔 setState），每格都順
+  const scroller = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
+  const onScroll = () => {
+    const el = scroller.current;
+    const b = bar.current;
+    if (!el || !b) return;
+    const hero = heroRef.current?.offsetHeight ?? 240;
+    const barH = b.offsetHeight;
+    // 黃色區底部去到細標題列底部之前 70px 開始滑落，到齊位時完全出現
+    const end = hero - barH;
+    const p = Math.min(1, Math.max(0, (el.scrollTop - (end - 70)) / 70));
+    // 實色由上面滑落（唔用半透明，唔會見到後面嘅字）
+    b.style.transform = `translateY(${(p - 1) * (barH + 12)}px)`;
+    b.style.visibility = p > 0 ? 'visible' : 'hidden';
+    b.style.pointerEvents = p > 0.6 ? 'auto' : 'none';
   };
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
@@ -53,24 +65,25 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
   };
 
   return (
-    <>
-      <header className={`app-bar home-hero${compact ? ' compact' : ''}`}>
+    <div className="home-tab">
+      {/* 捲咗上去先出嘅細標題列：App 名 + 搜尋 */}
+      <div className="home-minibar" ref={bar} aria-hidden="true">
+        <Logo size={24} />
+        <strong>下一程</strong>
+        <span className="app-sub">NextLeg</span>
+        <button className="bar-btn" onClick={() => go('nav')} aria-label="導航：想去邊度？" tabIndex={-1}>
+          <Icon name="search" />
+        </button>
+      </div>
+      <div className="home-scroll" ref={scroller} onScroll={onScroll}>
+      <header className="app-bar home-hero" ref={heroRef}>
         <div className="app-title">
-          <Logo size={compact ? 26 : 24} />
-          {compact && placeName ? (
-            <>
-              <h1>{placeName}</h1>
-              {area?.en && <span className="app-sub">{area.en}</span>}
-            </>
-          ) : (
-            <>
-              <h1>下一程</h1>
-              <span className="app-sub">NextLeg</span>
-            </>
-          )}
+          <Logo size={24} />
+          <h1>下一程</h1>
+          <span className="app-sub">NextLeg</span>
         </div>
         {/* 大字地區名（似港鐵 App「青衣 Tsing Yi」）；冇地區數據就用最近站頭名 */}
-        <div className="hero-loc" aria-live="polite" aria-hidden={compact}>
+        <div className="hero-loc" aria-live="polite">
           <span className="hero-name">{area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}</span>
           {area?.en && <span className="hero-en">{area.en}</span>}
           <span className="hero-sub">
@@ -101,7 +114,7 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
         </div>
       </header>
 
-      <div className="home-feed" onScroll={onScroll}>
+      <div className="home-feed">
         <section className="feed-section">
           <div className="feed-head">
             <h2>常用工具</h2>
@@ -190,6 +203,7 @@ export default function HomeTab({ go }: { go: (to: ToolId, pos?: { lat: number; 
           </section>
         )}
       </div>
-    </>
+      </div>
+    </div>
   );
 }
