@@ -13,6 +13,8 @@ export interface BusesDetail {
   segSeconds: number[];
   /** 打開咗邊個站（地圖用嚟調整畫面同顯示 tooltip）；冇就 null */
   openIndex: number | null;
+  /** 尾班車係 buses 入面邊一架（同一個 object）；認唔到就 null */
+  lastBus?: TrackedBus | null;
 }
 
 /** 最新一次巴士位置：地圖係延遲載入，載入時用嚟補返之前錯過咗嘅更新 */

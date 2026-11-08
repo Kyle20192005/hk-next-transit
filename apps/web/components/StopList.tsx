@@ -2,7 +2,7 @@
 import { getPrefs } from '@/lib/prefs';
 import { busesClient } from '@/lib/buses';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BusStabilizer, LIVE_REFRESH, type LastBus, parseLiveBuses, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
+import { BusStabilizer, LIVE_REFRESH, type LastBus, parseLiveBuses, busDistanceTo, busFraction, formatDistance, labelEtas, lastBusEtaIndex, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
 import { companyColor, companyInk } from '@/lib/company';
@@ -160,11 +160,6 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
     };
   }, [co, route, selectedVariantId]);
 
-  // 通知地圖
-  useEffect(() => {
-    if (!live) return;
-    publishBuses({ ...live, openIndex });
-  }, [live, openIndex]);
 
   // 打開咗嘅站：攞到站時間
   const open = openIndex !== null ? stops[openIndex] : undefined;
@@ -204,11 +199,21 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
   }, [seg, openIndex]);
 
   // 每班車而家喺邊：用成條線追蹤到嘅巴士對應返呢個站嘅 ETA
-  const whereLabels = useMemo(() => {
+  const matched = useMemo(() => {
     if (!live || openIndex === null || !etas) return null;
     // 九巴「原定班次」唔係實時，唔配對巴士位置
     const mine = etas.filter((e) => isMine(e) && !e.scheduled);
     const labels = labelEtas(live.buses, openIndex, mine.map((e) => Date.parse(e.eta!)), live.segSeconds, now);
+    // 尾班車：認到邊班 ETA 係尾班，又對到架車，就記住佢（地圖、時間線標「尾班」）
+    const li = lastBusEtaIndex(etas, lastBus[openIndex] ?? null);
+    const lk = li >= 0 ? mine.indexOf(etas[li]!) : -1;
+    const ll = lk >= 0 ? labels[lk] : undefined;
+    const lastTracked = ll && ll.kind !== 'notDeparted' ? ll.bus : null;
+    return { mine, labels, lastTracked };
+  }, [live, openIndex, etas, selectedVariantId, now, lastBus]);
+  const whereLabels = useMemo(() => {
+    if (!live || openIndex === null || !etas || !matched) return null;
+    const { mine, labels } = matched;
     return etas.map((e) => {
       const k = mine.indexOf(e);
       if (k < 0) return null;
@@ -219,7 +224,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
       const dist = m === null || m < 50 ? '' : ` · ${formatDistance(m)}`;
       return l.kind === 'arriving' ? `即將到站${dist}` : `距離 ${l.stopsAway} 個站${dist}`;
     });
-  }, [live, openIndex, etas, selectedVariantId, now, cumMetres]);
+  }, [live, openIndex, etas, matched, now, cumMetres]);
 
   // 下一班（揀咗嘅走法）喺打開咗嘅站嘅到站時間
   const nextAtOpen = useMemo(() => {
@@ -234,21 +239,35 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
     return () => clearInterval(t);
   }, []);
   const stabilizer = useMemo(() => new BusStabilizer(), []);
+  const stable = useMemo(() => (live ? stabilizer.update(live.buses, live.segSeconds, busNow) : []), [live, busNow, stabilizer]);
+  // 尾班車：打開站認到之後記住佢（穩定 id），閂咗個站都繼續標，直至佢行完全程
+  const [lastId, setLastId] = useState<number | null>(null);
+  const trackedId = matched?.lastTracked ? (stable.find((x) => x.bus === matched.lastTracked)?.id ?? null) : null;
+  if (trackedId !== null && trackedId !== lastId) setLastId(trackedId);
+  const lastStable = stable.find((x) => x.id === (trackedId ?? lastId)) ?? null;
+
+  // 通知地圖
+  useEffect(() => {
+    if (!live) return;
+    publishBuses({ ...live, openIndex, lastBus: lastStable?.bus ?? null });
+  }, [live, openIndex, lastStable?.bus]);
+
   const rowBuses = useMemo(() => {
     const out = new Map<number, RowBus[]>();
     if (!live) return out;
     const last = stops.length - 1;
-    for (const { id, bus, progress } of stabilizer.update(live.buses, live.segSeconds, busNow)) {
+    for (const { id, bus, progress } of stable) {
       const from = Math.min(Math.floor(progress), last - 1);
       const f = Math.min(1, progress - from);
       // 兩站之間：前半段畫喺上一個站嗰行嘅下半，後半段畫喺下一個站嗰行嘅上半
       const [row, half, t] = f < 0.5 ? [from, 'below' as const, f * 2] : [from + 1, 'above' as const, (f - 0.5) * 2];
       const mins = Math.max(0, Math.round((bus.nextEta - busNow) / 60000));
-      const label = (bus.schedule ? '按時間表估計：' : '') + (mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`);
-      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label, schedule: bus.schedule, color: companyColor(multiCompany ? (bus.company ?? company) : company), ink: companyInk(multiCompany ? (bus.company ?? company) : company) }]);
+      const isLast = id === lastStable?.id;
+      const label = (isLast ? '尾班車：' : '') + (bus.schedule ? '按時間表估計：' : '') + (mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`);
+      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label, schedule: bus.schedule, last: isLast, color: companyColor(multiCompany ? (bus.company ?? company) : company), ink: companyInk(multiCompany ? (bus.company ?? company) : company) }]);
     }
     return out;
-  }, [live, busNow, stabilizer, stops, multiCompany, company]);
+  }, [live, stable, busNow, stops, multiCompany, company, lastStable?.id]);
 
   return (
     <>

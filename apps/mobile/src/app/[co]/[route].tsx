@@ -19,6 +19,7 @@ import {
   labelEtas,
   LIVE_REFRESH,
   lastBusAt,
+  lastBusEtaIndex,
   parseLiveBuses,
   pointOnPath,
   secondsFrom,
@@ -354,11 +355,30 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
   }, [seg, openIndex]);
   const nextAtOpen = etas?.filter(isMine).map((e) => Date.parse(e.eta!)).filter((x) => x >= etaNow - 60_000).sort((a, b) => a - b)[0] ?? null;
 
-  // 每班車而家喺邊（「原定班次」唔係實時，唔配對）
-  const whereLabels = useMemo(() => {
+  // 打開咗嘅站嘅尾班車（終點站唔使）
+  const lastBusStop = openIndex !== null && openIndex < stops.length - 1 ? stops[openIndex] : undefined;
+  const openLastBus = useMemo(() => (lastBusStop ? lastBusAt(dirVariants, lastBusStop.stopId, lastBusStop.dir, calendar, etaNow) : null), [lastBusStop, dirVariants, calendar, etaNow]);
+
+  // 每班車而家喺邊（「原定班次」唔係實時，唔配對）；同時認邊架車係尾班（同網頁 StopList 一樣）
+  const matched = useMemo(() => {
     if (!live || openIndex === null || !etas) return null;
     const mine = etas.filter((e) => isMine(e) && !e.scheduled);
     const labels = labelEtas(live.buses, openIndex, mine.map((e) => Date.parse(e.eta!)), live.segSeconds, etaNow);
+    const li = lastBusEtaIndex(etas, openLastBus);
+    const lk = li >= 0 ? mine.indexOf(etas[li]!) : -1;
+    const ll = lk >= 0 ? labels[lk] : undefined;
+    return { mine, labels, lastTracked: ll && ll.kind !== 'notDeparted' ? ll.bus : null };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, openIndex, etas, selected?.id, etaNow, openLastBus]);
+  // 尾班車：認到之後記住佢（穩定 id），閂咗個站都繼續標，直至佢行完全程
+  const [lastId, setLastId] = useState<number | null>(null);
+  const trackedId = matched?.lastTracked ? (stable.find((x) => x.bus === matched.lastTracked)?.id ?? null) : null;
+  if (trackedId !== null && trackedId !== lastId) setLastId(trackedId);
+  const lastStableId = stable.find((x) => x.id === (trackedId ?? lastId))?.id ?? null;
+
+  const whereLabels = useMemo(() => {
+    if (!live || openIndex === null || !etas || !matched) return null;
+    const { mine, labels } = matched;
     return etas.map((e) => {
       const k = mine.indexOf(e);
       if (k < 0) return null;
@@ -368,8 +388,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
       const dist = m === null || m < 50 ? '' : ` · ${formatDistance(m)}`;
       return l.kind === 'arriving' ? `即將到站${dist}` : `距離 ${l.stopsAway} 個站${dist}`;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live, openIndex, etas, selected?.id, etaNow, cumMetres]);
+  }, [live, openIndex, etas, matched, etaNow, cumMetres]);
 
   const colorOf = (b: TrackedBus) => {
     const c = multiCompany ? (b.company ?? data.company) : data.company;
@@ -383,11 +402,11 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
       const from = Math.min(Math.floor(progress), last - 1);
       const f = Math.min(1, progress - from);
       const [row, half, tt] = f < 0.5 ? [from, 'below' as const, f * 2] : [from + 1, 'above' as const, (f - 0.5) * 2];
-      out.set(row, [...(out.get(row) ?? []), { key: id, half, t: tt, schedule: bus.schedule, ...colorOf(bus) }]);
+      out.set(row, [...(out.get(row) ?? []), { key: id, half, t: tt, schedule: bus.schedule, last: id === lastStableId, ...colorOf(bus) }]);
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stable, stops]);
+  }, [stable, stops, lastStableId]);
   // 地圖上嘅巴士：有 GPS（港鐵巴士）直接用，冇就沿走線推算
   const mapBuses: MapBus[] = useMemo(() => {
     const idx = path.length ? stopPathIndices(path, mapStops.map((m) => [m.lat, m.lng] as LatLng)) : [];
@@ -397,8 +416,9 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
       const from = Math.min(Math.floor(progress), last - 1);
       const f = Math.min(1, progress - from);
       const mins = Math.max(0, Math.round((bus.nextEta - busNow) / 60000));
-      const label = (bus.schedule ? '按時間表估計：' : '') + (mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`);
-      const base = { key: id, schedule: Boolean(bus.schedule), label, ...colorOf(bus) };
+      const isLast = id === lastStableId;
+      const label = (isLast ? '尾班車：' : '') + (bus.schedule ? '按時間表估計：' : '') + (mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`);
+      const base = { key: id, schedule: Boolean(bus.schedule), last: isLast, label, ...colorOf(bus) };
       if (bus.gps) return [{ ...base, latitude: bus.gps.lat, longitude: bus.gps.lng }];
       const a = at(from);
       const c = at(from + 1);
@@ -549,7 +569,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
                 now={etaNow}
                 selectedVariantId={selected?.id ?? null}
                 fare={fares[i] ?? null}
-                lastBus={openIndex === i && i < stops.length - 1 ? lastBusAt(dirVariants, s.stopId, s.dir, calendar, etaNow) : null}
+                lastBus={openIndex === i ? openLastBus : null}
                 nearestMetres={nearest?.index === i ? nearest.metres : null}
                 travelSeconds={after ? tr : null}
                 travelMetres={after ? (cumMetres[i] ?? 0) - (cumMetres[openIndex!] ?? 0) : null}

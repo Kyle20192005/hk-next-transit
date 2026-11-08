@@ -113,9 +113,17 @@ export function RouteMap({ lines, stops, buses, color, company, multiCompany, fo
           );
         })}
         {buses.map((b) => (
-          <Marker key={`bus-${b.key}`} coordinate={{ latitude: b.latitude, longitude: b.longitude }} anchor={{ x: 0.5, y: 0.5 }} tappable={false} zIndex={6}>
-            <View accessibilityLabel={b.label} style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#fff', backgroundColor: b.color, alignItems: 'center', justifyContent: 'center', opacity: b.schedule ? 0.5 : 1 }}>
-              <BusGlyph size={15} color={b.ink} />
+          // 尾班車：巴士下面加「尾班」（固定高度：巴士 28 + 2 + 標籤 16 = 46，錨點對準巴士中心）
+          <Marker key={`bus-${b.key}${b.last ? '-last' : ''}`} coordinate={{ latitude: b.latitude, longitude: b.longitude }} anchor={{ x: 0.5, y: b.last ? 14 / 46 : 0.5 }} tappable={false} zIndex={b.last ? 7 : 6}>
+            <View accessibilityLabel={b.label} style={{ width: b.last ? 40 : 28, alignItems: 'center', gap: 2 }}>
+              <View style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#fff', backgroundColor: b.color, alignItems: 'center', justifyContent: 'center', opacity: b.schedule ? 0.5 : 1 }}>
+                <BusGlyph size={15} color={b.ink} />
+              </View>
+              {b.last && (
+                <View style={{ height: 16, paddingHorizontal: 5, borderRadius: 6, backgroundColor: '#c62828', justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>尾班</Text>
+                </View>
+              )}
             </View>
           </Marker>
         ))}

@@ -13,6 +13,8 @@ export interface MapBus {
   ink: string;
   /** 按時間表推算：半透明 */
   schedule: boolean;
+  /** 尾班車（追蹤緊）：下面標「尾班」 */
+  last?: boolean;
   label: string;
 }
 export interface MapLine {

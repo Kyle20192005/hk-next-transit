@@ -20,7 +20,7 @@ describe('lastBusAt', () => {
   it('after last bus → next first tomorrow', () => {
     const info = lastBusAt([v([360, 1410])], 'B', 'O', calendar, hk(23, 50));
     expect(info?.nextFirst).toBe(hk(6, 10) + 86_400_000);
-    expect(lastBusText(info, hk(23, 50))?.text).toBe('今日已經冇車 · 下次頭班約 聽日 06:10');
+    expect(lastBusText(info, hk(23, 50))?.text).toBe('尾班車已經開走 · 下次頭班約 聽日 06:10');
   });
   it('after midnight still yesterday service (departure 1470 = 00:30)', () => {
     const info = lastBusAt([v([360, 1470])], 'B', 'O', calendar, hk(0, 20));
@@ -64,5 +64,28 @@ describe('lastBusEtaIndex', () => {
     const late = lastBusAt([v([360, 1380, 1410])], 'B', 'O', calendar, hk(23, 45));
     expect(lastBusEtaIndex([eta(hk(23, 50))], late)).toBe(0);
     expect(lastBusText(late, hk(23, 45), hk(23, 50))).toEqual({ text: '尾班車 23:50 · 仲有 5 分鐘', urgent: true, gone: false });
+  });
+});
+
+describe('after midnight (bug 2026-11-09)', () => {
+  // 尾班 23:35 開出、到 B 站 23:45；頭班 06:00
+  const vs = [v([360, 1415])];
+  it('00:03: last night\'s last bus has gone, next first 06:10 today', () => {
+    const info = lastBusAt(vs, 'B', 'O', calendar, hk(0, 3));
+    expect(info?.last).toBe(hk(23, 45) - 86_400_000);
+    expect(info?.nextFirst).toBe(hk(6, 10));
+    expect(lastBusText(info, hk(0, 3))?.text).toBe('尾班車已經開走 · 下次頭班約 06:10');
+  });
+  it('00:04: a late last bus still shown in ETAs is recognised', () => {
+    // 595 實例：時間表尾班 23:58 到呢個站，實際遲咗，00:04 先到
+    const info = lastBusAt([v([360, 1428])], 'B', 'O', calendar, hk(0, 4));
+    const eta = { eta: new Date(hk(0, 4) + 20_000 + 8 * 3600_000).toISOString().replace('Z', '+08:00'), company: 'CTB' as const };
+    expect(lastBusEtaIndex([eta], info)).toBe(0);
+    expect(lastBusText(info, hk(0, 4), hk(0, 4) + 20_000)?.text).toBe('尾班車 00:04 · 即將到站');
+    // ETA 啱啱過咗 20 秒：車喺站，仲係尾班
+    expect(lastBusText(info, hk(0, 4) + 40_000, hk(0, 4) + 20_000)?.text).toBe('尾班車 00:04 · 即將到站');
+  });
+  it('after first bus of the day, today is the service day', () => {
+    expect(lastBusAt(vs, 'B', 'O', calendar, hk(7))?.last).toBe(hk(23, 45));
   });
 });

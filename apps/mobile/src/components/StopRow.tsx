@@ -16,6 +16,8 @@ export interface RowBus {
   color: string;
   ink: string;
   schedule?: boolean;
+  /** 尾班車（追蹤緊）：下面標「尾班」 */
+  last?: boolean;
 }
 
 type Props = {
@@ -108,6 +110,11 @@ export const StopRow = memo(function StopRow(p: Props) {
           }}
         >
           <BusGlyph size={14} color={b.ink} />
+          {b.last && (
+            <View style={{ position: 'absolute', top: 26, paddingHorizontal: 5, borderRadius: 6, backgroundColor: '#c62828' }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800', lineHeight: 15 }}>尾班</Text>
+            </View>
+          )}
         </View>
       ))}
       <Pressable onPress={p.onToggle} accessibilityRole="button" accessibilityState={{ expanded: p.open }} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 54, paddingVertical: 6, paddingRight: 16 }}>

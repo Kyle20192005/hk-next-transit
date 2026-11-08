@@ -539,6 +539,10 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .map-help ul { padding-left: 18px; }
 .map-help-close { display: block; margin-left: auto; padding: 8px 18px; border: 0; border-radius: var(--radius-s); background: var(--brand); color: var(--on-brand); font-weight: 700; cursor: pointer; }
 .map-bus { cursor: default; }
+.map-bus { position: relative; }
+/* 尾班車：巴士旁邊紅色細標籤（地圖、時間線一樣） */
+.map-bus-tag { position: absolute; left: calc(100% + 3px); top: 50%; transform: translateY(-50%); padding: 0 6px; border-radius: 6px; background: #c62828; color: #fff; font-size: 0.6875rem; font-weight: 800; line-height: 1.5; white-space: nowrap; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
+.map-bus.is-last { z-index: 3; }
 .map-bus > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); }
 .map-failed { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 16px; text-align: center; font-size: 0.875rem; }
 .route-map { position: relative; }
@@ -584,6 +588,7 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .stop.terminus .tl-dot { width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 5px solid var(--text); box-shadow: none; }
 /* 時間線上嘅巴士：相對成個站（li）定位 */
 .tl-bus.is-schedule, .map-bus.is-schedule > span { opacity: 0.5; }
+.tl-bus.is-last::after { content: '尾班'; position: absolute; left: 50%; top: calc(100% + 2px); transform: translateX(-50%); padding: 0 5px; border-radius: 6px; background: #c62828; color: #fff; font-size: 0.625rem; font-weight: 800; line-height: 1.5; white-space: nowrap; }
 .tl-bus { position: absolute; left: var(--tl-x); width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--line-color, var(--route-line)); border: 2px solid var(--card); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); z-index: 2; pointer-events: none; }
 .stop-name { flex: 1; min-width: 0; display: flex; flex-direction: column; padding-left: 6px; font-size: 1rem; }
 .stop.open .stop-name { font-weight: 700; }

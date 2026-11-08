@@ -25,6 +25,8 @@ export interface RowBus {
   /** 公司代表色同上面圖示色 */
   color?: string;
   ink?: string;
+  /** 尾班車（追蹤緊）：旁邊標「尾班」 */
+  last?: boolean;
 }
 
 const busTop = (b: RowBus) =>
@@ -92,7 +94,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
   return (
     <li className={`stop${open ? ' open' : ''}${terminus ? ' terminus' : ''}`} ref={ref}>
       {buses.map((b) => (
-        <span key={b.key} className={`tl-bus${b.schedule ? ' is-schedule' : ''}`} style={{ top: busTop(b), ...(b.color ? { background: b.color, color: b.ink } : {}) }} title={b.label} aria-hidden="true">
+        <span key={b.key} className={`tl-bus${b.schedule ? ' is-schedule' : ''}${b.last ? ' is-last' : ''}`} style={{ top: busTop(b), ...(b.color ? { background: b.color, color: b.ink } : {}) }} title={b.label} aria-hidden="true">
           <BusIcon />
         </span>
       ))}

@@ -175,11 +175,12 @@ export default function RouteMap({ lines, stops, multiCompany = false, company }
             const mins = Math.max(0, Math.round((b.nextEta - now) / 60000));
             if (openIdx !== null && from < openIdx && !nearest) nearest = where;
             const node = document.createElement('div');
-            node.className = b.schedule ? 'map-bus is-schedule' : 'map-bus';
-            node.title = (b.schedule ? '按時間表估計：' : '') + (mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`);
+            const isLast = b === latest.lastBus;
+            node.className = `map-bus${b.schedule ? ' is-schedule' : ''}${isLast ? ' is-last' : ''}`;
+            node.title = (isLast ? '尾班車：' : '') + (b.schedule ? '按時間表估計：' : '') + (mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`);
             const bg = (multiCompany && companyColor(b.company)) || brand;
             const fg = multiCompany && b.company ? companyInk(b.company) : ink;
-            node.innerHTML = `<span style="background:${bg}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="${fg}" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>`;
+            node.innerHTML = `<span style="background:${bg}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="${fg}" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>${isLast ? '<b class="map-bus-tag">尾班</b>' : ''}`;
             busMarkers.push(new maplibregl.Marker({ element: node }).setLngLat(where).addTo(map));
           }
           // 打開站後第一次：調整地圖，同時睇到個站同最近嗰架車；左右留位，站名標籤唔會俾地圖邊切走

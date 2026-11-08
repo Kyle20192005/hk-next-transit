@@ -168,7 +168,11 @@ export function lastBusAt(variants: Variant[], stopId: string, dir: string, cale
   if (!any) return null;
   const max = (xs: number[]) => (xs.length ? Math.max(...xs) : null);
   const lastYesterday = max(perDay[0]!);
-  const day = lastYesterday !== null && lastYesterday > now ? perDay[0]! : perDay[1]!;
+  const min = (xs: number[]) => (xs.length ? Math.min(...xs) : null);
+  const firstToday = min(perDay[1]!);
+  // 服務日：琴日嘅班次未行完、或者今日頭班都未開（例如凌晨 00:03，琴晚 23:45 尾班已過）→ 仲係琴日
+  const yesterday = lastYesterday !== null && (lastYesterday > now || firstToday === null || now < firstToday);
+  const day = yesterday ? perDay[0]! : perDay[1]!;
   const last = max(day);
   // 前一班：早過尾班 1 分鐘以上（唔同走法同一時間開出當同一班）
   const prev = last === null ? null : max(day.filter((t) => t < last - 60_000));
@@ -215,15 +219,16 @@ export function lastBusEtaIndex(etas: readonly Pick<Eta, 'eta' | 'company'>[], i
 /**
  * 尾班車提示文字：
  * - 尾班未到：「尾班約 23:45」；30 分鐘內「尾班約 23:45 · 仲有 12 分鐘」（urgent）
- * - 過咗：「今日已經冇車 · 下次頭班約 06:10」（聽日嘅加「聽日」）
+ * - 過咗：「尾班車已經開走 · 下次頭班約 06:10」（聽日嘅加「聽日」）
  * 時間係時間表估算，所以寫「約」；有 `actual`（`lastBusEtaIndex` 認到嗰班嘅實時時間）就用實時：「尾班車 00:00 · 仲有 27 分鐘」（嗰班同時標「尾班」）。
  */
 export function lastBusText(info: LastBus | null, now: number, actual?: number | null): { text: string; urgent: boolean; gone: boolean } | null {
   if (!info) return null;
   // 認到邊班實時班次係尾班：用實時時間（唔再寫「約」）
-  if (actual != null && actual > now) {
-    const mins = Math.round((actual - now) / 60_000);
-    return { text: `尾班車 ${clock(actual)}${mins <= 30 ? ` · 仲有 ${mins} 分鐘` : ''}`, urgent: mins <= 30, gone: false };
+  // ETA 啱啱過咗幾秒（車喺站／即將到）都仲算
+  if (actual != null && actual > now - 60_000) {
+    const mins = Math.max(0, Math.round((actual - now) / 60_000));
+    return { text: `尾班車 ${clock(actual)}${mins <= 0 ? ' · 即將到站' : mins <= 30 ? ` · 仲有 ${mins} 分鐘` : ''}`, urgent: mins <= 30, gone: false };
   }
   if (info.last !== null && info.last > now) {
     const mins = Math.round((info.last - now) / 60_000);
@@ -231,7 +236,8 @@ export function lastBusText(info: LastBus | null, now: number, actual?: number |
       ? { text: `尾班約 ${clock(info.last)} · 仲有 ${mins} 分鐘`, urgent: true, gone: false }
       : { text: `尾班約 ${clock(info.last)}`, urgent: false, gone: false };
   }
-  if (info.nextFirst === null) return { text: '今日已經冇車', urgent: false, gone: true };
+  // 過咗午夜講「今日」會混淆（凌晨 00:03 嘅「今日」其實係琴晚），所以講「尾班車已經開走」
+  if (info.nextFirst === null) return { text: '尾班車已經開走', urgent: false, gone: true };
   const tomorrow = hkMidnight(info.nextFirst) > hkMidnight(now);
-  return { text: `今日已經冇車 · 下次頭班約 ${tomorrow ? '聽日 ' : ''}${clock(info.nextFirst)}`, urgent: false, gone: true };
+  return { text: `尾班車已經開走 · 下次頭班約 ${tomorrow ? '聽日 ' : ''}${clock(info.nextFirst)}`, urgent: false, gone: true };
 }
