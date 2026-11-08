@@ -21,6 +21,10 @@ export class TokenBucket {
   private low: (() => void)[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
 
+  get rate() {
+    return this.rps;
+  }
+
   constructor(
     private rps: number,
     private now: () => number = Date.now,
@@ -85,7 +89,7 @@ export function companyOf(url: string): string {
   return 'other';
 }
 
-export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: typeof fetch; now?: () => number }) {
+export function createUpstream(opts: { ttlMs: number; rps: number; rpsByHost?: Record<string, number>; fetchImpl?: typeof fetch; now?: () => number }) {
   const base = opts.fetchImpl ?? fetch;
   const now = opts.now ?? Date.now;
   // 每個伺服器各自限速：城巴同新大嶼山（rt.data.gov.hk）、九巴（data.etabus.gov.hk）、港鐵巴士係唔同伺服器，唔使互相搶
@@ -98,7 +102,7 @@ export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: t
       /* 唔係完整網址：共用 */
     }
     let b = buckets.get(host);
-    if (!b) buckets.set(host, (b = new TokenBucket(opts.rps, now)));
+    if (!b) buckets.set(host, (b = new TokenBucket(opts.rpsByHost?.[host] ?? opts.rps, now)));
     return b;
   };
   const cache = new Map<string, Stored>();
@@ -168,6 +172,7 @@ export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: t
   };
 
   const queued = () => [...buckets.values()].reduce((n, b) => n + b.waiting, 0);
+  const limits = () => Object.fromEntries([...buckets].map(([h, b]) => [h, b.rate]));
   return {
     /** 高優先：追蹤緊嘅路線、某站到站時間 */
     fetch: makeFetch(false),
@@ -175,6 +180,7 @@ export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: t
     lowFetch: (onBusy: () => void) => makeFetch(true, onBusy),
     stats,
     queued,
+    limits,
     sweep,
     cacheSize: () => cache.size,
   };

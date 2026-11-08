@@ -12,7 +12,8 @@ import { getAllStops, getRoute } from './data';
  *  （2026-11-08 第一次只用 10 條線輪流問，每秒 10、20 嗰兩級中位數得 8–11 毫秒，即係 cache 頂咗）。
  * - 由每秒 5 個開始，每級 30 秒逐級加；任何一部伺服器出錯率 > 2% 或者有 429／403 即刻停。
  * - 睇中位數：一路幾百毫秒 = 正常；升到一秒幾 = 開始頂唔順；跌到十幾毫秒 = 撞中 cache（嗰級唔準）。
- * 預設最多每秒 20 個（PROBE_MAX_RPS 可以改，最多 50），揀夜晚人少先試高。
+ * 預設最多每秒 20 個（PROBE_MAX_RPS 可以改，最多 50），揀夜晚人少先試高。邊部伺服器出錯就淨係停邊部，另一部繼續；
+ * PROBE_ONLY=rt（或 kmb）淨係試一部。
  */
 const LEVELS = [5, 10, 15, 20, 25, 30, 35, 40, 50].filter((r) => r <= Number(process.env.PROBE_MAX_RPS ?? 20));
 const SECONDS = Number(process.env.PROBE_SECONDS ?? 30);
@@ -120,29 +121,39 @@ async function run() {
   console.log(`rt.data.gov.hk（城巴＋新大嶼山＋港鐵巴士）：${rt.length} 個唔同網址；data.etabus.gov.hk（九巴）：${kmb.length} 個`);
   console.log(`每個網址只問一次；每部伺服器今次最多用 ${need} 個（每級 ${SECONDS} 秒，兩部同時問）\n`);
   console.log('每秒 | 伺服器             | 成功 | 錯 | 中位ms | p95ms | 狀態碼 | 問咗邊間');
-  let iRt = 0;
-  let iKmb = 0;
-  const safe = { rt: 0, kmb: 0 };
+  // 每部伺服器各自計：邊部出錯就淨係停邊部，另一部繼續加（PROBE_ONLY=rt 或 kmb 可以淨係試一部）
+  const only = process.env.PROBE_ONLY;
+  const hosts = [
+    { key: 'rt', name: 'rt.data.gov.hk', list: rt, i: 0, safe: 0, stopped: only === 'kmb', note: '' },
+    { key: 'kmb', name: 'data.etabus.gov.hk', list: kmb, i: 0, safe: 0, stopped: only === 'rt', note: '' },
+  ];
   for (const rps of LEVELS) {
-    const [a, b] = await Promise.all([runHost(rt, iRt, rps), runHost(kmb, iKmb, rps)]);
-    iRt = a.next;
-    iKmb = b.next;
-    console.log(line('rt.data.gov.hk', rps, a.level));
-    console.log(line('data.etabus.gov.hk', rps, b.level));
-    const badRt = failed(a.level);
-    const badKmb = failed(b.level);
-    if (!badRt) safe.rt = rps;
-    if (!badKmb) safe.kmb = rps;
-    if (badRt || badKmb || a.level.ranOut || b.level.ranOut) {
-      if (badRt) console.log(`\nrt.data.gov.hk 每秒 ${rps} 個開始出錯`);
-      if (badKmb) console.log(`\ndata.etabus.gov.hk 每秒 ${rps} 個開始出錯`);
-      break;
-    }
+    const active = hosts.filter((h) => !h.stopped);
+    if (!active.length) break;
+    const results = await Promise.all(active.map((h) => runHost(h.list, h.i, rps)));
+    active.forEach((h, k) => {
+      const { level, next } = results[k]!;
+      h.i = next;
+      console.log(line(h.name, rps, level));
+      if (failed(level)) {
+        h.stopped = true;
+        h.note = `每秒 ${rps} 個開始出錯`;
+      } else {
+        h.safe = rps;
+        if (level.ranOut) (h.stopped = true), (h.note = '網址用晒');
+      }
+    });
     await new Promise((r) => setTimeout(r, 10_000)); // 每級之間休息
   }
-  const rec = Math.max(1, Math.round(Math.min(safe.rt, safe.kmb) * 0.7));
-  console.log(`\n冇出錯嘅最高一級：rt.data.gov.hk 每秒 ${safe.rt} 個、data.etabus.gov.hk 每秒 ${safe.kmb} 個。`);
-  console.log(`建議 UPSTREAM_RPS=${rec}（兩部之中較低嗰個嘅 70%；tracker 每部伺服器各自用呢個上限）。`);
+  console.log('');
+  const byHost: string[] = [];
+  for (const h of hosts) {
+    if (only && h.key !== only) continue;
+    const top = h.note.includes('出錯') ? '' : '（未試到頂）';
+    console.log(`${h.name}：冇出錯嘅最高一級每秒 ${h.safe} 個${top}${h.note ? `；${h.note}` : ''}`);
+    if (h.safe) byHost.push(`${h.name}=${Math.max(1, Math.round(h.safe * 0.7))}`);
+  }
+  console.log(`\n建議（每部伺服器用佢自己嘅 70%）：UPSTREAM_RPS_BY_HOST=${byHost.join(',')}`);
 }
 
 run().catch((e) => {

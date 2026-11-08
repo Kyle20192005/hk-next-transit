@@ -54,6 +54,7 @@ pipeline 每次都 clone 最新 `main`，改 pipeline 程式唔使重新部署�
    DATA_BASE_URL=<同 Vercel 嘅 DATA_BASE_URL 一樣>
    DATA_TOKEN=<同 Vercel 一樣；公開 repo 唔使>
    UPSTREAM_RPS=14
+   UPSTREAM_RPS_BY_HOST=data.etabus.gov.hk=10
    CORS_ORIGINS=https://eta.kyle05.dev
    ```
 

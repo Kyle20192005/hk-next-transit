@@ -384,6 +384,9 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
       每秒 10、20 嗰兩級中位數只有 8–11 毫秒（5、15 係 230–250 毫秒）：data.gov.hk 前面應該有 cache，同一個網址短時間重問好快，
       所以真正上限可能高過 20，未試。決定：tracker `UPSTREAM_RPS=14`、pipeline `RT_RPS=12`。
       之前俾封係 fetch.py 32 條線程（大約每秒 100 個）。
+- [x] 第二次 probe（四間公司、按伺服器同時試、每個網址只問一次）：rt.data.gov.hk 每秒 5–20 個 0 出錯、中位數穩定約 240 毫秒（真係計，冇撞 cache，未到頂）；
+      data.etabus.gov.hk（九巴）15 個冇事，**20 個開始超時**（14/592 個等 8 秒冇回應），p95 本身已經 1.7–2.8 秒。
+      → tracker 加 `UPSTREAM_RPS_BY_HOST`（按伺服器設上限）：九巴 10、rt.data.gov.hk 14；probe 改做邊部出錯淨係停邊部，可以再量 rt 嘅頂
 - [x] Vercel 設 `NEXT_PUBLIC_TRACKER_URL=https://rt.kyle05.dev`（2026-11-08）：正式網站巴士位置由 tracker 攞，CORS 正常
 - [x] Caddy 永久接駁 `dokploy-network`（moodle-docker compose）；pipeline 刪咗 `RUN_ON_START`、加 `/state` volume
 - [x] 到站時間都經 tracker（`/api/eta`，2026-11-08，用戶要求前後端分清楚）：追蹤緊嘅線直接用上游 cache（實測打開一個站上游請求 0）；

@@ -67,7 +67,8 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 - `deploy/pipeline/`：每日 04:17 數據更新容器（取代 GitHub Actions），每次 clone 最新 main；要 `GITHUB_TOKEN`（Contents 讀寫）、`DATA_REPO`。
 - 已部署：tracker `https://rt.kyle05.dev`（VPS 嘅 80／443 係 Moodle 嘅 Caddy，HTTPS 由佢 reverse_proxy，Dokploy 唔設 Domain）；
   pipeline 每日 04:17。data.gov.hk 同一個 IP 問得太密會 403（32 條線程、大約每秒 100 個試過俾封）；probe 實測每秒 20 個冇問題，
-  所以 tracker `UPSTREAM_RPS=14`、pipeline `RT_RPS=12`（每個伺服器各自計）。
+  第二次（四間公司同時、唔重複網址）：rt.data.gov.hk 20 個未到頂，九巴（data.etabus.gov.hk）20 個開始超時、15 個冇事。
+  所以 tracker `UPSTREAM_RPS=14` + `UPSTREAM_RPS_BY_HOST=data.etabus.gov.hk=10`（按伺服器設上限）、pipeline `RT_RPS=12`。
 
 ## 九巴同聯營線
 

@@ -14,7 +14,7 @@ import { BusyError, createUpstream } from './upstream';
  *   GET /api/here?lat=22.28&lng=114.15          呢個位置可以搭嘅路線（喺度搭得、首頁下班車）
  *   GET /health
  */
-const upstream = createUpstream({ ttlMs: config.upstreamTtlMs, rps: config.upstreamRps });
+const upstream = createUpstream({ ttlMs: config.upstreamTtlMs, rps: config.upstreamRps, rpsByHost: config.upstreamRpsByHost });
 const lines = createLines(upstream.fetch);
 const startedAt = Date.now();
 setInterval(upstream.sweep, 60_000).unref();
@@ -62,8 +62,8 @@ const server = createServer(async (req, res) => {
         version: APP_VERSION,
         uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
         dataVersion: await dataVersion(),
-        config: { pollMs: config.pollMs, upstreamRps: config.upstreamRps, upstreamTtlMs: config.upstreamTtlMs, maxLines: config.maxLines },
-        upstream: { queued: upstream.queued(), cached: upstream.cacheSize(), companies },
+        config: { pollMs: config.pollMs, upstreamRps: config.upstreamRps, upstreamRpsByHost: config.upstreamRpsByHost, upstreamTtlMs: config.upstreamTtlMs, maxLines: config.maxLines },
+        upstream: { queued: upstream.queued(), limits: upstream.limits(), cached: upstream.cacheSize(), companies },
         lines: lines.status(),
         memoryMb: Math.round(process.memoryUsage().rss / 1048576),
       }, { 'Cache-Control': 'no-store' });

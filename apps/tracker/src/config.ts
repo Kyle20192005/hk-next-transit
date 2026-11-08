@@ -18,6 +18,18 @@ export const config = {
   upstreamTtlMs: num('UPSTREAM_TTL_MS', 10_000),
   /** 限流：去每個營辦商伺服器（例如 rt.data.gov.hk）嘅請求，每秒最多幾多個 */
   upstreamRps: num('UPSTREAM_RPS', 10),
+  /**
+   * 個別伺服器嘅上限（蓋過 UPSTREAM_RPS），格式「host=數字,host=數字」。
+   * 2026-11-08 實測：data.etabus.gov.hk（九巴）每秒 20 個開始超時、15 個冇事；rt.data.gov.hk 20 個都冇事（未量到頂）。
+   * 例如 UPSTREAM_RPS_BY_HOST=data.etabus.gov.hk=10,rt.data.gov.hk=14
+   */
+  upstreamRpsByHost: Object.fromEntries(
+    (process.env.UPSTREAM_RPS_BY_HOST ?? '')
+      .split(',')
+      .map((x) => x.split('=').map((y) => y.trim()))
+      .filter(([h, n]) => h && Number(n) > 0)
+      .map(([h, n]) => [h!, Number(n)]),
+  ) as Record<string, number>,
   /** 同時最多幾多條線 poll 緊（超出嘅照計，但唔會背景 poll） */
   maxLines: num('MAX_LINES', 60),
   /** CORS：准邊啲網站 call（逗號分隔）；冇設定就全部准 */

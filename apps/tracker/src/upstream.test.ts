@@ -75,3 +75,12 @@ describe('priority', () => {
     expect(busy).toBe(true);
   });
 });
+
+describe('per-host limits', () => {
+  it('uses rpsByHost for matching host', () => {
+    const up = createUpstream({ ttlMs: 1000, rps: 10, rpsByHost: { 'data.etabus.gov.hk': 3 }, fetchImpl: async () => new Response('{}') });
+    void up.fetch('https://data.etabus.gov.hk/x');
+    void up.fetch('https://rt.data.gov.hk/y');
+    expect(up.limits()).toEqual({ 'data.etabus.gov.hk': 3, 'rt.data.gov.hk': 10 });
+  });
+});
