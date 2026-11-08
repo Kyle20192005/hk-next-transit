@@ -36,6 +36,17 @@ const server = createServer(async (req, res) => {
   if (req.method !== 'GET') return send(req, res, 405, { error: '只支援 GET' });
 
   try {
+    if (url.pathname === '/') {
+      return send(req, res, 200, {
+        service: '下一程 NextLeg tracker（巴士位置後端）',
+        version: APP_VERSION,
+        endpoints: {
+          '/health': '狀態：每間公司請求數、出錯率、而家追蹤緊邊幾條線',
+          '/api/buses?co=ctb&route=38&v=1000304-1': '一個走法嘅巴士位置（同網站 /api/buses 一樣格式）',
+        },
+      });
+    }
+
     if (url.pathname === '/health') {
       const companies = Object.fromEntries(
         [...upstream.stats].map(([co, s]) => [co, { ...s, avgMs: s.requests ? Math.round(s.totalMs / s.requests) : null, errorRate: s.requests ? +(s.errors / s.requests).toFixed(3) : 0 }]),
