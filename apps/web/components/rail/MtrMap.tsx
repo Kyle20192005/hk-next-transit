@@ -17,7 +17,7 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<View | null>(null);
-  const stations = useMemo(() => mtrMapStations(0.17), []);
+  const stations = useMemo(() => mtrMapStations(), []);
   // 綫：轉角圓角（似港鐵圖），每條綫只避開自己嘅站
   const linePaths = useMemo(
     () => MTR_MAP_LINES.flatMap((l) => l.paths.map((p, i) => ({ key: `${l.line}-${i}`, color: mtrLine(l.line)?.color, d: mtrRoundPathD(p, Object.values(l.stations)) }))),
@@ -137,7 +137,7 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
           {stations.map((s) => {
             const inter = s.lines.length > 1;
             const r = Math.min(s.box.w, s.box.h) / 2;
-            const lp = mtrLabelPos(s.box, s.label);
+            const lp = mtrLabelPos(s.box, s.label, 0.14 + s.labelGap);
             const zhY = lp.baseline === 'top' ? lp.y + 0.3 : lp.baseline === 'bottom' ? lp.y - 0.22 : lp.y - 0.02;
             const enY = zhY + 0.25;
             const on = selected === s.code;
