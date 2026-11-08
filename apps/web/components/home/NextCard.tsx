@@ -5,6 +5,7 @@ import {
   busDepartureRows,
   favDepartureRows,
   formatDistance,
+  favsForNow,
   groupFavorites,
   groupStopHeads,
   minutesLabel,
@@ -18,6 +19,7 @@ import {
 import Icon from '@/components/Icon';
 import type { Co } from '@/lib/data';
 import { useFavorites, type Favorite } from '@/lib/favorites';
+import { useFavGroups } from '@/lib/fav-groups';
 import { warmRoute } from '@/lib/prefetch';
 import { usePrefs } from '@/lib/prefs';
 import type { NearbyState, NearStop } from './Nearby';
@@ -178,7 +180,11 @@ function useHeadRows(heads: StopHead<NearStop>[]): Record<string, { rows: Depart
 }
 
 function FavPane({ favs, onAll }: { favs: Favorite[]; onAll: () => void }) {
-  const groups = groupFavorites(favs);
+  // 收藏分組：而家時段嘅組（例如朝早「返工」）排最前，卡頂標組名
+  const favGroups = useFavGroups();
+  const [now] = useState(() => Date.now());
+  const { favs: ordered, active } = favsForNow(favs, favGroups, now);
+  const groups = groupFavorites(ordered);
   if (!groups.length) return <Message text="喺路線頁撳星號收藏路線，或者打開一個站撳「收藏呢個站」，就會喺度見到下一班車。" />;
   return (
     <Swiper
@@ -187,6 +193,7 @@ function FavPane({ favs, onAll }: { favs: Favorite[]; onAll: () => void }) {
         <>
           <Icon name={g.isStop ? 'pin' : 'route'} size={18} className="nc-loc-icon" />
           <strong>{g.name}</strong>
+          {active && g.favs.some((f) => f.group === active.id) && <span className="nc-group-tag">{active.name}</span>}
         </>
       )}
       action={{ label: '全部', onClick: onAll }}

@@ -238,6 +238,10 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     定位邏輯 `useNearbyStops`（網頁 `components/home/Nearby.tsx`、App `components/Nearby.tsx`）。
   - 收藏（`lib/favorites.ts`，localStorage，try/catch）：路線頁標題列星號收藏路線（某方向），打開站撳「收藏呢個站」；
     收藏頁同首頁直接顯示收藏咗嘅站嘅下一班（`/api/eta`，同方向；App `components/FavItem.tsx`）。
+  - **收藏分組**（core `fav-groups.ts`，`hknt.favGroups.v1`；網頁 `lib/fav-groups.ts`、App `src/lib/fav-groups.ts`）：例如「返工」「返屋企」，
+    最多 8 組，每組可以設時段（`FAV_GROUP_WINDOWS`，深夜跨午夜）；收藏記 `group`（冇 = 未分組，刪組變返未分組，收藏唔刪）。
+    收藏頁頂一行分組（全部 + 各組，而家時段嘅組有綠點，預設揀佢如果有收藏）、每個收藏下面揀組（網頁 select、App 彈出面板）、
+    「＋ 分組」／「改名／時段」開編輯面板（建議名、時段、刪除）。首頁大卡收藏分頁用 `favsForNow`：而家時段嘅組排先，卡頂標組名。
 - **設定**（網頁 `components/home/Settings.tsx`、App `src/app/(tabs)/settings.tsx`）：**每項都要真係有作用**，唔好加擺樣嘅設定。
   core `prefs.ts` 嘅 `Prefs`（`cleanPrefs` 清走唔認得嘅值），網頁 `lib/prefs.ts`（localStorage `hknt.prefs`）、App `src/lib/prefs.ts`（AsyncStorage，同格式）；
   `usePrefs()` 即時更新，effect／callback 入面用 `getPrefs()`（網頁 hydration 時 usePrefs 先俾預設值）。

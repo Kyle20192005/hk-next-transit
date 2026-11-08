@@ -15,6 +15,7 @@ export type IconName =
   | 'backspace'
   | 'close'
   | 'plus'
+  | 'folder'
   | 'minus'
   | 'info'
   | 'route'
@@ -136,6 +137,8 @@ export function Icon({ name, size = 22, color, duo = false }: { name: IconName; 
         return <Path {...p} d="M6 6l12 12M18 6L6 18" />;
       case 'plus':
         return <Path {...p} d="M12 5v14M5 12h14" />;
+      case 'folder':
+        return <Path {...p} d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />;
       case 'minus':
         return <Path {...p} d="M5 12h14" />;
       case 'info':

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import type { Eta } from '@hknt/core';
+import type { Eta, FavGroupDef } from '@hknt/core';
 import { api } from '@/lib/api';
 import { removeFavorite, type Favorite } from '@/lib/favorites';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
@@ -13,10 +13,12 @@ import { EtaInline } from './EtaInline';
 const REFRESH_MS = 30_000;
 
 /** 收藏一行（收藏頁同首頁共用）：收藏咗嘅站直接顯示下一班 */
-export function FavItem({ f }: { f: Favorite }) {
+export function FavItem({ f, groups = [], onPickGroup }: { f: Favorite; groups?: FavGroupDef[]; onPickGroup?: () => void }) {
   const t = useTheme();
+  const group = groups.find((g) => g.id === f.group);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderRadius: radius.l, ...shadow }}>
+    <View style={{ backgroundColor: t.card, borderRadius: radius.l, ...shadow }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Pressable
           onPressIn={() => warmRoute(f.co, f.route, { dir: f.dir, stopId: f.stopId })}
           onPress={() => router.push({ pathname: '/[co]/[route]', params: { co: f.co, route: f.route, dir: f.dir, ...(f.stopId ? { stop: f.stopId } : {}) } })}
@@ -40,9 +42,17 @@ export function FavItem({ f }: { f: Favorite }) {
           </View>
           {f.stopId ? <FavEtas f={f} /> : <Icon name="chevron-right" size={20} color={t.muted} />}
         </Pressable>
-      <Pressable onPress={() => removeFavorite(f)} accessibilityLabel={`取消收藏 ${f.route}${f.stopName ? ` ${f.stopName}` : ''}`} hitSlop={6} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
-        <Icon name="star-fill" size={20} color={t.brand} />
-      </Pressable>
+        <Pressable onPress={() => removeFavorite(f)} accessibilityLabel={`取消收藏 ${f.route}${f.stopName ? ` ${f.stopName}` : ''}`} hitSlop={6} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
+          <Icon name="star-fill" size={20} color={t.brand} />
+        </Pressable>
+      </View>
+      {onPickGroup && groups.length > 0 && (
+        <Pressable onPress={onPickGroup} accessibilityRole="button" accessibilityLabel={`${f.route} 放入分組：而家${group?.name ?? '未分組'}`} hitSlop={4} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: -6, paddingHorizontal: 16, paddingBottom: 10 }}>
+          <Icon name="folder" size={14} color={t.muted} />
+          <Text style={{ color: t.muted, fontSize: 13, fontWeight: '600' }}>{group?.name ?? '未分組'}</Text>
+          <Icon name="chevron-down" size={14} color={t.muted} />
+        </Pressable>
+      )}
     </View>
   );
 }

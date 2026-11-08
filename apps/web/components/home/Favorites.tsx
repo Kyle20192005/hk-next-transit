@@ -1,19 +1,32 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import type { Eta } from '@hknt/core';
+import { activeFavGroup, FAV_GROUP_PRESETS, FAV_GROUP_WINDOWS, favGroupWindowLabel, favsInGroup, newFavGroupId, type Eta, type FavGroupDef } from '@hknt/core';
 import CompanyTag from '@/components/CompanyTag';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
-import { favKey, removeFavorite, useFavorites, type Favorite } from '@/lib/favorites';
+import { favKey, removeFavorite, setFavoriteGroup, useFavorites, type Favorite } from '@/lib/favorites';
+import { deleteFavGroup, saveFavGroup, useFavGroups } from '@/lib/fav-groups';
 import EtaInline from '@/components/EtaInline';
 import { liveClient } from '@/lib/buses';
 
 const REFRESH_MS = 30_000;
 
-/** 收藏：收藏咗嘅站直接顯示下一班；收藏咗嘅路線一撳就入 */
+/**
+ * 收藏：收藏咗嘅站直接顯示下一班；收藏咗嘅路線一撳就入。
+ * 分組（例如「返工」「返屋企」，core fav-groups.ts）：頂部一行揀組，預設揀而家時段嘅組；每個收藏下面揀放入邊組。
+ */
 export default function Favorites({ onBrowse }: { onBrowse: () => void }) {
   const list = useFavorites();
+  const groups = useFavGroups();
+  const [picked, setPicked] = useState<string | null>(null);
+  const [editing, setEditing] = useState<FavGroupDef | 'new' | null>(null);
+  // 預設：而家時段嘅組（有收藏先揀），否則全部
+  const active = activeFavGroup(groups, Date.now());
+  const current = picked ?? (active && list.some((f) => f.group === active.id) ? active.id : 'all');
+  const shown = favsInGroup(list, current, groups);
+  const currentGroup = groups.find((g) => g.id === current) ?? null;
+
   return (
     <>
       <header className="app-bar">
@@ -37,17 +50,56 @@ export default function Favorites({ onBrowse }: { onBrowse: () => void }) {
           </button>
         </div>
       ) : (
-        <ul className="fav-list">
-          {list.map((f) => (
-            <FavItem key={favKey(f)} f={f} />
-          ))}
-        </ul>
+        <div className="fav-page">
+          <div className="fav-groups" role="tablist" aria-label="收藏分組">
+            <button role="tab" aria-selected={current === 'all'} className="news-chip" onClick={() => setPicked('all')}>
+              全部 <span className="fav-count">{list.length}</span>
+            </button>
+            {groups.map((g) => (
+              <button key={g.id} role="tab" aria-selected={current === g.id} className="news-chip" onClick={() => setPicked(g.id)}>
+                {active?.id === g.id && <span className="status-dot" aria-label="而家時段" />}
+                {g.name} <span className="fav-count">{list.filter((f) => f.group === g.id).length}</span>
+              </button>
+            ))}
+            <button className="news-chip fav-group-add" onClick={() => setEditing('new')} aria-label="新增分組">
+              <Icon name="plus" size={16} /> 分組
+            </button>
+          </div>
+          {currentGroup && (
+            <div className="fav-group-head">
+              <span className="muted">{favGroupWindowLabel(currentGroup) ? `${favGroupWindowLabel(currentGroup)} 首頁大卡會排先` : '冇設時段'}</span>
+              <button className="text-btn" onClick={() => setEditing(currentGroup)}>
+                改名／時段
+              </button>
+            </div>
+          )}
+          {shown.length === 0 ? (
+            <p className="feed-hint card">呢組未有收藏：喺下面「全部」入面揀收藏，再喺每個收藏下面揀「{currentGroup?.name ?? '分組'}」。</p>
+          ) : (
+            <ul className="fav-list compact">
+              {shown.map((f) => (
+                <FavItem key={favKey(f)} f={f} groups={groups} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {editing && (
+        <FavGroupEditor
+          group={editing === 'new' ? null : editing}
+          used={groups.map((g) => g.name)}
+          onClose={(id) => {
+            setEditing(null);
+            if (id === null) setPicked('all');
+            else if (id) setPicked(id);
+          }}
+        />
       )}
     </>
   );
 }
 
-export function FavItem({ f }: { f: Favorite }) {
+export function FavItem({ f, groups = [] }: { f: Favorite; groups?: FavGroupDef[] }) {
   const href = `/${f.co}/${f.route}?dir=${f.dir}${f.stopId ? `&stop=${f.stopId}` : ''}`;
   return (
     <li className="fav card">
@@ -67,7 +119,99 @@ export function FavItem({ f }: { f: Favorite }) {
       <button className="fav-remove" onClick={() => removeFavorite(f)} aria-label={`取消收藏 ${f.route}${f.stopName ? ` ${f.stopName}` : ''}`}>
         <Icon name="star-fill" size={20} />
       </button>
+      {groups.length > 0 && (
+        <label className="fav-group-pick">
+          <Icon name="folder" size={14} />
+          <select value={f.group && groups.some((g) => g.id === f.group) ? f.group : ''} onChange={(e) => setFavoriteGroup(f, e.target.value || null)} aria-label={`${f.route} 放入分組`}>
+            <option value="">未分組</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          <Icon name="chevron-down" size={14} />
+        </label>
+      )}
     </li>
+  );
+}
+
+/** 新增／修改分組：名（有建議）、時段（預設幾款）；可以刪 */
+function FavGroupEditor({ group, used, onClose }: { group: FavGroupDef | null; used: string[]; onClose: (id?: string | null) => void }) {
+  const suggestion = FAV_GROUP_PRESETS.find((p) => !used.includes(p.name));
+  const [name, setName] = useState(group?.name ?? suggestion?.name ?? '');
+  const [win, setWin] = useState(() => {
+    const src = group ?? suggestion;
+    const i = FAV_GROUP_WINDOWS.findIndex((w) => w.from === src?.from && w.to === src?.to);
+    return i >= 0 ? i : 0;
+  });
+  const save = () => {
+    const w = FAV_GROUP_WINDOWS[win]!;
+    const id = group?.id ?? newFavGroupId();
+    saveFavGroup({ id, name: name.trim().slice(0, 12), ...(w.from !== undefined && w.to !== undefined ? { from: w.from, to: w.to } : {}) });
+    onClose(id);
+  };
+  return (
+    <div className="sheet-backdrop" onClick={() => onClose()}>
+      <div className="sheet card" role="dialog" aria-label={group ? '修改分組' : '新增分組'} onClick={(e) => e.stopPropagation()}>
+        <h2>{group ? '修改分組' : '新增分組'}</h2>
+        <label className="sheet-field">
+          <span>名</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={12} placeholder="例如：返工" autoFocus />
+        </label>
+        {!group && (
+          <div className="sheet-chips">
+            {FAV_GROUP_PRESETS.filter((p) => !used.includes(p.name)).map((p) => (
+              <button
+                key={p.name}
+                className="news-chip"
+                aria-selected={name === p.name}
+                onClick={() => {
+                  setName(p.name);
+                  const i = FAV_GROUP_WINDOWS.findIndex((w) => w.from === p.from && w.to === p.to);
+                  setWin(i >= 0 ? i : 0);
+                }}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="sheet-field">
+          <span>時段（呢段時間首頁大卡會將呢組排先）</span>
+          <div className="sheet-chips">
+            {FAV_GROUP_WINDOWS.map((w, i) => (
+              <button key={w.label} className="news-chip" aria-selected={win === i} onClick={() => setWin(i)}>
+                {w.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="sheet-actions">
+          {group && (
+            <button
+              className="settings-btn danger"
+              onClick={() => {
+                if (window.confirm(`刪除「${group.name}」？入面嘅收藏唔會刪，會變返未分組。`)) {
+                  deleteFavGroup(group.id);
+                  onClose(null);
+                }
+              }}
+            >
+              刪除分組
+            </button>
+          )}
+          <span style={{ flex: 1 }} />
+          <button className="settings-btn" onClick={() => onClose()}>
+            取消
+          </button>
+          <button className="primary-btn" onClick={save} disabled={!name.trim()}>
+            儲存
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

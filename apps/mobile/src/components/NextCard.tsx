@@ -2,9 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { busDepartureRows, favDepartureRows, formatDistance, groupFavorites, groupStopHeads, minutesLabel, radiusLabel, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
+import { busDepartureRows, favDepartureRows, favsForNow, formatDistance, groupFavorites, groupStopHeads, minutesLabel, radiusLabel, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
 import { api, type Co, type NearStop } from '@/lib/api';
 import { useFavorites, type Favorite } from '@/lib/favorites';
+import { useFavGroups } from '@/lib/fav-groups';
 import { warmRoute } from '@/lib/prefetch';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import Svg, { Path } from 'react-native-svg';
@@ -161,7 +162,11 @@ function useHeadRows(heads: StopHead<NearStop>[]): Record<string, { rows: Depart
 
 function FavPane({ favs }: { favs: Favorite[] }) {
   const t = useTheme();
-  const groups = groupFavorites(favs);
+  // 收藏分組：而家時段嘅組（例如朝早「返工」）排最前，卡頂標組名
+  const favGroups = useFavGroups();
+  const [now] = useState(() => Date.now());
+  const { favs: ordered, active } = favsForNow(favs, favGroups, now);
+  const groups = groupFavorites(ordered);
   if (!groups.length) return <Message text="喺路線頁撳星號收藏路線，或者打開一個站撳「收藏呢個站」，就會喺度見到下一班車。" />;
   return (
     <Swiper
@@ -172,6 +177,11 @@ function FavPane({ favs }: { favs: Favorite[] }) {
           <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 17, fontWeight: '700', color: t.text }}>
             {g.name}
           </Text>
+          {active && g.favs.some((f) => f.group === active.id) && (
+            <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: t.brandSoft }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: t.accent }}>{active.name}</Text>
+            </View>
+          )}
         </>
       )}
       action={{ label: '全部', onPress: () => router.navigate('/favorites') }}

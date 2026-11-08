@@ -19,6 +19,8 @@ export interface Favorite {
   stopName?: string;
   /** 加入時間（排序用） */
   at: number;
+  /** 收藏分組 ID（core fav-groups.ts）；冇 = 未分組 */
+  group?: string;
 }
 
 const KEY = 'hknt.favorites.v1';
@@ -90,4 +92,14 @@ export function removeFavorite(f: Favorite) {
 /** 清除所有收藏（設定頁） */
 export function clearFavorites() {
   write([]);
+}
+
+/** 放入分組（null = 移出分組） */
+export function setFavoriteGroup(f: Favorite, group: string | null) {
+  write(read().map((x) => (favKey(x) === favKey(f) ? { ...x, group: group ?? undefined } : x)));
+}
+
+/** 刪分組時：入面嘅收藏變返未分組 */
+export function clearFavoriteGroup(group: string) {
+  write(read().map((x) => (x.group === group ? { ...x, group: undefined } : x)));
 }

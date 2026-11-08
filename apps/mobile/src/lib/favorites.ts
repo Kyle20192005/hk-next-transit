@@ -15,6 +15,8 @@ export interface Favorite {
   companies: Company[];
   stopId?: string;
   stopName?: string;
+  /** 收藏分組 ID（core fav-groups.ts）；冇 = 未分組 */
+  group?: string;
   at: number;
 }
 
@@ -74,6 +76,17 @@ export function useFavorite(target: Omit<Favorite, 'at'>): [boolean, () => void]
 
 export function removeFavorite(f: Favorite) {
   write(list.filter((x) => favKey(x) !== favKey(f)));
+}
+
+/** 放入分組（null = 未分組） */
+export function setFavoriteGroup(f: Favorite, group: string | null) {
+  write(list.map((x) => (favKey(x) === favKey(f) ? { ...x, group: group ?? undefined } : x)));
+}
+
+/** 刪分組時：入面嘅收藏變返未分組 */
+export function clearFavoriteGroup(group: string) {
+  load();
+  write(list.map((x) => (x.group === group ? { ...x, group: undefined } : x)));
 }
 
 /** 清除所有收藏（設定頁） */

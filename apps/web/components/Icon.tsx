@@ -16,6 +16,7 @@ export type IconName =
   | 'backspace'
   | 'close'
   | 'plus'
+  | 'folder'
   | 'minus'
   | 'info'
   | 'route'
@@ -111,6 +112,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   close: <path d="M6 6l12 12M18 6L6 18" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  folder: <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />,
   minus: <path d="M5 12h14" />,
   info: (
     <>
