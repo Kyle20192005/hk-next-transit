@@ -11,7 +11,7 @@
     },
     "apps/mobile": {
       "name": "mobile",
-      "version": "0.13.3",
+      "version": "0.14.0",
       "dependencies": {
         "@expo/metro-runtime": "~58.0.17",
         "@hknt/core": "workspace:*",
@@ -41,7 +41,7 @@
     },
     "apps/tracker": {
       "name": "tracker",
-      "version": "0.13.3",
+      "version": "0.14.0",
       "dependencies": {
         "@hknt/core": "workspace:*",
       },
@@ -55,7 +55,7 @@
     },
     "apps/web": {
       "name": "web",
-      "version": "0.13.3",
+      "version": "0.14.0",
       "dependencies": {
         "@hknt/core": "workspace:*",
         "maplibre-gl": "^5.24.0",
@@ -73,7 +73,7 @@
     },
     "packages/core": {
       "name": "@hknt/core",
-      "version": "0.13.3",
+      "version": "0.14.0",
       "devDependencies": {
         "typescript": "5.9.3",
         "vitest": "4.1.12",

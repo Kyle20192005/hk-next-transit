@@ -276,7 +276,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   站點一次只開一個，打開時地圖放大去嗰個站；撳地圖嘅站會打開列表對應嘅站（web 用 `lib/events.ts` 嘅 window event）。
 - 地圖方向箭嘴：網頁由 MapLibre 沿線自動擺放（symbol-placement line）；App 用 core `lineArrows`，只喺 300 米以上嘅段放。
 - 路線分頁：用巴士號碼鍵盤（`components/home/Keypad.tsx`，只開可以接落去嘅數字同字母，唔彈系統鍵盤；
-  「地點」轉做打字搜起訖點），列表無限捲動（每次 40 條），搜尋欄固定。「附近」用定位
+  「地點」轉做打字搜地方：起點、終點、號碼撞中嘅排先，之後係**中途站經過**嘅路線——站點索引太大唔落載，停手 0.25 秒問 `/api/stop-search?q=`（core `searchStopRoutes`，伺服器記憶體 cache），core `placeMatches` 合併；經過嘅方向寫「經 XX」（起點就唔寫），撳入去 `?stop=` 直接打開嗰個站），列表無限捲動（每次 40 條），搜尋欄固定。「附近」用定位
   （`/api/nearby` 搵 600 米內嘅站，`/api/stop-etas` 一次攞一個站所有路線嘅下一班；站點索引 `out/ctb/stops.json` 唔包終點站）。
   撳附近嘅路線開 `/ctb/<路線>?dir=&stop=`，路線頁會自動揀經過嗰個站嘅走法同打開嗰個站。
 - 路線頁視覺：藍色標題列（‹、路線號碼、往 X、⇅），站點列表係時間線（豎線 + 圓點，特別班用紅色；

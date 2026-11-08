@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Logo } from '@/components/Logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { TRANSPORT_MODES, orderedModes, radiusLabel, type RouteIndex, type TransportMode } from '@hknt/core';
+import { TRANSPORT_MODES, orderedModes, placeMatches, radiusLabel, type PlaceMatch, type RouteIndex, type StopRouteHit, type TransportMode } from '@hknt/core';
 import { api, type Co } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { AppBar, ComingSoon, CompanyTag } from '@/components/ui';
@@ -41,7 +41,7 @@ export default function RoutesTab() {
     setMode(priority === 'rail' ? 'rail' : 'bus');
   }
   const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
-  const list = useRef<FlatList<Route>>(null);
+  const list = useRef<FlatList<PlaceMatch<Route>>>(null);
 
   const fetchRoutes = () => api.routes().then((r) => setRoutes(r.routes)).catch((e: Error) => setError(e.message));
   useEffect(() => {
@@ -52,14 +52,30 @@ export default function RoutesTab() {
     void fetchRoutes();
   };
 
-  const matches = useMemo(() => {
+  // 地點搜尋：中途站經過嘅路線由伺服器搵（同網頁一樣），停手 0.25 秒先問
+  const [hits, setHits] = useState<{ q: string; routes: StopRouteHit[] }>({ q: '', routes: [] });
+  const placeQ = place?.trim() ?? '';
+  useEffect(() => {
+    if (!placeQ) return;
+    let cancelled = false;
+    const id = setTimeout(() => {
+      api
+        .stopSearch(placeQ)
+        .then((b) => !cancelled && setHits({ q: placeQ, routes: b.routes }))
+        .catch(() => {});
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [placeQ]);
+  const searchingStops = place !== null && !!placeQ && hits.q !== placeQ;
+
+  const matches = useMemo<PlaceMatch<Route>[]>(() => {
     if (!routes) return [];
-    if (place !== null) {
-      const s = place.trim();
-      return s ? routes.filter((r) => r.origTc?.includes(s) || r.destTc?.includes(s) || r.route.includes(s.toUpperCase())) : routes;
-    }
-    return code ? routes.filter((r) => r.route.startsWith(code)) : routes;
-  }, [routes, code, place]);
+    if (place !== null) return placeMatches(routes, placeQ, hits.q === placeQ ? hits.routes : []);
+    return (code ? routes.filter((r) => r.route.startsWith(code)) : routes).map((r) => ({ r, via: {} }));
+  }, [routes, code, place, placeQ, hits]);
 
   const nextChars = useMemo(() => {
     const set = new Set<string>();
@@ -75,7 +91,7 @@ export default function RoutesTab() {
   useEffect(() => {
     if (!code && !place?.trim()) return;
     if (matches.length === 0 || matches.length > 3) return;
-    const id = setTimeout(() => matches.forEach((r) => preloadRoute((r.co ?? 'ctb') as Co, r.route)), 400);
+    const id = setTimeout(() => matches.forEach(({ r }) => preloadRoute((r.co ?? 'ctb') as Co, r.route)), 400);
     return () => clearTimeout(id);
   }, [matches, code, place]);
 
@@ -142,14 +158,15 @@ export default function RoutesTab() {
         <FlatList
           ref={list}
           data={matches}
-          keyExtractor={(r) => `${r.co ?? 'ctb'}-${r.route}`}
+          keyExtractor={({ r }) => `${r.co ?? 'ctb'}-${r.route}`}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: 12, gap: 8 }}
           initialNumToRender={15}
           windowSize={7}
-          renderItem={({ item }) => <RouteCard r={item} />}
+          renderItem={({ item }) => <RouteCard r={item.r} via={item.via} />}
           ListHeaderComponent={!code && place === null ? <NearbyShortcut /> : undefined}
-          ListEmptyComponent={<Text style={{ textAlign: 'center', padding: 20, color: t.muted }}>搵唔到路線</Text>}
+          ListEmptyComponent={searchingStops ? undefined : <Text style={{ textAlign: 'center', padding: 20, color: t.muted }}>搵唔到路線</Text>}
+          ListFooterComponent={searchingStops ? <Text style={{ textAlign: 'center', padding: 16, color: t.muted }}>搵緊經過呢度嘅路線…</Text> : undefined}
         />
       )}
 
@@ -161,16 +178,24 @@ export default function RoutesTab() {
 }
 
 /** 一條路線一張卡：左邊號碼同公司，右邊每個方向一行（撳入對應方向） */
-function RouteCard({ r }: { r: Route }) {
+function RouteCard({ r, via = {} }: { r: Route; via?: PlaceMatch<Route>['via'] }) {
   const t = useTheme();
   const co = (r.co ?? 'ctb') as Co;
   const dirs = r.dirs ?? ['O'];
   const loop = r.origTc === r.destTc;
+  // 地點搜尋撞中中途站：顯示「經 XX」，撳入去直接打開嗰個站（同網頁一樣）
+  const loopVia = via.O ?? via.I;
   const options = loop
-    ? [{ d: 'O' as const, to: r.origTc, sub: '循環線' }]
+    ? [{ d: loopVia?.dir ?? ('O' as const), to: r.origTc, sub: loopVia ? `循環線 · 經 ${loopVia.stopName}` : '循環線', stop: loopVia?.stopId, isVia: !!loopVia }]
     : (['O', 'I'] as const)
         .filter((d) => dirs.includes(d))
-        .map((d) => ({ d, to: d === 'O' ? r.destTc : r.origTc, sub: dirs.length === 1 ? `由 ${d === 'O' ? r.origTc : r.destTc}` : null }));
+        .map((d) => ({
+          d,
+          to: d === 'O' ? r.destTc : r.origTc,
+          sub: via[d] ? `經 ${via[d]!.stopName}` : dirs.length === 1 ? `由 ${d === 'O' ? r.origTc : r.destTc}` : null,
+          stop: via[d]?.stopId,
+          isVia: !!via[d],
+        }));
   return (
     <View style={{ flexDirection: 'row', backgroundColor: t.card, borderRadius: radius.m, overflow: 'hidden', ...shadow }}>
       <Pressable onPressIn={() => warmRoute(co, r.route)} onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: r.route } })} accessibilityRole="link" style={{ width: 108, paddingVertical: 12, paddingLeft: 16, justifyContent: 'center', gap: 4 }} accessibilityLabel={`${r.route} 路線`}>
@@ -182,10 +207,10 @@ function RouteCard({ r }: { r: Route }) {
         {options.map((o, i) => (
             <Pressable
               key={o.d}
-              onPressIn={() => warmRoute(co, r.route, { dir: o.d })}
-              onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: r.route, dir: o.d } })}
+              onPressIn={() => warmRoute(co, r.route, { dir: o.d, stopId: o.stop })}
+              onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: r.route, dir: o.d, ...(o.stop ? { stop: o.stop } : {}) } })}
               accessibilityRole="link"
-              accessibilityLabel={`${r.route} 往 ${o.to}`}
+              accessibilityLabel={`${r.route} 往 ${o.to}${o.isVia ? `，${o.sub}` : ''}`}
               style={{ flex: 1, minHeight: 46, flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingLeft: 4, paddingRight: 12, borderTopWidth: i ? 1 : 0, borderTopColor: t.line }}
             >
               <View style={{ flex: 1 }}>
@@ -194,7 +219,7 @@ function RouteCard({ r }: { r: Route }) {
                   {o.to}
                 </Text>
                 {o.sub && (
-                  <Text numberOfLines={1} style={{ color: t.muted, fontSize: 13 }}>
+                  <Text numberOfLines={1} style={{ color: o.isVia ? t.accent : t.muted, fontWeight: o.isVia ? '600' : '400', fontSize: 13 }}>
                     {o.sub}
                   </Text>
                 )}

@@ -3,7 +3,7 @@ import { usePrefs } from '@/lib/prefs';
 import Link from 'next/link';
 import CompanyTag from '@/components/CompanyTag';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { TRANSPORT_MODES, orderedModes, radiusLabel, type RouteIndex, type TransportMode } from '@hknt/core';
+import { TRANSPORT_MODES, orderedModes, placeMatches, radiusLabel, type PlaceMatch, type RouteIndex, type StopRouteHit, type TransportMode } from '@hknt/core';
 import ComingSoon from './ComingSoon';
 import Keypad from './Keypad';
 import Logo from '@/components/Logo';
@@ -43,13 +43,29 @@ export default function RouteBrowser({
   const sentinel = useRef<HTMLLIElement>(null);
   const placeInput = useRef<HTMLInputElement>(null);
 
-  const matches = useMemo(() => {
-    if (place !== null) {
-      const q = place.trim();
-      return q ? routes.filter((r) => r.origTc?.includes(q) || r.destTc?.includes(q) || r.route.includes(q.toUpperCase())) : routes;
-    }
-    return code ? routes.filter((r) => r.route.startsWith(code)) : routes;
-  }, [routes, code, place]);
+  // 地點搜尋：中途站經過嘅路線由伺服器搵（站點索引太大，唔落載），停手 0.25 秒先問
+  const [hits, setHits] = useState<{ q: string; routes: StopRouteHit[] }>({ q: '', routes: [] });
+  const placeQ = place?.trim() ?? '';
+  useEffect(() => {
+    if (!placeQ) return;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      fetch(`/api/stop-search?q=${encodeURIComponent(placeQ)}`, { signal: ctrl.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((b: { routes: StopRouteHit[] } | null) => b && setHits({ q: placeQ, routes: b.routes }))
+        .catch(() => {});
+    }, 250);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [placeQ]);
+  const searchingStops = place !== null && !!placeQ && hits.q !== placeQ;
+
+  const matches = useMemo<PlaceMatch<Routes[number]>[]>(() => {
+    if (place !== null) return placeMatches(routes, placeQ, hits.q === placeQ ? hits.routes : []);
+    return (code ? routes.filter((r) => r.route.startsWith(code)) : routes).map((r) => ({ r, via: {} }));
+  }, [routes, code, place, placeQ, hits]);
 
   // 下一個可以打嘅字：所有以而家號碼開頭嘅路線嘅下一個字
   const nextChars = useMemo(() => {
@@ -62,7 +78,7 @@ export default function RouteBrowser({
   useEffect(() => {
     if (!code && !place?.trim()) return;
     if (matches.length === 0 || matches.length > 3) return;
-    const t = setTimeout(() => matches.forEach((r) => preloadRoute(r.co ?? 'ctb', r.route)), 400);
+    const t = setTimeout(() => matches.forEach(({ r }) => preloadRoute(r.co ?? 'ctb', r.route)), 400);
     return () => clearTimeout(t);
   }, [matches, code, place]);
 
@@ -184,7 +200,7 @@ export default function RouteBrowser({
             </button>
           </li>
         )}
-        {matches.slice(0, shown).map((r) => {
+        {matches.slice(0, shown).map(({ r, via }) => {
           const co = r.co ?? 'ctb';
           return (
             <li key={`${co}-${r.route}`} className="route-item">
@@ -192,11 +208,12 @@ export default function RouteBrowser({
                 <span className="route-num">{r.route}</span>
                 <CompanyTag companies={r.companies ?? ['CTB']} />
               </Link>
-              <RouteDirs r={r} co={co} />
+              <RouteDirs r={r} co={co} via={via} />
             </li>
           );
         })}
-        {matches.length === 0 && <li className="empty">搵唔到路線</li>}
+        {matches.length === 0 && !searchingStops && <li className="empty">搵唔到路線</li>}
+        {searchingStops && <li className="loading-more">搵緊經過呢度嘅路線…</li>}
         {shown < matches.length && <li ref={sentinel} className="loading-more">載入中…</li>}
         {shown >= matches.length && matches.length > 0 && (
           <li className="list-end muted">
@@ -227,15 +244,18 @@ export default function RouteBrowser({
  * 單向路線一個；循環線顯示「X 循環線」。
  * 方向 O = 由 origTc 往 destTc，I = 回程。
  */
-function RouteDirs({ r, co }: { r: Routes[number]; co: string }) {
+function RouteDirs({ r, co, via = {} }: { r: Routes[number]; co: string; via?: PlaceMatch<Routes[number]>['via'] }) {
   const dirs = r.dirs ?? ['O'];
   const base = `/${co}/${r.route}`;
+  // 地點搜尋撞中中途站：撳入去直接打開嗰個站
+  const href = (d: 'O' | 'I') => `${base}?dir=${d}${via[d] ? `&stop=${via[d]!.stopId}` : ''}`;
   if (r.origTc === r.destTc) {
+    const v = via.O ?? via.I;
     return (
       <span className="route-dirs">
-        <Link href={base} className="route-dir" onPointerDown={() => warmRoute(co, r.route)}>
+        <Link href={v ? href(v.dir) : base} className="route-dir" onPointerDown={() => warmRoute(co, r.route, v ? { dir: v.dir, stopId: v.stopId } : undefined)}>
           <span className="route-dir-to">{r.origTc}</span>
-          <span className="route-dir-sub">循環線</span>
+          <span className="route-dir-sub">{v ? `循環線 · 經 ${v.stopName}` : '循環線'}</span>
         </Link>
       </span>
     );
@@ -246,11 +266,11 @@ function RouteDirs({ r, co }: { r: Routes[number]; co: string }) {
   return (
     <span className="route-dirs">
       {options.map((o) => (
-        <Link key={o.d} href={`${base}?dir=${o.d}`} className="route-dir" aria-label={`${r.route} 往 ${o.to}`} onPointerDown={() => warmRoute(co, r.route, { dir: o.d })}>
+        <Link key={o.d} href={href(o.d)} className="route-dir" aria-label={`${r.route} 往 ${o.to}${via[o.d] ? `，經 ${via[o.d]!.stopName}` : ''}`} onPointerDown={() => warmRoute(co, r.route, { dir: o.d, stopId: via[o.d]?.stopId })}>
           <span className="route-dir-to">
             <small>往</small> {o.to}
           </span>
-          {options.length === 1 && <span className="route-dir-sub">由 {o.from}</span>}
+          {via[o.d] ? <span className="route-dir-sub via">經 {via[o.d]!.stopName}</span> : options.length === 1 && <span className="route-dir-sub">由 {o.from}</span>}
           <Icon name="chevron-right" size={18} className="route-dir-go" />
         </Link>
       ))}
