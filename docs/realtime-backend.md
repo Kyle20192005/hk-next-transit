@@ -381,7 +381,9 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
 - [x] 實測：城巴 38、九巴 1A、聯營 101、新大嶼山 11、港鐵巴士 K76 同網站一致；第一次 4–12 秒（限速每秒 8），之後用快照
 - [x] 前端超時（5 秒）唔再當 tracker 死咗（只係今次用後備）；限速改為每個上游伺服器各自計
 - [ ] 喺 VPS 跑 probe 定 `UPSTREAM_RPS`（等俾人封過嘅 IP 冷靜一兩日先）
-- [ ] Vercel 設 `NEXT_PUBLIC_TRACKER_URL` 重新部署
+- [x] Vercel 設 `NEXT_PUBLIC_TRACKER_URL=https://rt.kyle05.dev`（2026-11-08）：正式網站巴士位置由 tracker 攞，CORS 正常
+- [x] Caddy 永久接駁 `dokploy-network`（moodle-docker compose）；pipeline 刪咗 `RUN_ON_START`、加 `/state` volume
+- [ ] App 預設 `EXPO_PUBLIC_TRACKER_URL`（網頁試順幾日先）
 - 之後：九巴改用 `route-eta`（成條線一次）代替逐站，請求量大減
 
 ### 階段 1b：WebSocket 推送
