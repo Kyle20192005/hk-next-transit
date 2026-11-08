@@ -380,7 +380,10 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
       （Caddy 接駁 `dokploy-network`，reverse_proxy 去 tracker 容器），Dokploy 唔設 Domain；步驟見 `deploy/README.md`
 - [x] 實測：城巴 38、九巴 1A、聯營 101、新大嶼山 11、港鐵巴士 K76 同網站一致；第一次 4–12 秒（限速每秒 8），之後用快照
 - [x] 前端超時（5 秒）唔再當 tracker 死咗（只係今次用後備）；限速改為每個上游伺服器各自計
-- [ ] 喺 VPS 跑 probe 定 `UPSTREAM_RPS`（等俾人封過嘅 IP 冷靜一兩日先）
+- [x] 喺 VPS 跑 probe（2026-11-08 晚）：城巴 ETA 每秒 5／10／15／20 個請求全部 0 出錯（254 個站×路線輪流問）。
+      每秒 10、20 嗰兩級中位數只有 8–11 毫秒（5、15 係 230–250 毫秒）：data.gov.hk 前面應該有 cache，同一個網址短時間重問好快，
+      所以真正上限可能高過 20，未試。決定：tracker `UPSTREAM_RPS=14`、pipeline `RT_RPS=12`。
+      之前俾封係 fetch.py 32 條線程（大約每秒 100 個）。
 - [x] Vercel 設 `NEXT_PUBLIC_TRACKER_URL=https://rt.kyle05.dev`（2026-11-08）：正式網站巴士位置由 tracker 攞，CORS 正常
 - [x] Caddy 永久接駁 `dokploy-network`（moodle-docker compose）；pipeline 刪咗 `RUN_ON_START`、加 `/state` volume
 - [x] 到站時間都經 tracker（`/api/eta`，2026-11-08，用戶要求前後端分清楚）：追蹤緊嘅線直接用上游 cache（實測打開一個站上游請求 0）；

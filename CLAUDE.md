@@ -66,7 +66,8 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
   兩邊只係各自載入實測行車時間檔（網頁 `lib/journey.ts`、tracker `src/segments.ts`）。esbuild 連 core 打包，Docker 唔使 node_modules。
 - `deploy/pipeline/`：每日 04:17 數據更新容器（取代 GitHub Actions），每次 clone 最新 main；要 `GITHUB_TOKEN`（Contents 讀寫）、`DATA_REPO`。
 - 已部署：tracker `https://rt.kyle05.dev`（VPS 嘅 80／443 係 Moodle 嘅 Caddy，HTTPS 由佢 reverse_proxy，Dokploy 唔設 Domain）；
-  pipeline 每日 04:17。data.gov.hk 同一個 IP 問得太密會 403：pipeline `RT_RPS`（每秒 8）、tracker `UPSTREAM_RPS` 每個伺服器各自計。
+  pipeline 每日 04:17。data.gov.hk 同一個 IP 問得太密會 403（32 條線程、大約每秒 100 個試過俾封）；probe 實測每秒 20 個冇問題，
+  所以 tracker `UPSTREAM_RPS=14`、pipeline `RT_RPS=12`（每個伺服器各自計）。
 
 ## 九巴同聯營線
 
