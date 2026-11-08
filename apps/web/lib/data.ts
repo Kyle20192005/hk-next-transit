@@ -1,7 +1,7 @@
 import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Calendar, Place, RouteData, RouteIndex } from '@hknt/core';
+import { CO_LIST, dataFileRequest, isCo, SAFE_ROUTE, type Calendar, type Co, type Place, type RouteData, type RouteIndex } from '@hknt/core';
 
 /**
  * 讀 pipeline 輸出嘅數據。
@@ -16,25 +16,8 @@ const BASE = process.env.DATA_BASE_URL?.replace(/\/+$/, '');
 const TOKEN = process.env.DATA_TOKEN;
 const LOCAL = path.resolve(process.cwd(), '../../pipeline/out');
 
-const RAW_GITHUB = /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/(.+)$/;
-
-/** 回傳實際要 call 嘅網址同 headers */
-function remote(file: string): { url: string; headers: Record<string, string>; via: 'github-api' | 'url' } {
-  const m = BASE!.match(RAW_GITHUB);
-  if (TOKEN && m) {
-    const [, owner, repo, ref] = m;
-    return {
-      url: `https://api.github.com/repos/${owner}/${repo}/contents/${file}?ref=${encodeURIComponent(ref!)}`,
-      headers: {
-        Accept: 'application/vnd.github.raw+json',
-        Authorization: `Bearer ${TOKEN}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-      via: 'github-api',
-    };
-  }
-  return { url: `${BASE}/${file}`, headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}, via: 'url' };
-}
+/** 回傳實際要 call 嘅網址同 headers（core dataFileRequest，同 tracker 共用） */
+const remote = (file: string) => dataFileRequest(BASE!, TOKEN, file);
 
 /** 數據版本（index.json 嘅 generatedAt）檢查頻率 */
 const VERSION_REVALIDATE_S = 300;
@@ -77,7 +60,6 @@ async function load<T>(file: string): Promise<T | null> {
   }
 }
 
-const SAFE_ROUTE = /^[A-Za-z0-9]{1,6}$/;
 
 export function getCtbRoute(route: string): Promise<RouteData | null> {
   if (!SAFE_ROUTE.test(route)) return Promise.resolve(null);
@@ -101,10 +83,8 @@ export async function getCtbStops(): Promise<StopIndexEntry[]> {
   return (await load<{ stops: StopIndexEntry[] }>('ctb/stops.json'))?.stops ?? [];
 }
 
-/** 路線檔位置：ctb（城巴同聯營線）、kmb（九巴、龍運）、nlb（新大嶼山巴士）、mtrb（港鐵巴士） */
-export type Co = 'ctb' | 'kmb' | 'nlb' | 'mtrb';
-export const CO_LIST: readonly Co[] = ['ctb', 'kmb', 'nlb', 'mtrb'];
-export const isCo = (x: string | null | undefined): x is Co => CO_LIST.includes(x as Co);
+/** 路線檔位置（core 共用） */
+export { CO_LIST, isCo, type Co };
 
 export function getRoute(co: Co, route: string): Promise<RouteData | null> {
   if (!isCo(co) || !SAFE_ROUTE.test(route)) return Promise.resolve(null);

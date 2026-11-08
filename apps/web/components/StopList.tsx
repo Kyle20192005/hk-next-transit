@@ -2,7 +2,7 @@
 import { getPrefs } from '@/lib/prefs';
 import { busesClient } from '@/lib/buses';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BusStabilizer, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
+import { BusStabilizer, LIVE_REFRESH, parseLiveBuses, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
 import { companyColor, companyInk } from '@/lib/company';
@@ -34,11 +34,11 @@ type Props = {
   children?: React.ReactNode;
 };
 
-const ETA_REFRESH_MS = 30_000;
-const MAX_ETAS = 5;
+const ETA_REFRESH_MS = LIVE_REFRESH.etaMs;
+const MAX_ETAS = LIVE_REFRESH.maxEtas;
 /** 最近嘅站要喺幾多米內先算（太遠即係唔喺呢條線附近） */
 const NEAREST_MAX_M = 500;
-const BUSES_REFRESH_MS = 20_000;
+const BUSES_REFRESH_MS = LIVE_REFRESH.busesMs;
 
 /**
  * 站點列表：一次只開一個站。
@@ -145,7 +145,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
         if (!res.ok) return;
         const body = (await res.json()) as { buses: { from: number; nextEta: string; company?: string; gps?: { lat: number; lng: number }; schedule?: boolean }[]; segSeconds: number[] };
         if (cancelled) return;
-        setLive({ buses: body.buses.map((b) => ({ from: b.from, nextEta: Date.parse(b.nextEta), company: b.company, gps: b.gps, schedule: b.schedule })), segSeconds: body.segSeconds });
+        setLive({ buses: parseLiveBuses(body.buses), segSeconds: body.segSeconds });
       } catch {
         /* 下次再試 */
       }

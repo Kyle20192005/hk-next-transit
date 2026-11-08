@@ -54,6 +54,9 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
   其他（路線資料、附近、`/api/here`、`/api/stop-etas`、消息）暫時留 Vercel（分散 IP）。
 - `apps/tracker`：`GET /api/buses`、`/api/eta`（同 Vercel 一樣格式）、`/health`、`/`。有人問先計，背景每 15 秒 poll，3 分鐘冇人問就停；
   上游 fetch 包一層（10 秒 cache、合併同時請求、限流 `UPSTREAM_RPS` 每個伺服器各自計、每間公司統計）；`node dist/probe.js` 量上游上限。
+  只問過一次嘅線（多數係撳落路線嘅預先 fetch）45 秒冇人再問就停；冇 poll 又耐冇人問嘅線定時清走。
+- 共用定義喺 core `ids.ts`（`Co`、`isCo`、`SAFE_ROUTE`、`SAFE_STOP`、`LIVE_REFRESH` 更新頻率、`dataFileRequest` GitHub 數據網址、
+  `parseLiveBuses`）：網頁、App、tracker 唔好再各自抄。
   打開追蹤緊嘅線嘅站，`/api/eta` 直接用 cache，唔會再問巴士公司。計巴士位置用 core `computeBuses`（`live.ts`），Vercel 同 tracker 共用，
   兩邊只係各自載入實測行車時間檔（網頁 `lib/journey.ts`、tracker `src/segments.ts`）。esbuild 連 core 打包，Docker 唔使 node_modules。
 - `deploy/pipeline/`：每日 04:17 數據更新容器（取代 GitHub Actions），每次 clone 最新 main；要 `GITHUB_TOKEN`（Contents 讀寫）、`DATA_REPO`。

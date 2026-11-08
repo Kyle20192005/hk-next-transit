@@ -17,6 +17,8 @@ import {
   formatFare,
   joyYouFare,
   labelEtas,
+  LIVE_REFRESH,
+  parseLiveBuses,
   pointOnPath,
   secondsFrom,
   serviceWindow,
@@ -48,9 +50,9 @@ import { TimetableSheet } from '@/components/TimetableSheet';
 import { VariantPicker, type VariantItem } from '@/components/VariantPicker';
 import { getPrefs } from '@/lib/prefs';
 
-const ETA_REFRESH_MS = 30_000;
-const BUSES_REFRESH_MS = 20_000;
-const MAX_ETAS = 5;
+const ETA_REFRESH_MS = LIVE_REFRESH.etaMs;
+const BUSES_REFRESH_MS = LIVE_REFRESH.busesMs;
+const MAX_ETAS = LIVE_REFRESH.maxEtas;
 const NEAREST_MAX_M = 500;
 
 type StopItem = { dir: Dir; stopId: string; name: string; lat?: number; lng?: number };
@@ -317,7 +319,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
         if (!cancelled)
           setLive({
             variantId: selected.id,
-            buses: body.buses.map((b) => ({ from: b.from, nextEta: Date.parse(b.nextEta), company: b.company, gps: b.gps, schedule: b.schedule })),
+            buses: parseLiveBuses(body.buses),
             segSeconds: body.segSeconds,
           });
       } catch {

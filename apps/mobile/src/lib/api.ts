@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createLiveClient, type Calendar, type Company, type Eta, type NewsItem, type RouteData, type RouteIndex } from '@hknt/core';
+import { createLiveClient, isCo, type Co, type Calendar, type Company, type Eta, type NewsItem, type RouteData, type RouteIndex } from '@hknt/core';
 
 /**
  * 後端 = apps/web 嘅 API。預設用線上網站（手機連唔到電腦嘅 localhost）；
@@ -14,9 +14,8 @@ export const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || 'https://eta.kyle05
 export const TRACKER_URL = process.env.EXPO_PUBLIC_TRACKER_URL ?? 'https://rt.kyle05.dev';
 const live = createLiveClient({ trackerBase: TRACKER_URL, fallbackBase: API_BASE });
 
-/** 路線檔位置：ctb（城巴同聯營線）、kmb（九巴、龍運）、nlb（新大嶼山巴士）、mtrb（港鐵巴士） */
-export type Co = 'ctb' | 'kmb' | 'nlb' | 'mtrb';
-export const isCo = (x: unknown): x is Co => x === 'ctb' || x === 'kmb' || x === 'nlb' || x === 'mtrb';
+/** 路線檔位置（core 共用） */
+export { isCo, type Co };
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);

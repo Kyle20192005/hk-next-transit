@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Calendar, RouteData, RouteIndex } from '@hknt/core';
+import { dataFileRequest, isCo, SAFE_ROUTE, SAFE_STOP, type Calendar, type Co, type RouteData, type RouteIndex } from '@hknt/core';
 import { config } from './config';
 
 /**
@@ -8,21 +8,8 @@ import { config } from './config';
  * DATA_BASE_URL（GitHub data 分支；私人 repo 加 DATA_TOKEN，自動改用 Contents API）或者本地 DATA_DIR。
  * 記憶體 cache；每 5 分鐘睇一次數據版本（index.json 嘅 generatedAt），換咗版就清 cache。
  */
-const RAW_GITHUB = /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/(.+)$/;
 const VERSION_CHECK_MS = 5 * 60_000;
-
-function remote(file: string): { url: string; headers: Record<string, string> } {
-  const base = config.dataBaseUrl!;
-  const m = base.match(RAW_GITHUB);
-  if (config.dataToken && m) {
-    const [, owner, repo, ref] = m;
-    return {
-      url: `https://api.github.com/repos/${owner}/${repo}/contents/${file}?ref=${encodeURIComponent(ref!)}`,
-      headers: { Accept: 'application/vnd.github.raw+json', Authorization: `Bearer ${config.dataToken}`, 'X-GitHub-Api-Version': '2022-11-28' },
-    };
-  }
-  return { url: `${base}/${file}`, headers: config.dataToken ? { Authorization: `Bearer ${config.dataToken}` } : {} };
-}
+const remote = (file: string) => dataFileRequest(config.dataBaseUrl!, config.dataToken, file);
 
 async function loadFile<T>(file: string): Promise<T | null> {
   if (config.dataBaseUrl) {
@@ -72,11 +59,7 @@ function cached<T>(file: string): Promise<T | null> {
   return p;
 }
 
-export type Co = 'ctb' | 'kmb' | 'nlb' | 'mtrb';
-export const isCo = (x: string): x is Co => x === 'ctb' || x === 'kmb' || x === 'nlb' || x === 'mtrb';
-export const SAFE_ROUTE = /^[A-Za-z0-9]{1,6}$/;
-/** 同網頁 apps/web/lib/params.ts 一樣：城巴 6 位、九巴 16 位十六進制、新大嶼山、港鐵巴士 */
-export const SAFE_STOP = /^(\d{1,6}|[0-9A-F]{16}|[A-Z0-9]{1,6}(-[A-Z0-9]{1,3})?-[a-z]?[UD]\d{3}[A-Z]?)$/;
+export { isCo, SAFE_ROUTE, SAFE_STOP, type Co };
 
 export async function getRoute(co: Co, route: string): Promise<RouteData | null> {
   await dataVersion();

@@ -6,7 +6,8 @@ import { getCalendar, getRoute, type Co } from './data';
 /**
  * 有人睇緊嘅線（一個走法一條）：
  * - 第一次有人問就計一次，之後喺背景每 `pollMs` 重新計，所有人共用同一份結果（一條線只 poll 一份）
- * - `idleMs` 冇人問就停
+ * - `idleMs` 冇人問就停；淨係問過一次（多數係撳落路線嘅預先 fetch，未必真係入去睇）45 秒冇人再問就停
+ * - 定時清走冇 poll 又冇人問嘅線（例如超出上限嗰啲），免得記憶體越嚟越大
  * - 同時 poll 緊嘅線有上限（`maxLines`），超出嘅照即時計，但唔會背景 poll
  */
 interface Line {
@@ -17,6 +18,8 @@ interface Line {
   snapshot: BusesSnapshot | null;
   computing: Promise<BusesSnapshot> | null;
   lastAsked: number;
+  /** 問過幾多次（1 = 只係預先 fetch） */
+  asks: number;
   timer: ReturnType<typeof setInterval> | null;
   polls: number;
   lastError: string | null;
@@ -51,11 +54,19 @@ export function createLines(fetcher: typeof fetch) {
     }
   }
 
+  const WARM_IDLE_MS = 45_000;
+  const idleFor = (line: Line) => (line.asks <= 1 ? Math.min(WARM_IDLE_MS, config.idleMs) : config.idleMs);
+
+  // 冇 poll 緊（超出 MAX_LINES）又耐冇人問嘅線：清走
+  setInterval(() => {
+    for (const [k, l] of lines) if (!l.timer && !l.computing && Date.now() - l.lastAsked > config.idleMs) lines.delete(k);
+  }, 60_000).unref();
+
   function startPolling(line: Line) {
     if (line.timer) return;
     if ([...lines.values()].filter((l) => l.timer).length >= config.maxLines) return;
     line.timer = setInterval(() => {
-      if (Date.now() - line.lastAsked > config.idleMs) {
+      if (Date.now() - line.lastAsked > idleFor(line)) {
         clearInterval(line.timer!);
         line.timer = null;
         lines.delete(line.key);
@@ -70,10 +81,11 @@ export function createLines(fetcher: typeof fetch) {
     const key = `${co}:${route.toUpperCase()}:${variant}`;
     let line = lines.get(key);
     if (!line) {
-      line = { key, co, route, variant, snapshot: null, computing: null, lastAsked: 0, timer: null, polls: 0, lastError: null };
+      line = { key, co, route, variant, snapshot: null, computing: null, lastAsked: 0, asks: 0, timer: null, polls: 0, lastError: null };
       lines.set(key, line);
     }
     line.lastAsked = Date.now();
+    line.asks++;
     const fresh = line.snapshot && Date.now() - Date.parse(line.snapshot.fetchedAt) < config.pollMs + 5000;
     try {
       const snap = fresh ? line.snapshot! : await compute(line);
@@ -90,6 +102,7 @@ export function createLines(fetcher: typeof fetch) {
       line: l.key,
       polling: Boolean(l.timer),
       polls: l.polls,
+      asks: l.asks,
       buses: l.snapshot?.buses.length ?? null,
       lastAskedSecondsAgo: Math.round((Date.now() - l.lastAsked) / 1000),
       lastError: l.lastError,
