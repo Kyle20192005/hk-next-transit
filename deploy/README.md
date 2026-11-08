@@ -54,7 +54,8 @@ pipeline 每次都 clone 最新 `main`，改 pipeline 程式唔使重新部署�
    DATA_BASE_URL=<同 Vercel 嘅 DATA_BASE_URL 一樣>
    DATA_TOKEN=<同 Vercel 一樣；公開 repo 唔使>
    UPSTREAM_RPS=14
-   UPSTREAM_RPS_BY_HOST=data.etabus.gov.hk=10
+   UPSTREAM_RPS_BY_HOST=rt.data.gov.hk=20,data.etabus.gov.hk=10
+   POLL_MS=20000
    CORS_ORIGINS=https://eta.kyle05.dev
    ```
 
@@ -105,7 +106,7 @@ node dist/probe.js
 
 四間公司一齊試，按伺服器分開計（`rt.data.gov.hk` = 城巴＋新大嶼山＋港鐵巴士；`data.etabus.gov.hk` = 九巴），兩部同時問；
 每個網址只問一次（唔會撞中 cache）。由每秒 5 個開始，每級 30 秒逐級加，任何一部出錯或者 429／403 就停，最後話你 `UPSTREAM_RPS` 設幾多。
-預設最多試到每秒 20 個（`PROBE_MAX_RPS=40 node dist/probe.js` 可以試高啲）。揀夜晚人少嗰陣跑。
+預設最多試到每秒 20 個。**已經量過（2026-11-08）**：rt.data.gov.hk 每秒 40 個即刻 403 封 IP、35 個冇事；九巴 20 個開始超時。唔好再試高過 35。揀夜晚人少嗰陣跑。
 結果記入 `docs/realtime-backend.md`。
 
 ### 前端接 tracker

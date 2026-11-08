@@ -15,7 +15,9 @@ import { getAllStops, getRoute } from './data';
  * 預設最多每秒 20 個（PROBE_MAX_RPS 可以改，最多 50），揀夜晚人少先試高。邊部伺服器出錯就淨係停邊部，另一部繼續；
  * PROBE_ONLY=rt（或 kmb）淨係試一部。
  */
-const LEVELS = [5, 10, 15, 20, 25, 30, 35, 40, 50].filter((r) => r <= Number(process.env.PROBE_MAX_RPS ?? 20));
+// 2026-11-08 已經量過：rt.data.gov.hk 每秒 40 個即刻 403 封 IP。最多 35，除非 PROBE_FORCE=1
+const MAX = Math.min(Number(process.env.PROBE_MAX_RPS ?? 20), process.env.PROBE_FORCE === '1' ? 50 : 35);
+const LEVELS = [5, 10, 15, 20, 25, 30, 35, 40, 50].filter((r) => r <= MAX);
 const SECONDS = Number(process.env.PROBE_SECONDS ?? 30);
 
 type Req = { co: string; url: string; init?: RequestInit };
