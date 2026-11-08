@@ -1,6 +1,7 @@
 /**
  * 巴士位置用邊個後端（網頁同 App 共用）：設咗 tracker 網址就先問 tracker（香港 VPS，所有人共用同一份上游請求），
- * 佢冇回應、出錯或者超時就退返原本嘅 `/api/buses`（Vercel），而且之後 `downMs` 內直接用後備，唔再等 tracker。
+ * 佢出錯或者超時就退返原本嘅 `/api/buses`（Vercel）；連唔到或者 5xx 先當佢死咗，之後 `downMs` 內直接用後備。
+ * 超時唔算死：tracker 第一次計一條線要幾秒，之後有快照就即刻有。
  * 兩邊回應格式一樣（docs/realtime-backend.md 階段 1a）。
  */
 export const busesPath = (co: string, route: string, variantId: string) =>
@@ -34,7 +35,8 @@ export function createBusesClient(opts: {
       if (res.status >= 500) downUntil = now() + downMs;
       return null; // 4xx（例如數據版本未同步）：今次用後備，唔當佢死咗
     } catch {
-      downUntil = now() + downMs;
+      // 超時（tracker 第一次計一條長線要幾秒）：今次用後備，但唔當佢死咗，下次照問（嗰陣 tracker 已經計好）
+      if (!ctl.signal.aborted) downUntil = now() + downMs;
       return null;
     } finally {
       clearTimeout(t);

@@ -46,7 +46,7 @@ const server = createServer(async (req, res) => {
         uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
         dataVersion: await dataVersion(),
         config: { pollMs: config.pollMs, upstreamRps: config.upstreamRps, upstreamTtlMs: config.upstreamTtlMs, maxLines: config.maxLines },
-        upstream: { queued: upstream.bucket.waiting, cached: upstream.cacheSize(), companies },
+        upstream: { queued: upstream.queued(), cached: upstream.cacheSize(), companies },
         lines: lines.status(),
         memoryMb: Math.round(process.memoryUsage().rss / 1048576),
       }, { 'Cache-Control': 'no-store' });

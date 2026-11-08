@@ -2,7 +2,7 @@
  * 去營辦商 API 嘅 fetch（俾 core 嘅 etasAtStop 用）：
  * - 短時間 cache（同一個網址 + body，`upstreamTtlMs` 內唔再問）
  * - 合併同時請求（同一個網址未返嚟，第二個人等同一個結果）
- * - 全局限流（token bucket，所有線共用，超出就排隊）
+ * - 限流（token bucket，所有線共用；每個伺服器各自計，超出就排隊）
  * - 統計：每間公司請求數、出錯數、平均回應時間（/health 顯示，用嚟及早發現俾人限流）
  */
 
@@ -78,7 +78,19 @@ export function companyOf(url: string): string {
 export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: typeof fetch; now?: () => number }) {
   const base = opts.fetchImpl ?? fetch;
   const now = opts.now ?? Date.now;
-  const bucket = new TokenBucket(opts.rps, now);
+  // 每個伺服器各自限速：城巴同新大嶼山（rt.data.gov.hk）、九巴（data.etabus.gov.hk）、港鐵巴士係唔同伺服器，唔使互相搶
+  const buckets = new Map<string, TokenBucket>();
+  const bucketFor = (url: string) => {
+    let host = 'other';
+    try {
+      host = new URL(url).host;
+    } catch {
+      /* 唔係完整網址：共用 */
+    }
+    let b = buckets.get(host);
+    if (!b) buckets.set(host, (b = new TokenBucket(opts.rps, now)));
+    return b;
+  };
   const cache = new Map<string, Stored>();
   const inflight = new Map<string, Promise<Stored>>();
   const stats = new Map<string, UpstreamStats>();
@@ -104,7 +116,7 @@ export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: t
     let p = inflight.get(key);
     if (!p) {
       p = (async () => {
-        await bucket.take();
+        await bucketFor(url).take();
         const s = stat(co);
         const t0 = now();
         s.requests++;
@@ -140,5 +152,6 @@ export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: t
     for (const [k, v] of cache) if (t - v.at > opts.ttlMs * 3) cache.delete(k);
   };
 
-  return { fetch: upstreamFetch, stats, bucket, sweep, cacheSize: () => cache.size };
+  const queued = () => [...buckets.values()].reduce((n, b) => n + b.waiting, 0);
+  return { fetch: upstreamFetch, stats, queued, sweep, cacheSize: () => cache.size };
 }

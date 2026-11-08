@@ -376,7 +376,11 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
 - [x] 前端：core `createBusesClient`，網頁 `NEXT_PUBLIC_TRACKER_URL`、App `EXPO_PUBLIC_TRACKER_URL`；
       tracker 出錯／超時 5 秒就退返 `/api/buses`，60 秒後再試
 - [x] 本地驗證：城巴 38、九巴 1A、聯營 101、新大嶼山 11、港鐵巴士 K76 結果同 `/api/buses` 一樣；停咗 tracker 前端自動退返
-- [ ] Dokploy 部署、網址、HTTPS；喺 VPS 跑 probe 定 `UPSTREAM_RPS`
+- [x] Dokploy 部署（2026-11-08）：`https://rt.kyle05.dev`。VPS 嘅 80／443 係 Moodle 嘅 Caddy，所以 HTTPS 由 Caddy 做
+      （Caddy 接駁 `dokploy-network`，reverse_proxy 去 tracker 容器），Dokploy 唔設 Domain；步驟見 `deploy/README.md`
+- [x] 實測：城巴 38、九巴 1A、聯營 101、新大嶼山 11、港鐵巴士 K76 同網站一致；第一次 4–12 秒（限速每秒 8），之後用快照
+- [x] 前端超時（5 秒）唔再當 tracker 死咗（只係今次用後備）；限速改為每個上游伺服器各自計
+- [ ] 喺 VPS 跑 probe 定 `UPSTREAM_RPS`（等俾人封過嘅 IP 冷靜一兩日先）
 - [ ] Vercel 設 `NEXT_PUBLIC_TRACKER_URL` 重新部署
 - 之後：九巴改用 `route-eta`（成條線一次）代替逐站，請求量大減
 

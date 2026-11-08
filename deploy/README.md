@@ -63,6 +63,37 @@ pipeline 每次都 clone 最新 `main`，改 pipeline 程式唔使重新部署�
 4. Deploy 之後開 `https://rt.<網域>/health`，見到 `"ok": true` 同 `dataVersion` 就得。
    試一條線：`https://rt.<網域>/api/buses?co=ctb&route=38&v=1000304-1`
 
+### 呢部 VPS 嘅實際做法：80／443 由 Moodle 嘅 Caddy 接（2026-11-08）
+
+呢部 VPS 先有 `~/moodle-docker`，入面嘅 Caddy 容器（`moodle-docker-caddy-1`）佔咗 80、443，Traefik 只係開喺 8080，
+所以 **Dokploy Domains 開 HTTPS 永遠攞唔到證書**（Let's Encrypt 驗證去咗 Caddy）。做法：
+
+1. Dokploy `tracker` **唔設 Domain**（設咗 Traefik 會不停試攞證書）。
+2. Caddy 接駁 Dokploy 網絡，直接搵 tracker 容器。永久寫入 `~/moodle-docker/docker-compose.yml` 嘅 `caddy`：
+
+   ```yaml
+     caddy:
+       # …原本嘅設定…
+       networks:
+         - default
+         - dokploy-network
+   networks:
+     dokploy-network:
+       external: true
+   ```
+
+   然後 `docker compose up -d caddy`（Caddy 重開幾秒，Moodle 同 Dokploy 介面會斷一斷）。
+3. `~/moodle-docker/Caddyfile` 加：
+
+   ```
+   rt.kyle05.dev {
+   	reverse_proxy hktransitbackendbackend-a99ilv:8080
+   }
+   ```
+
+   `hktransitbackendbackend-a99ilv` = Dokploy 俾 tracker 嘅內部名（Advanced → Traefik 嗰度 `url: http://<名>:8080`）。
+   改完 `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`；證書 Caddy 自己攞。
+
 ### 量上游請求上限（第一次部署後做一次）
 
 data.gov.hk 冇公開請求上限，全部請求由 VPS 一個 IP 發出。喺 tracker 嘅 Terminal：
