@@ -1,5 +1,5 @@
 import type { Calendar, Dir, RouteData, Variant } from './types';
-import { departuresAround } from './schedule';
+import { departuresAround, LAST_BUS_GAP_MS } from './schedule';
 import { hkParts } from './time';
 
 /** 走法簡稱：「置富花園 - 北角碼頭(不經華富)」→「不經華富」；冇括號就用全名 */
@@ -61,6 +61,8 @@ export const LOOKAHEAD_MIN = 60;
 
 export type VariantStatus =
   | { state: 'running'; /** 最接近而家嘅開車時間同而家差幾多分鐘，用嚟排序 */ distance: number }
+  /** 尾班車已經由總站開出、仲喺路上（之後要 3 個鐘以上先再有車） */
+  | { state: 'lastRunning'; distance: number }
   | { state: 'later'; nextDeparture: number }
   | { state: 'ended' }
   | { state: 'none' }
@@ -75,8 +77,15 @@ export function variantStatus(v: Variant, calendar: Calendar, now: Date): Varian
   const runMin = (v.offsets[v.offsets.length - 1] ?? 0) / 60;
   // 已經開出但未到終點嘅車，或者未來 60 分鐘會開出嘅車
   const active = deps.filter((d) => d >= nowMin - runMin && d <= nowMin + LOOKAHEAD_MIN);
-  if (active.length) return { state: 'running', distance: Math.min(...active.map((d) => Math.abs(d - nowMin))) };
   const next = deps.find((d) => d > nowMin);
+  if (active.length) {
+    const distance = Math.min(...active.map((d) => Math.abs(d - nowMin)));
+    // 路上嘅車全部已經開出，下一班要隔 3 個鐘以上（或者今日冇）：嗰架係尾班
+    const departed = active.filter((d) => d <= nowMin);
+    const lastOut = departed.length === active.length ? Math.max(...departed) : null;
+    if (lastOut !== null && (next === undefined || (next - lastOut) * 60_000 >= LAST_BUS_GAP_MS)) return { state: 'lastRunning', distance };
+    return { state: 'running', distance };
+  }
   return next === undefined ? { state: 'ended' } : { state: 'later', nextDeparture: next };
 }
 
@@ -85,6 +94,8 @@ export function statusText(s: VariantStatus, short = false): string {
   switch (s.state) {
     case 'running':
       return '現正服務';
+    case 'lastRunning':
+      return '尾班車已開出';
     case 'later':
       return short ? `${LOOKAHEAD_MIN}分鐘內冇班次` : `未來${LOOKAHEAD_MIN}分鐘沒有班次由總站開出`;
     case 'ended':
@@ -102,7 +113,7 @@ export function statusText(s: VariantStatus, short = false): string {
  */
 export function sortVariants(variants: Variant[], calendar: Calendar, now: Date): { variant: Variant; status: VariantStatus }[] {
   // 冇時間表嘅走法唔知有冇車，排喺「未來冇班次」同「已結束」之間
-  const rank = (s: VariantStatus) => ({ running: 0, later: 1, unknown: 2, ended: 3, none: 4 })[s.state];
+  const rank = (s: VariantStatus) => ({ running: 0, lastRunning: 0.5, later: 1, unknown: 2, ended: 3, none: 4 })[s.state];
   return variants
     .map((variant) => ({ variant, status: variantStatus(variant, calendar, now) }))
     .sort((a, b) => {

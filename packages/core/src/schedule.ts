@@ -109,6 +109,41 @@ export function timetablePeriods(departures: number[]): TimetablePeriod[] {
   return out;
 }
 
+/**
+ * 詳細班次用邊個服務日：琴晚過咗午夜嘅班次（開車時間 ≥ 1440）未行完，就仲係琴日，
+ * 時間以琴日午夜計（例如 00:31 → 1471），咁「翌日 00:20」嗰行先標到「尾班已開出」，唔會跳咗去今日嘅 06:50。
+ */
+export function timetableDay(variant: { schedules: Variant['schedules']; runMin: number }, calendar: Calendar, now: Date): { serviceIds: Set<string>; minutes: number } {
+  const nowMin = hkParts(now).minutes;
+  const runMin = variant.runMin;
+  const yesterday = activeServiceIds(calendar, addDays(now, -1));
+  const lastYesterday = Math.max(-1, ...variant.schedules.filter((s) => yesterday.has(s.serviceId)).flatMap((s) => s.departures));
+  if (lastYesterday >= 1440 && nowMin + 1440 <= lastYesterday + runMin) return { serviceIds: yesterday, minutes: nowMin + 1440 };
+  return { serviceIds: activeServiceIds(calendar, now), minutes: nowMin };
+}
+
+/** 走法由總站行到尾站要幾多分鐘（時間表估算；詳細班次判斷尾班仲喺唔喺路上） */
+export const runMinutes = (v: Pick<Variant, 'offsets'>) => (v.offsets[v.offsets.length - 1] ?? 0) / 60;
+
+/**
+ * 詳細班次邊行要標：而家嘅時段（now）、下一班（next），或者尾班已開出仲行緊（lastRunning）。
+ * runMin = 由總站行到尾站要幾多分鐘。
+ */
+export function timetableMarker(periods: TimetablePeriod[], minutes: number, runMin: number): { index: number; kind: 'now' | 'next' | 'lastRunning' } | null {
+  const lastI = periods.length - 1;
+  const last = periods[lastI];
+  if (!last) return null;
+  // 尾班之後：尾班仲喺路上就標佢，否則冇嘢標
+  if (minutes > last.end) return minutes <= last.end + runMin ? { index: lastI, kind: 'lastRunning' } : null;
+  const now = periods.findIndex((p, i) => {
+    const next = periods[i + 1];
+    return minutes >= p.start && (p.headway ? minutes <= p.end : !next || minutes < next.start);
+  });
+  if (now >= 0) return { index: now, kind: 'now' };
+  const next = periods.findIndex((p) => p.start > minutes);
+  return next >= 0 ? { index: next, kind: 'next' } : null;
+}
+
 /** 服務日子文字：例如「星期一至五」、「星期六」、「星期日及公眾假期」 */
 export function serviceDaysLabel(days: boolean[]): string {
   const names = ['一', '二', '三', '四', '五', '六', '日'];

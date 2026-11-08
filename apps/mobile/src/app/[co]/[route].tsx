@@ -209,7 +209,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
       id: v.id,
       label: variantLabel(v),
       special: v.special,
-      running: status.state === 'running',
+      running: status.state === 'running' || status.state === 'lastRunning',
       unknown: status.state === 'unknown',
       status: statusText(status),
       statusShort: statusText(status, true),

@@ -1,7 +1,7 @@
 import { useRef, useState, type ComponentRef } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { activeServiceIds, fmtMinutes, hkParts, serviceDaysLabel, timetablePeriods, variantLabel, type Calendar, type Variant } from '@hknt/core';
+import { fmtMinutes, runMinutes, serviceDaysLabel, timetableDay, timetableMarker, timetablePeriods, variantLabel, type Calendar, type Variant } from '@hknt/core';
 import { radius, shadowLg, tabular, useTheme } from '@/lib/theme';
 import { Icon } from './Icon';
 
@@ -17,9 +17,11 @@ export function TimetableSheet({ visible, onClose, variants, selectedId, calenda
   const withTimes = variants.filter((v) => v.schedules.length);
   const [variantId, setVariantId] = useState(selectedId);
   const v = withTimes.find((x) => x.id === variantId) ?? withTimes[0];
-  const now = new Date();
-  const today = activeServiceIds(calendar, now);
-  const nowMinutes = hkParts(now).minutes;
+  // 服務日：琴晚過咗午夜嘅班次未行完就仲係琴日（core timetableDay，同網頁一樣）
+  const runMin = v ? runMinutes(v) : 0;
+  const day = v ? timetableDay({ schedules: v.schedules, runMin }, calendar, new Date()) : null;
+  const today = day?.serviceIds ?? new Set<string>();
+  const nowMinutes = day?.minutes ?? 0;
 
   // 服務日子分頁：同一組日子嘅 serviceId 併埋（計算好平，唔使 memo）
   const groups = new Map<string, { label: string; ids: string[]; today: boolean; order: number }>();
@@ -37,13 +39,9 @@ export function TimetableSheet({ visible, onClose, variants, selectedId, calenda
   const current = tabs.find((x) => x.label === tab) ?? tabs.find((x) => x.today) ?? tabs[0];
   const isToday = current?.today ?? false;
   const periods = v && current ? timetablePeriods(v.schedules.filter((s) => current.ids.includes(s.serviceId)).flatMap((s) => s.departures)) : [];
-  const nowIndex = isToday
-    ? periods.findIndex((p, i) => {
-        const next = periods[i + 1];
-        return nowMinutes >= p.start && (p.headway ? nowMinutes <= p.end : !next || nowMinutes < next.start);
-      })
-    : -1;
-  const nextIndex = isToday && nowIndex < 0 ? periods.findIndex((p) => p.start > nowMinutes) : -1;
+  // 而家嘅時段／下一班／尾班已開出（core timetableMarker）
+  const marker = isToday ? timetableMarker(periods, nowMinutes, runMin) : null;
+  const markIndex = marker?.index ?? -1;
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const rowY = useRef<number[]>([]);
 
@@ -78,13 +76,13 @@ export function TimetableSheet({ visible, onClose, variants, selectedId, calenda
               <ScrollView
                 ref={scroll}
                 onContentSizeChange={() => {
-                  const k = nowIndex >= 0 ? nowIndex : nextIndex;
+                  const k = markIndex;
                   const y = rowY.current[k];
                   if (k >= 0 && y !== undefined) scroll.current?.scrollTo({ y: Math.max(0, y - 120), animated: false });
                 }}
               >
                 {periods.map((p, i) => {
-                  const hl = i === nowIndex || i === nextIndex;
+                  const hl = i === markIndex;
                   return (
                     <View
                       key={`${p.start}-${i}`}
@@ -96,9 +94,9 @@ export function TimetableSheet({ visible, onClose, variants, selectedId, calenda
                         {p.headway !== null ? ` – ${time(p.end)}` : ''}
                       </Text>
                       {p.headway !== null && <Text style={{ fontSize: 14, color: hl ? t.text : t.muted }}>每 {p.headway} 分鐘</Text>}
-                      {(i === nowIndex || i === nextIndex) && (
+                      {hl && marker && (
                         <Text style={{ fontSize: 11, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 1, borderRadius: 999, overflow: 'hidden', backgroundColor: t.brand, color: t.onBrand }}>
-                          {i === nowIndex ? '而家' : '下一班'}
+                          {marker.kind === 'now' ? '而家' : marker.kind === 'next' ? '下一班' : '尾班已開出'}
                         </Text>
                       )}
                     </View>

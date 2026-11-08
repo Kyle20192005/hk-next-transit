@@ -1,13 +1,15 @@
 'use client';
 import Icon from './Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fmtMinutes, serviceDaysLabel, timetablePeriods, type Calendar } from '@hknt/core';
+import { fmtMinutes, serviceDaysLabel, timetableDay, timetableMarker, timetablePeriods, type Calendar } from '@hknt/core';
 
 export interface DrawerVariant {
   id: string;
   label: string;
   special: boolean;
   schedules: { serviceId: string; departures: number[] }[];
+  /** 總站行到尾站要幾多分鐘（尾班仲喺唔喺路上） */
+  runMin: number;
 }
 
 type Props = {
@@ -15,10 +17,6 @@ type Props = {
   selectedId: string | null;
   /** 只包呢啲走法用到嘅 serviceId */
   calendar: Calendar;
-  /** 今日生效嘅 serviceId（server 計好，避免時區問題） */
-  todayServiceIds: string[];
-  /** 而家由午夜起計幾多分鐘（香港時間） */
-  nowMinutes: number;
 };
 
 const time = (m: number) => `${m >= 1440 ? '翌日 ' : ''}${fmtMinutes(m)}`;
@@ -27,11 +25,15 @@ const time = (m: number) => `${m >= 1440 ? '翌日 ' : ''}${fmtMinutes(m)}`;
  * 詳細班次：撳標題列「班次」由右邊拉出。
  * 按服務日子分頁（預設今日），時段由時間表還原（每 N 分鐘一班），今日而家嘅時段會標示同捲到。
  */
-export default function TimetableDrawer({ variants, selectedId, calendar, todayServiceIds, nowMinutes }: Props) {
+export default function TimetableDrawer({ variants, selectedId, calendar }: Props) {
   const [open, setOpen] = useState(false);
   const [variantId, setVariantId] = useState(selectedId ?? variants[0]?.id ?? null);
   const v = variants.find((x) => x.id === variantId) ?? variants[0];
-  const today = new Set(todayServiceIds);
+  // 服務日：琴晚過咗午夜嘅班次未行完就仲係琴日（core timetableDay）；只喺打開時計（伺服器唔使）
+  const [openedAt, setOpenedAt] = useState(0);
+  const day = useMemo(() => (v && openedAt ? timetableDay(v, calendar, new Date(openedAt)) : null), [v, calendar, openedAt]);
+  const today = day?.serviceIds ?? new Set<string>();
+  const nowMinutes = day?.minutes ?? 0;
 
   // 服務日子分頁：同一組日子嘅 serviceId 併埋
   const tabs = useMemo(() => {
@@ -47,7 +49,7 @@ export default function TimetableDrawer({ variants, selectedId, calendar, todayS
     }
     return [...groups.values()].sort((a, b) => a.order - b.order);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [v, calendar, todayServiceIds]);
+  }, [v, calendar, day]);
 
   const [tab, setTab] = useState<string | null>(null);
   const current = tabs.find((t) => t.label === tab) ?? tabs.find((t) => t.today) ?? tabs[0];
@@ -58,19 +60,14 @@ export default function TimetableDrawer({ variants, selectedId, calendar, todayS
     return timetablePeriods(v.schedules.filter((s) => current.ids.includes(s.serviceId)).flatMap((s) => s.departures));
   }, [v, current]);
 
-  // 而家嘅時段：今日分頁先標示
-  const nowIndex = isToday
-    ? periods.findIndex((p, i) => {
-        const next = periods[i + 1];
-        return nowMinutes >= p.start && (p.headway ? nowMinutes <= p.end : !next || nowMinutes < next.start);
-      })
-    : -1;
-  const nextIndex = isToday && nowIndex < 0 ? periods.findIndex((p) => p.start > nowMinutes) : -1;
+  // 而家嘅時段／下一班／尾班已開出：今日（服務日）分頁先標示
+  const marker = isToday && v ? timetableMarker(periods, nowMinutes, v.runMin) : null;
+  const markIndex = marker?.index ?? -1;
 
   const nowRow = useRef<HTMLLIElement>(null);
   useEffect(() => {
     if (open) requestAnimationFrame(() => nowRow.current?.scrollIntoView({ block: 'center' }));
-  }, [open, nowIndex, nextIndex, variantId, current?.label]);
+  }, [open, markIndex, variantId, current?.label]);
 
   // Esc 收埋
   useEffect(() => {
@@ -83,7 +80,15 @@ export default function TimetableDrawer({ variants, selectedId, calendar, todayS
   if (!variants.length) return null;
   return (
     <>
-      <button className="bar-btn" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label="詳細班次">
+      <button
+        className="bar-btn"
+        onClick={() => {
+          setOpenedAt(Date.now());
+          setOpen(true);
+        }}
+        aria-haspopup="dialog"
+        aria-label="詳細班次"
+      >
         <Icon name="clock" />
       </button>
       {open && (
@@ -120,7 +125,7 @@ export default function TimetableDrawer({ variants, selectedId, calendar, todayS
                 <p className="muted drawer-note">由總站開出時間</p>
                 <ol className="periods">
                   {periods.map((p, i) => {
-                    const hl = i === nowIndex || i === nextIndex;
+                    const hl = i === markIndex;
                     return (
                       <li key={`${p.start}-${i}`} ref={hl ? nowRow : undefined} className={hl ? 'now' : undefined}>
                         <span className="period-time">
@@ -128,8 +133,7 @@ export default function TimetableDrawer({ variants, selectedId, calendar, todayS
                           {p.headway !== null && <> – {time(p.end)}</>}
                         </span>
                         <span className="period-freq">{p.headway !== null ? `每 ${p.headway} 分鐘` : ''}</span>
-                        {i === nowIndex && <span className="period-tag">而家</span>}
-                        {i === nextIndex && <span className="period-tag">下一班</span>}
+                        {hl && <span className="period-tag">{marker!.kind === 'now' ? '而家' : marker!.kind === 'next' ? '下一班' : '尾班已開出'}</span>}
                       </li>
                     );
                   })}

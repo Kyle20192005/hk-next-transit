@@ -260,7 +260,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   因為黃色喺地圖馬路上唔顯眼。聯營線：走線用路線檔嘅公司，每架巴士用自己公司嘅顏色。特別班只用標籤區分。
 - 路線列表：雙向路線列出兩個目的地，各自撳入 `?dir=O|I`（唔好要用戶入咗頁先轉方向）。「只限 XX」標示：全部係特別班先用紅色。
 - 路線頁按走法顯示（同城巴 App 一致）：走法排序同狀態用 core 嘅 `sortVariants`、`statusText`；
-  「現正服務」= 未來 60 分鐘有班次由總站開出，或者有車行緊。站點用 `variantStops`（包埋城巴獨有站）。
+  「現正服務」= 未來 60 分鐘有班次由總站開出，或者有車行緊。路上嘅車全部已開出、下一班要隔 3 個鐘以上（或者今日冇）→「尾班車已開出」（`lastRunning`，同 running 一樣排先、綠色）。站點用 `variantStops`（包埋城巴獨有站）。
 - 走法名稱用 `variantLabel`：正常走法叫「正常路線」，括號係走法描述（經／繞／不）先加，目的地唔加。
 - 地圖（2026-11 改版）：網頁用 MapLibre GL（`components/RouteMap.tsx`，只喺瀏覽器載入），底圖用 OpenFreeMap 向量地圖
   （OpenStreetMap 數據，免費、唔使 key）嘅 Positron 風格再自己調色（`lib/map-style.ts`：淺米色底、藍海、綠公園、白色馬路，
@@ -311,7 +311,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   唔適用：機場 A／NA、馬場（…R）、城巴旅遊 H 線、包車／預約（`pipeline/build.py` 嘅 `joyyou_ok`，政府數據冇標記，按號碼同名判斷；
   「新增長途路線」冇清單，判斷唔到）。路線檔 `joyYou: false` 時標題列寫「不設樂悠咭優惠」。
 - 詳細班次：標題列「🕒 班次」掣，撳開右邊 drawer（`components/TimetableDrawer.tsx`）。按服務日子分頁（`serviceDaysLabel`，預設今日），
-  可以揀走法；時段由開車時間還原（`timetablePeriods`：最少三班相隔一樣先併做「每 N 分鐘」，零散班次逐班列），今日而家嘅時段標「而家」並捲到。
+  可以揀走法；時段由開車時間還原（`timetablePeriods`：最少三班相隔一樣先併做「每 N 分鐘」，零散班次逐班列），今日而家嘅時段標「而家」並捲到。服務日用 core `timetableDay`：琴晚過咗午夜嘅班次（≥ 1440）未行完就仲係琴日（00:31 → 1471），`timetableMarker` 標「而家」「下一班」或者「尾班已開出」（尾班開出咗、未行完全程）。
   標題列第二行只用嚟寫「不設樂悠咭優惠」。
 - 闊螢幕（≥ 768px，iPad、電腦）：路線頁兩欄（`.route-top` 用 `display: contents`，grid 左邊標題／走法／站點，右邊全高地圖）；
   首頁路線列表兩欄（電腦三欄）。電腦（`hover: hover` + `pointer: fine` + ≥ 1024px）收埋屏幕鍵盤，直接用實體鍵盤打號碼

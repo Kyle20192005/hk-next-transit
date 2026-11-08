@@ -5,8 +5,7 @@ import {
   lastBusAt,
   fmtMinutes,
   serviceWindow,
-  activeServiceIds,
-  hkParts,
+  runMinutes,
   formatFare,
   joyYouFare,
   smoothLine,
@@ -76,7 +75,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
       href: `?dir=${dir}&v=${v.id}`,
       label: variantLabel(v),
       special: v.special,
-      running: status.state === 'running',
+      running: status.state === 'running' || status.state === 'lastRunning',
       unknown: status.state === 'unknown',
       status: statusText(status),
       statusShort: statusText(status, true),
@@ -106,11 +105,9 @@ export default async function RoutePage({ params, searchParams }: Props) {
   // 冇時間表嘅走法（例如政府未有嘅新路線）唔放入詳細班次；全部都冇就唔出「班次」掣
   const drawerVariants = sorted
     .filter(({ variant: x }) => x.schedules.length)
-    .map(({ variant: x }) => ({ id: x.id, label: variantLabel(x), special: x.special, schedules: x.schedules }));
+    .map(({ variant: x }) => ({ id: x.id, label: variantLabel(x), special: x.special, schedules: x.schedules, runMin: runMinutes(x) }));
   const usedServices = new Set(drawerVariants.flatMap((x) => x.schedules.map((sc) => sc.serviceId)));
   const drawerCalendar = Object.fromEntries(Object.entries(calendar).filter(([id]) => usedServices.has(id)));
-  const todayServiceIds = [...activeServiceIds(drawerCalendar, now)];
-  const nowMinutes = hkParts(now).minutes;
   const dest = stops[stops.length - 1]?.name;
   // 平均行車時間：攞到即時數據之前先用
   const segSeconds = selected?.segSeconds ?? null;
@@ -169,8 +166,6 @@ export default async function RoutePage({ params, searchParams }: Props) {
             variants={drawerVariants}
             selectedId={selected?.id ?? null}
             calendar={drawerCalendar}
-            todayServiceIds={todayServiceIds}
-            nowMinutes={nowMinutes}
           />
           {other && (
             <Link
