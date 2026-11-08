@@ -24,7 +24,8 @@ export default function RootLayout() {
         <Stack.Screen name="[co]/[route]" />
         <Stack.Screen name="nearby" />
         <Stack.Screen name="news" />
-        <Stack.Screen name="tools" />
+        {/* iOS 26 起預設成個畫面向右掃都返上一頁，會搶咗拖住工具左右移排位置（PanResponder）；只保留由左邊邊緣掃返 */}
+        <Stack.Screen name="tools" options={{ fullScreenGestureEnabled: false }} />
       </Stack>
       <LaunchOverlay />
     </SafeAreaProvider>

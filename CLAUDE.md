@@ -332,6 +332,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - App 唔好用 `Link asChild` 包 Pressable 做列表行：改用 `Pressable` + `router.push`。
 - App `flex: 1` 只可以用喺**橫排**入面平分闊度：放喺直排（View 預設）入面，iOS／Android 會將高度壓到 0（Expo web 預覽唔會，睇唔到），
   內容溢出卡外（2026-11 自訂常用工具頂部一行就係咁，包住 ToolTile 嘅拖拉 View 要 `flexDirection: 'row'`）。
+- App iOS 26 起 stack 畫面預設**成個畫面向右掃都返上一頁**（`fullScreenGestureEnabled` 預設 true），會搶咗 PanResponder 嘅橫向拖拉；
+  有橫向拖拉嘅畫面（例如 `tools`）要喺 `_layout.tsx` 設 `fullScreenGestureEnabled: false`（左邊邊緣掃返照用得）。
 - App 預覽：`EXPO_PUBLIC_API_BASE=http://localhost:3000 npx expo start --web`（`RouteMap.web.tsx` 係地圖佔位 `MapPlaceholder`，react-native-maps 冇 web）。
   改完 code 截圖前要殺咗 server 再用 `--clear` 重開：Metro web 延遲載入嘅 chunk 會繼續送舊 code。
 
