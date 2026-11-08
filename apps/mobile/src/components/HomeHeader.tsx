@@ -3,7 +3,7 @@ import { Animated, Easing, Pressable, Text, View, type LayoutChangeEvent } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, shadow, useTheme } from '@/lib/theme';
 import { Icon } from './Icon';
-import { Logo } from './Logo';
+import { Brand, BRAND_ROW } from './ui';
 
 /** 頂部一行上下嘅空位 */
 const PAD = 12;
@@ -78,10 +78,8 @@ export function HomeHeader({
     <View pointerEvents="box-none" onLayout={(e) => (setH(e.nativeEvent.layout.height), onHeight(e.nativeEvent.layout.height))} style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + PAD, paddingHorizontal: 16, paddingBottom: 18, gap: 10 }}>
       {/* 黃色底：同捲動 1:1 收起；上面再墊一截，iPhone 拉落唔露灰 */}
       <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: -600, bottom: 0, backgroundColor: t.brand, borderBottomLeftRadius: radius.bar, borderBottomRightRadius: radius.bar, transform: [{ translateY: lerp(-D, false) }], ...shadow }} />
-      <View onLayout={(e) => setBar(box(e))} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40 }}>
-        <Logo size={22} />
-        <Text style={{ fontSize: 18, fontWeight: '800', color: t.onBrand }}>下一程</Text>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>NextLeg</Text>
+      <View onLayout={(e) => setBar(box(e))} style={BRAND_ROW}>
+        <Brand />
         <View style={{ flex: 1 }} />
         {pill && (
           <Animated.View onLayout={(e) => setPillB(box(e))} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 160, paddingVertical: 5, paddingLeft: 8, paddingRight: 10, borderRadius: 999, backgroundColor: t.onBrandSoft, opacity: between(D * 0.9, D, 0, 1) }}>

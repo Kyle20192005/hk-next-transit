@@ -133,7 +133,7 @@ export default function RouteBrowser({
     <>
       <header className="app-bar">
         <div className="app-title">
-          <Logo size={26} />
+          <Logo size={24} />
           <h1>下一程</h1>
           <span className="app-sub">NextLeg</span>
         </div>

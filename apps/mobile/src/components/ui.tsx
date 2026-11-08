@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COMPANIES, type Company } from '@hknt/core';
 import { radius, shadow, useTheme } from '@/lib/theme';
 import { BusGlyph, Icon, type IconName } from './Icon';
+import { Logo } from './Logo';
 
 /** 公司標籤：巴士圖示 + 公司名，用公司代表色；聯營線合併做一個分色標籤 */
 export function CompanyTag({ companies, compact = false }: { companies: readonly Company[]; compact?: boolean }) {
@@ -31,7 +32,8 @@ export function AppBar({ children, style }: { children: ReactNode; style?: Style
       style={[
         {
           backgroundColor: t.brand,
-          paddingTop: insets.top + 10,
+          // 同首頁 HomeHeader 嘅 PAD（12）一樣，轉分頁標題唔會跳位
+          paddingTop: insets.top + 12,
           paddingBottom: 14,
           paddingHorizontal: 16,
           borderBottomLeftRadius: radius.bar,
@@ -45,6 +47,21 @@ export function AppBar({ children, style }: { children: ReactNode; style?: Style
     </View>
   );
 }
+
+/** 品牌一行「logo 下一程 NextLeg」：首頁 HomeHeader 同路線分頁共用，大細同位置一模一樣（同網頁 .hh-bar／.app-title:has(.logo)） */
+export function Brand() {
+  const t = useTheme();
+  return (
+    <>
+      <Logo size={24} />
+      <Text style={{ fontSize: 20, fontWeight: '800', color: t.onBrand, letterSpacing: -0.2 }}>下一程</Text>
+      <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginTop: 3 }}>NextLeg</Text>
+    </>
+  );
+}
+
+/** 品牌一行嘅外框（高 40，同首頁頂部一行一樣） */
+export const BRAND_ROW = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, minHeight: 40 };
 
 /** 標題列上嘅圖示掣（40×40） */
 export function BarButton({ icon, onPress, label, on = false }: { icon: IconName; onPress: () => void; label: string; on?: boolean }) {

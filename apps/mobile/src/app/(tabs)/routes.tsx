@@ -1,11 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Logo } from '@/components/Logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { TRANSPORT_MODES, orderedModes, placeMatches, radiusLabel, type PlaceMatch, type RouteIndex, type StopRouteHit, type TransportMode } from '@hknt/core';
 import { api, type Co } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
-import { AppBar, ComingSoon, CompanyTag } from '@/components/ui';
+import { AppBar, Brand, BRAND_ROW, ComingSoon, CompanyTag } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { Keypad } from '@/components/Keypad';
 import { preloadRoute, warmRoute } from '@/lib/prefetch';
@@ -98,10 +97,8 @@ export default function RoutesTab() {
   return (
     <View style={{ flex: 1 }}>
       <AppBar>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Logo size={26} />
-          <Text style={{ fontSize: 24, fontWeight: '800', color: t.onBrand, letterSpacing: -0.3 }}>下一程</Text>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: t.onBrand, opacity: 0.7, marginLeft: 2, marginTop: 6 }}>NextLeg</Text>
+        <View style={BRAND_ROW}>
+          <Brand />
         </View>
         {/* 交通工具分類（同網頁一樣）：喺搜尋欄上面；揀咗未做嘅，搜尋欄同鍵盤都收埋 */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16, marginTop: -4, marginBottom: -2 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
