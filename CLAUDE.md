@@ -204,6 +204,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 視覺（2026-11 改版）：保留黃色標題列（`.app-bar`、`.route-bar`，底部圓角），其他用卡片（圓角 14–18、柔和陰影）、
   統一 SVG 圖示（`components/Icon.tsx`），**唔好用 emoji 或者文字符號做圖示**（⇅、⌫、🕒 喺唔同系統大細唔同）。
   顏色、圓角、陰影全部用 `globals.css` 嘅 CSS 變數，深色模式只改變數。
+  字體：一律用系統字（iPhone／Mac = SF Pro + 蘋方-港 PingFang HK，`<html lang="zh-HK">` 令漢字用香港字形）；
+  網頁 body 嘅 font-family 係唯一定義，`button, input, select, textarea` 一律 `font: inherit`，唔好另外指定字體；App 唔設 fontFamily（用系統字）。
 - 底部分頁列（網頁 `components/home/Home.tsx`、App `src/app/(tabs)/_layout.tsx`）：**首頁／路線／導航／收藏／設定**，預設首頁，
   記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區，變成一條頂部欄：左邊品牌（`.tab-brand`，logo 下一程 NextLeg）、
   右邊分頁，對齊 1100px；闊螢幕各分頁自己嘅品牌標題行（`.app-title:has(> .logo)`）同首頁 header 頂部一行（`.hh-bar`）收埋，唔好重複。
