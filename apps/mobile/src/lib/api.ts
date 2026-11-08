@@ -1,11 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Calendar, Company, Eta, NewsItem, RouteData, RouteIndex } from '@hknt/core';
+import { createBusesClient, type Calendar, type Company, type Eta, type NewsItem, type RouteData, type RouteIndex } from '@hknt/core';
 
 /**
  * 後端 = apps/web 嘅 API。預設用線上網站（手機連唔到電腦嘅 localhost）；
  * 想用本地 server 就設定 EXPO_PUBLIC_API_BASE（例如 http://<電腦 IP>:3000）。
  */
 export const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || 'https://eta.kyle05.dev').replace(/\/+$/, '');
+
+/** 巴士位置：tracker（EXPO_PUBLIC_TRACKER_URL）優先，出錯退返 API_BASE */
+const busesClient = createBusesClient({ trackerBase: process.env.EXPO_PUBLIC_TRACKER_URL, fallbackBase: API_BASE });
 
 /** 路線檔位置：ctb（城巴同聯營線）、kmb（九巴、龍運）、nlb（新大嶼山巴士）、mtrb（港鐵巴士） */
 export type Co = 'ctb' | 'kmb' | 'nlb' | 'mtrb';
@@ -57,8 +60,13 @@ export const api = {
   calendar: () => get<Calendar>('/api/calendar'),
   route: (co: Co, route: string) => get<RouteData>(`/api/route/${co}/${q(route)}`),
   /** 成條線嘅巴士位置同同 ETA 一致嘅每段行車時間 */
-  buses: (co: Co, route: string, variantId: string) =>
-    get<{ buses: LiveBus[]; segSeconds: number[]; fetchedAt: string }>(`/api/buses?co=${co}&route=${q(route)}&v=${q(variantId)}`),
+  buses: async (co: Co, route: string, variantId: string) => {
+    // 設咗 EXPO_PUBLIC_TRACKER_URL 就先問 tracker（香港 VPS），出錯自動退返網站 /api/buses
+    const res = await busesClient.buses(co, route, variantId);
+    const body = await res.json();
+    if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+    return body as { buses: LiveBus[]; segSeconds: number[]; fetchedAt: string };
+  },
   /** 某站到站時間；failed = 攞唔到數據嘅公司（唔好當佢冇車） */
   eta: (co: Co, route: string, stop: string) =>
     get<{ etas: Eta[]; failed?: Company[]; fetchedAt: string }>(`/api/eta?co=${co}&route=${q(route)}&stop=${q(stop)}`),

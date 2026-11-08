@@ -1,6 +1,6 @@
 # 實時後端計劃：香港 tracker + Supabase 帳戶
 
-> 狀態：**計劃中**（2026-11）。未開始實作。
+> 狀態：**實作中**（2026-11-08 開始）。Dokploy 已經準備好；部署步驟睇 **`deploy/README.md`**。
 > 做嘅時候逐步更新呢份文件（每個階段完成就喺「階段」嗰度打剔，改咗設計就改返呢度），
 > 完成後將重點搬入根目錄 `CLAUDE.md`。
 >
@@ -8,6 +8,16 @@
 > （Postgres + Valkey + tracker 自己用 WebSocket 推送），**唔自架 Supabase**；
 > 帳戶（登入、收藏同步、設定）用 **Supabase 雲端版（新加坡）**。原因：帳戶數據流量細、唔怕慢幾十毫秒，
 > 但最怕外洩同冇備份，交俾託管服務；實時數據要快、要喺香港，自己架。VPS 因此 4GB 就夠（自架整套 Supabase 要 8GB）。
+
+> **2026-11-08 檢討後改動**：
+> - 次序改為：每日 pipeline 搬上 VPS（數據更新停咗，最急）→ 量上游請求上限 → tracker 第一版（HTTP，同 `/api/buses` 一樣格式）
+>   → WebSocket → 到站推送通知 → 記憶同過站紀錄。
+> - tracker 第一版**唔用 Valkey／Postgres**：一個 instance，記憶體 cache 就夠；多 instance 或者要記狀態先加。
+> - 城巴冇成條線 API，逐站問：一條 30 個站嘅線每 15 秒一輪 ≈ 每秒 2 個請求，全局每秒 20–30 個即係同時大約 10–15 條城巴線。
+>   所以要先量上限（`node dist/probe.js`），之後考慮隔站問、只密 poll 打開咗嘅站上游嗰段；單站 ETA 照用 Vercel `/api/eta`（分開 IP）。
+> - 過站偵測（ETA 消失）會好嘈：要連續兩輪唔見而且下游仲見到同一架車先算；`segment_times` 用中位數。
+> - 加「到站推送通知」階段（推送 token 存 Supabase，tracker 檢查，Expo 推送服務發出）。
+> - tracker 網址要喺 App 上架前定（買咗網域先用佢嘅子網域）。
 
 ## 1. 目標
 
@@ -322,6 +332,7 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
 ## 5. 階段
 
 ### 階段 0：伺服器準備
+- [x] Dokploy（2026-11-08 用戶已經準備好）
 - [ ] 香港 VPS：**4GB RAM、40GB SSD** 就夠（平時約 1.1–1.6GB，每日 pipeline 高峰再加 1.6GB：
       2026-11-06 實測 build.py 最高 1643MB、59 秒）；想用 2GB 要先減細 pipeline 記憶體 + 開 swap。
       先由細規格開始，唔夠先升級
@@ -344,16 +355,39 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
 - [x] 預設走法用 core `pickVariant`／`defaultDir`，路線頁同預熱一致（網址唔同就唔會命中伺服器 cache）
 - 驗收：由撳路線到見到第一架巴士嘅時間，比冇預載快
 
-### 階段 1：tracker + 推送（只做巴士位置）
-- [ ] Valkey：Dokploy 部署，只聽內網
-- [ ] `apps/tracker`：Node + TypeScript，用 `@hknt/core`；Dockerfile；Dokploy 部署
-- [ ] 上游 cache、合併同時請求、全局限流全部經 Redis
+### 階段 0.8：每日數據更新搬上 VPS（2026-11-08 程式寫好，未部署）
+- [x] `deploy/pipeline/`：Dockerfile + `run.sh`（同 data.yml 一樣：clone → fetch → build → check → 推 data 分支）
+      + `scheduler.py`（每日 04:17 香港時間、`RUN_ON_START`、`PING_URL` 監察、`/state/last-run.json`）
+- [x] 本地用假 repo 跑通成個流程（約 2 分 15 秒）
+- [ ] Dokploy 部署、GitHub fine-grained token（Contents 讀寫）、第一次跑成功
+- [ ] 停用 GitHub Actions `data.yml`
+
+### 階段 1a：tracker 第一版（HTTP，2026-11-08 程式寫好，未部署）
+- [x] `apps/tracker`：Node 22 + TypeScript，esbuild 打包（連 core），Dockerfile（node:22-alpine，唔使 node_modules）
+- [x] `GET /api/buses`：同網頁一樣格式（多咗 `failed`）；第一次有人問就計，之後背景每 15 秒 poll，3 分鐘冇人問就停；
+      同時 poll 上限 `MAX_LINES`
+- [x] 上游 fetch：10 秒 cache、合併同時請求、全局 token bucket 限流、每間公司統計（`/health`）
+- [x] `node dist/probe.js`：量城巴 API 請求上限
+- [x] 前端：core `createBusesClient`，網頁 `NEXT_PUBLIC_TRACKER_URL`、App `EXPO_PUBLIC_TRACKER_URL`；
+      tracker 出錯／超時 5 秒就退返 `/api/buses`，60 秒後再試
+- [x] 本地驗證：城巴 38、九巴 1A、聯營 101、新大嶼山 11、港鐵巴士 K76 結果同 `/api/buses` 一樣；停咗 tracker 前端自動退返
+- [ ] Dokploy 部署、網址、HTTPS；喺 VPS 跑 probe 定 `UPSTREAM_RPS`
+- [ ] Vercel 設 `NEXT_PUBLIC_TRACKER_URL` 重新部署
+- 之後：九巴改用 `route-eta`（成條線一次）代替逐站，請求量大減
+
+### 階段 1b：WebSocket 推送
+- [ ] Valkey：要多個 instance 或者重啟唔失憶先加（第一版用記憶體）
 - [ ] 預熱訊號（`/warm`）同上限；快照（`snap:*`）
 - [ ] WebSocket 訂閱驅動嘅 lazy poll、全局限流、退避
 - [ ] 計位置（先沿用 `trackLine` + `BusStabilizer` + `mergeScheduleBuses`，未有記憶）
 - [ ] WebSocket `buses` 事件；`/health`、`/snapshot`
 - [ ] 網頁同 App 訂閱，失敗自動退返 `/api/buses`
 - 驗收：兩個瀏覽器睇同一條線，巴士公司 API 每 15 秒只被 call 一輪；斷開 tracker，前端 45 秒內退返輪詢
+
+### 階段 1c：到站推送通知
+- [ ] App：expo-notifications，推送 token 存 Supabase（要帳戶，階段 A）
+- [ ] 用戶喺打開咗嘅站設「仲有 N 分鐘提我」；tracker 每輪計完檢查，經 Expo 推送服務發出
+- [ ] 一次性提醒，發咗就刪；冇人睇嘅線都要 poll（計入全局限流）
 
 ### 階段 2：記憶同過站紀錄
 - [ ] 虛擬車輛 ID（跨輪配對同一架車）

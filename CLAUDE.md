@@ -47,6 +47,14 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 香港 VPS（4GB，Dokploy）跑 tracker + Postgres/PostGIS + Valkey，tracker 自己用 WebSocket 推巴士位置（唔自架 Supabase）；
 帳戶（登入、收藏同步）用 Supabase 雲端版（新加坡），唔登入照用得。計劃、數據表、訊息格式、同步規則同階段：**`docs/realtime-backend.md`**。做嘅時候照住佢，改咗設計就更新嗰份文件。
 
+已經做咗（2026-11-08，部署步驟 **`deploy/README.md`**）：
+- `apps/tracker`：巴士位置後端第一版，`GET /api/buses`（同網頁一樣格式）+ `/health`。有人問先計，背景每 15 秒 poll，3 分鐘冇人問就停；
+  上游 fetch 包一層（10 秒 cache、合併同時請求、全局限流 `UPSTREAM_RPS`、每間公司統計）；`node dist/probe.js` 量上游上限。
+  計位置邏輯同網頁 `/api/buses` 一樣（`src/buses.ts`），改一邊要改埋另一邊。esbuild 連 core 打包，Docker 唔使 node_modules。
+- 前端：core `createBusesClient`。網頁 `NEXT_PUBLIC_TRACKER_URL`（`lib/buses.ts`）、App `EXPO_PUBLIC_TRACKER_URL`（`lib/api.ts`）；
+  冇設定就用 `/api/buses`；tracker 出錯或超時 5 秒自動退返，60 秒後再試。
+- `deploy/pipeline/`：每日 04:17 數據更新容器（取代 GitHub Actions），每次 clone 最新 main；要 `GITHUB_TOKEN`（Contents 讀寫）、`DATA_REPO`。
+
 ## 九巴同聯營線
 
 - 路線檔分 `out/ctb/<路線>.json`（城巴同大部分聯營線）同 `out/kmb/<路線>.json`（九巴、龍運）。網址 `/ctb/101`、`/kmb/1A`。

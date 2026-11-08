@@ -1,5 +1,6 @@
 'use client';
 import { getPrefs } from '@/lib/prefs';
+import { busesClient } from '@/lib/buses';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BusStabilizer, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
@@ -140,7 +141,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
     let cancelled = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/buses?co=${co}&route=${encodeURIComponent(route)}&v=${selectedVariantId}`);
+        const res = await busesClient.buses(co, route, selectedVariantId);
         if (!res.ok) return;
         const body = (await res.json()) as { buses: { from: number; nextEta: string; company?: string; gps?: { lat: number; lng: number }; schedule?: boolean }[]; segSeconds: number[] };
         if (cancelled) return;

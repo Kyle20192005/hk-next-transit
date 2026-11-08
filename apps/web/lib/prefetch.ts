@@ -1,5 +1,6 @@
 'use client';
 import { defaultDir, pickVariant, sortVariants, variantsForDir, type Calendar, type RouteData } from '@hknt/core';
+import { busesClient } from './buses';
 
 /**
  * 預先 fetch（docs/realtime-backend.md 階段 0.5）：趁用戶揀緊／撳落去未放手，提早準備數據。
@@ -59,6 +60,6 @@ export function warmRoute(co: string, route: string, opts: { dir?: string | null
     const v = pickVariant(sortVariants(variantsForDir(data, dir), cal, new Date()), dir, { stopId: opts.stopId });
     if (!v) return;
     // 網址要同 StopList 一模一樣，伺服器 cache 先會命中
-    await fetch(`/api/buses?co=${co}&route=${encodeURIComponent(data.route)}&v=${v.id}`);
+    await busesClient.buses(co, data.route, v.id);
   })().catch(() => {});
 }

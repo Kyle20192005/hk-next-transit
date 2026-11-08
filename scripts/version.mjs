@@ -32,7 +32,7 @@ const next = `${maj}.${min}.${pat}`;
 
 writeFileSync(versionFile, src.replace(/APP_VERSION = '[^']+'/, `APP_VERSION = '${next}'`));
 
-for (const p of ['package.json', 'apps/web/package.json', 'apps/mobile/package.json', 'packages/core/package.json']) {
+for (const p of ['package.json', 'apps/web/package.json', 'apps/mobile/package.json', 'packages/core/package.json', 'apps/tracker/package.json']) {
   const file = join(root, p);
   const json = JSON.parse(readFileSync(file, 'utf8'));
   json.version = next;

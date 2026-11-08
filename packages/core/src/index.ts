@@ -20,3 +20,4 @@ export * from './departures';
 export * from './news';
 export * from './prefs';
 export * from './area';
+export * from './tracker-client';
