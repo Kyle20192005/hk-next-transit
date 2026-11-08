@@ -43,6 +43,12 @@ describe('createBusesClient', () => {
     await c.buses('ctb', '38', 'x');
     expect(calls.pop()).toBe('https://rt/api/buses?co=ctb&route=38&v=x');
   });
+  it('eta goes through tracker too', async () => {
+    const calls: string[] = [];
+    const c = createBusesClient({ trackerBase: 'https://rt', fallbackBase: '', fetcher: async (i) => (calls.push(String(i)), new Response('{}')) });
+    await c.eta('ctb', '101', '001152');
+    expect(calls).toEqual(['https://rt/api/eta?co=ctb&route=101&stop=001152']);
+  });
   it('without tracker uses fallback only', async () => {
     const calls: string[] = [];
     const c = createBusesClient({ trackerBase: '', fallbackBase: 'https://eta', fetcher: async (i) => (calls.push(String(i)), new Response('{}')) });

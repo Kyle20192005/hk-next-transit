@@ -1,14 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { APP_VERSION } from '@hknt/core';
+import { APP_VERSION, etasAtStopDetailed } from '@hknt/core';
 import { config } from './config';
-import { dataVersion, isCo, SAFE_ROUTE } from './data';
+import { dataVersion, getCalendar, getRoute, isCo, SAFE_ROUTE, SAFE_STOP } from './data';
 import { createLines, NotFound } from './lines';
 import { createUpstream } from './upstream';
 
 /**
  * tracker 第一版（docs/realtime-backend.md 階段 1a）：
  * 背景 poll 有人睇嘅線，用同網頁 /api/buses 一樣嘅格式俾巴士位置；所有人共用同一份上游請求。
- *   GET /api/buses?co=ctb&route=38&v=1540-1
+ *   GET /api/buses?co=ctb&route=38&v=1540-1   巴士位置
+ *   GET /api/eta?co=ctb&route=101&stop=001152  某站到站時間（同網站 /api/eta 一樣格式；追蹤緊嘅線直接用 cache，唔使再問巴士公司）
  *   GET /health
  */
 const upstream = createUpstream({ ttlMs: config.upstreamTtlMs, rps: config.upstreamRps });
@@ -43,6 +44,7 @@ const server = createServer(async (req, res) => {
         endpoints: {
           '/health': '狀態：每間公司請求數、出錯率、而家追蹤緊邊幾條線',
           '/api/buses?co=ctb&route=38&v=1000304-1': '一個走法嘅巴士位置（同網站 /api/buses 一樣格式）',
+          '/api/eta?co=ctb&route=101&stop=001152': '某路線喺某站嘅到站時間（同網站 /api/eta 一樣格式）',
         },
       });
     }
@@ -71,6 +73,19 @@ const server = createServer(async (req, res) => {
       if (!SAFE_ROUTE.test(route) || !/^[A-Za-z0-9-]{1,20}$/.test(v)) return send(req, res, 400, { error: 'route 或 v 格式唔啱' });
       const snap = await lines.get(co, route, v);
       return send(req, res, 200, snap, { 'Cache-Control': 'no-store' });
+    }
+
+    if (url.pathname === '/api/eta') {
+      const co = url.searchParams.get('co') ?? 'ctb';
+      const route = url.searchParams.get('route') ?? '';
+      const stop = url.searchParams.get('stop') ?? '';
+      if (!isCo(co)) return send(req, res, 400, { error: 'co 要係 ctb、kmb、nlb 或 mtrb' });
+      if (!SAFE_ROUTE.test(route) || !SAFE_STOP.test(stop)) return send(req, res, 400, { error: 'route 或 stop 格式唔啱' });
+      const [data, calendar] = await Promise.all([getRoute(co, route), getCalendar()]);
+      if (!data) return send(req, res, 404, { error: `搵唔到路線 ${route}` });
+      // 經 upstream（10 秒 cache）：呢條線追蹤緊嘅話，呢個站啱啱先問過，唔會再問巴士公司
+      const { etas, failed } = await etasAtStopDetailed(data, stop, calendar, upstream.fetch);
+      return send(req, res, 200, { route: data.route, stop, fetchedAt: new Date().toISOString(), etas, failed }, { 'Cache-Control': 'no-store' });
     }
 
     send(req, res, 404, { error: '冇呢個網址' });

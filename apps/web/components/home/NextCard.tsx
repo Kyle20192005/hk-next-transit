@@ -22,6 +22,7 @@ import { warmRoute } from '@/lib/prefetch';
 import { usePrefs } from '@/lib/prefs';
 import type { NearbyState, NearStop } from './Nearby';
 import { groupKey } from './nextcard-key';
+import { liveClient } from '@/lib/buses';
 
 const MAX_CARDS = 5;
 /** 載入幾多個站頭（有啲冇車，要多攞幾個先夠 5 張） */
@@ -261,7 +262,7 @@ function FavCard({ group, active }: { group: FavGroup<Favorite>; active: boolean
       group.favs.map(async (fav) => {
         if (!fav.stopId) return { fav, etas: null };
         try {
-          const res = await fetch(`/api/eta?co=${fav.co}&route=${encodeURIComponent(fav.route)}&stop=${encodeURIComponent(fav.stopId)}`);
+          const res = await liveClient.eta(fav.co, fav.route, fav.stopId);
           const body = (await res.json()) as { etas?: Eta[] };
           return { fav, etas: (body.etas ?? []).filter((e) => e.eta && e.dir === fav.dir) };
         } catch {

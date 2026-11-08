@@ -1,4 +1,5 @@
-import { computeBuses, type BusesSnapshot } from './buses';
+import { computeBuses, variantStops, type BusesResult as BusesSnapshot } from '@hknt/core';
+import { hourlyTimesFor } from './segments';
 import { config } from './config';
 import { getCalendar, getRoute, type Co } from './data';
 
@@ -33,7 +34,8 @@ export function createLines(fetcher: typeof fetch) {
       if (!data) throw new NotFound(`搵唔到路線 ${line.route}`);
       const v = data.variants.find((x) => x.id === line.variant);
       if (!v) throw new NotFound(`搵唔到走法 ${line.variant}`);
-      const snap = await computeBuses(data, v, calendar, fetcher);
+      const now = new Date();
+      const snap = await computeBuses(data, v, calendar, fetcher, await hourlyTimesFor(variantStops(v), calendar, now), now);
       line.snapshot = snap;
       line.polls++;
       line.lastError = null;

@@ -7,6 +7,7 @@ import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import { favKey, removeFavorite, useFavorites, type Favorite } from '@/lib/favorites';
 import EtaInline from '@/components/EtaInline';
+import { liveClient } from '@/lib/buses';
 
 const REFRESH_MS = 30_000;
 
@@ -78,7 +79,7 @@ function FavEtas({ f }: { f: Favorite }) {
     let cancelled = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/eta?co=${f.co}&route=${encodeURIComponent(f.route)}&stop=${encodeURIComponent(f.stopId!)}`);
+        const res = await liveClient.eta(f.co, f.route, f.stopId!);
         const body = (await res.json()) as { etas?: Eta[] };
         if (!cancelled && res.ok) setEtas((body.etas ?? []).filter((e) => e.eta && e.dir === f.dir));
       } catch {

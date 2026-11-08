@@ -75,6 +75,8 @@ function cached<T>(file: string): Promise<T | null> {
 export type Co = 'ctb' | 'kmb' | 'nlb' | 'mtrb';
 export const isCo = (x: string): x is Co => x === 'ctb' || x === 'kmb' || x === 'nlb' || x === 'mtrb';
 export const SAFE_ROUTE = /^[A-Za-z0-9]{1,6}$/;
+/** 同網頁 apps/web/lib/params.ts 一樣：城巴 6 位、九巴 16 位十六進制、新大嶼山、港鐵巴士 */
+export const SAFE_STOP = /^(\d{1,6}|[0-9A-F]{16}|[A-Z0-9]{1,6}(-[A-Z0-9]{1,3})?-[a-z]?[UD]\d{3}[A-Z]?)$/;
 
 export async function getRoute(co: Co, route: string): Promise<RouteData | null> {
   await dataVersion();

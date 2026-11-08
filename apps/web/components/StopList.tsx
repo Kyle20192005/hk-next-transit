@@ -171,7 +171,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
     let cancelled = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/eta?co=${co}&route=${encodeURIComponent(route)}&stop=${open.stopId}`);
+        const res = await busesClient.eta(co, route, open.stopId);
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? res.statusText);
         if (cancelled) return;

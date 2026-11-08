@@ -48,11 +48,14 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 帳戶（登入、收藏同步）用 Supabase 雲端版（新加坡），唔登入照用得。計劃、數據表、訊息格式、同步規則同階段：**`docs/realtime-backend.md`**。做嘅時候照住佢，改咗設計就更新嗰份文件。
 
 已經做咗（2026-11-08，部署步驟 **`deploy/README.md`**）：
-- `apps/tracker`：巴士位置後端第一版，`GET /api/buses`（同網頁一樣格式）+ `/health`。有人問先計，背景每 15 秒 poll，3 分鐘冇人問就停；
-  上游 fetch 包一層（10 秒 cache、合併同時請求、全局限流 `UPSTREAM_RPS`、每間公司統計）；`node dist/probe.js` 量上游上限。
-  計位置邏輯同網頁 `/api/buses` 一樣（`src/buses.ts`），改一邊要改埋另一邊。esbuild 連 core 打包，Docker 唔使 node_modules。
-- 前端：core `createBusesClient`。網頁 `NEXT_PUBLIC_TRACKER_URL`（`lib/buses.ts`）、App `EXPO_PUBLIC_TRACKER_URL`（`lib/api.ts`）；
-  冇設定就用 `/api/buses`；tracker 出錯或超時 5 秒自動退返，60 秒後再試。
+- **分工**：前端（網頁、App）只負責顯示同互動，**從來唔直接問巴士公司**。實時巴士數據（巴士位置 `/api/buses`、某站到站時間 `/api/eta`）
+  一律先問 **tracker**，出錯先退返 Vercel 同名 API（core `createLiveClient`；網頁 `lib/buses.ts` 嘅 `liveClient`、`NEXT_PUBLIC_TRACKER_URL`；
+  App `lib/api.ts`，預設 `https://rt.kyle05.dev`，`EXPO_PUBLIC_TRACKER_URL` 可改、空白 = 唔用）。超時 5 秒只係今次用後備；連唔到或 5xx 先停用 60 秒。
+  其他（路線資料、附近、`/api/here`、`/api/stop-etas`、消息）暫時留 Vercel（分散 IP）。
+- `apps/tracker`：`GET /api/buses`、`/api/eta`（同 Vercel 一樣格式）、`/health`、`/`。有人問先計，背景每 15 秒 poll，3 分鐘冇人問就停；
+  上游 fetch 包一層（10 秒 cache、合併同時請求、限流 `UPSTREAM_RPS` 每個伺服器各自計、每間公司統計）；`node dist/probe.js` 量上游上限。
+  打開追蹤緊嘅線嘅站，`/api/eta` 直接用 cache，唔會再問巴士公司。計巴士位置用 core `computeBuses`（`live.ts`），Vercel 同 tracker 共用，
+  兩邊只係各自載入實測行車時間檔（網頁 `lib/journey.ts`、tracker `src/segments.ts`）。esbuild 連 core 打包，Docker 唔使 node_modules。
 - `deploy/pipeline/`：每日 04:17 數據更新容器（取代 GitHub Actions），每次 clone 最新 main；要 `GITHUB_TOKEN`（Contents 讀寫）、`DATA_REPO`。
 - 已部署：tracker `https://rt.kyle05.dev`（VPS 嘅 80／443 係 Moodle 嘅 Caddy，HTTPS 由佢 reverse_proxy，Dokploy 唔設 Domain）；
   pipeline 每日 04:17。data.gov.hk 同一個 IP 問得太密會 403：pipeline `RT_RPS`（每秒 8）、tracker `UPSTREAM_RPS` 每個伺服器各自計。
