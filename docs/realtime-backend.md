@@ -289,7 +289,7 @@ create table segment_times (
   App 用 `expo-apple-authentication`、Google 用 Supabase OAuth（`expo-auth-session`／`expo-web-browser`）；用之前睇 Expo SDK 58 文件。
 - **刪除帳戶**：App 入面要有（App Store、Google Play 都要求），刪埋所有用戶數據。
 - **私隱政策頁**：上架前要有，寫明存咩（電郵、收藏、設定）、存喺邊（Supabase 新加坡）、點刪。
-- **唔存位置**：定位只喺部機用，唔上傳。
+- **帳戶唔存位置**：定位只喺部機用，唔連帳戶上傳。（`docs/data-analytics.md` D5 嘅上車 GPS 要另外同意、唔連帳戶。）
 
 表（全部開 RLS：`user_id = auth.uid()` 先讀寫得）：
 
@@ -418,15 +418,9 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
 - [ ] 用戶喺打開咗嘅站設「仲有 N 分鐘提我」；tracker 每輪計完檢查，經 Expo 推送服務發出
 - [ ] 一次性提醒，發咗就刪；冇人睇嘅線都要 poll（計入全局限流）
 
-### 階段 2：記憶同過站紀錄
-- [ ] 虛擬車輛 ID（跨輪配對同一架車）
-- [ ] 用實測車速推位置；過站偵測寫入 `trips`
-- [ ] 驗收：抽 5 條線，比較推算位置同實際到站時間，誤差要細過而家
-
-### 階段 3：自己嘅行車時間
-- [ ] aggregator 每小時由 `trips` 計 `segment_times`
-- [ ] tracker 同 pipeline 優先用自己嘅實測
-- [ ] 驗收：樣本夠嘅段，用自己數據計嘅「+N 分」同實際到站時間比較，誤差要細過 hk-bus-time-between-stops
+### 階段 2、3：記錄、分析、前後端合作提高準確度 → **`docs/data-analytics.md`**
+2026-11-08 用戶方向：前端同後端互相合作，增加準確度同做大數據分析。原本嘅「過站紀錄」「自己嘅行車時間」併入嗰份文件
+（D1 記錄巴士公司 ETA → 實際到站、ETA 誤差、行車時間；D2 匿名使用紀錄；D3 乘客回報；D4 改善顯示；D5 上車 GPS）。
 
 ### 階段 4：數據庫做主要數據來源
 - [ ] pipeline 寫入 Postgres；Dokploy 排程取代 GitHub Actions
