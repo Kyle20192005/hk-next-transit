@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lastBusAt, lastBusText } from './schedule';
+import { lastBusAt, lastBusEtaIndex, lastBusText } from './schedule';
 import type { Calendar, Variant } from './types';
 
 // 每日都有嘅服務
@@ -13,7 +13,7 @@ describe('lastBusAt', () => {
   it('before last bus', () => {
     // 尾班 23:30 由總站開，去 B 站要 10 分鐘 → 23:40
     const info = lastBusAt([v([360, 1410])], 'B', 'O', calendar, hk(20));
-    expect(info).toEqual({ last: hk(23, 40), nextFirst: null });
+    expect(info).toEqual({ last: hk(23, 40), nextFirst: null, prev: hk(6, 10) });
     expect(lastBusText(info, hk(20))).toEqual({ text: '尾班約 23:40', urgent: false, gone: false });
     expect(lastBusText(info, hk(23, 20))).toEqual({ text: '尾班約 23:40 · 仲有 20 分鐘', urgent: true, gone: false });
   });
@@ -33,5 +33,36 @@ describe('lastBusAt', () => {
   it('uses latest across variants', () => {
     const info = lastBusAt([v([360, 1300]), v([400, 1380], 300)], 'B', 'O', calendar, hk(12));
     expect(info?.last).toBe(hk(23, 5));
+  });
+});
+
+describe('lastBusEtaIndex', () => {
+  // 時間表：23:00、23:30 開出，去 B 站 10 分鐘 → 23:10、23:40（尾班）
+  const info = lastBusAt([v([360, 1380, 1410])], 'B', 'O', calendar, hk(23));
+  const iso = (t: number) => new Date(t + 8 * 3600_000).toISOString().replace('Z', '+08:00');
+  const eta = (t: number, company: 'CTB' | 'KMB' = 'CTB') => ({ eta: iso(t), company });
+  it('marks the latest real-time bus near the timetable last', () => {
+    expect(info?.prev).toBe(hk(23, 10));
+    expect(lastBusEtaIndex([eta(hk(23, 12)), eta(hk(23, 43))], info)).toBe(1);
+    // 次序唔重要：揀最遲嗰班
+    expect(lastBusEtaIndex([eta(hk(23, 43), 'KMB'), eta(hk(23, 12))], info)).toBe(0);
+  });
+  it('not when the latest is closer to the previous bus', () => {
+    expect(lastBusEtaIndex([eta(hk(23, 5)), eta(hk(23, 14))], info)).toBe(-1);
+  });
+  it('not when too far from the timetable', () => {
+    expect(lastBusEtaIndex([eta(hk(23, 59))], info)).toBe(-1);
+    expect(lastBusEtaIndex([], info)).toBe(-1);
+    expect(lastBusEtaIndex([eta(hk(23, 40))], null)).toBe(-1);
+  });
+  it('company already gave 3 buses: later ones may be hidden', () => {
+    const three = [eta(hk(23, 12)), eta(hk(23, 20)), eta(hk(23, 33))];
+    expect(lastBusEtaIndex(three, { ...info!, prev: null })).toBe(-1);
+    expect(lastBusEtaIndex([eta(hk(23, 12)), eta(hk(23, 20)), eta(hk(23, 39))], { ...info!, prev: null })).toBe(2);
+  });
+  it('delayed last bus after the estimated time still counts', () => {
+    const late = lastBusAt([v([360, 1380, 1410])], 'B', 'O', calendar, hk(23, 45));
+    expect(lastBusEtaIndex([eta(hk(23, 50))], late)).toBe(0);
+    expect(lastBusText(late, hk(23, 45), hk(23, 50))).toEqual({ text: '尾班車 23:50 · 仲有 5 分鐘', urgent: true, gone: false });
   });
 });

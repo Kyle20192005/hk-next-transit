@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { COMPANIES, formatDistance, lastBusText, shortName, type Company, type Eta, type LastBus } from '@hknt/core';
+import { COMPANIES, formatDistance, lastBusEtaIndex, lastBusText, shortName, type Company, type Eta, type LastBus } from '@hknt/core';
 import { tabular, useTheme } from '@/lib/theme';
 import { useFavorite, type Favorite } from '@/lib/favorites';
 import { BusGlyph, Icon } from './Icon';
@@ -58,11 +58,13 @@ const hhmm = (ms: number) => new Date(ms).toLocaleTimeString('zh-HK', { timeZone
 export const StopRow = memo(function StopRow(p: Props) {
   const t = useTheme();
   const [height, setHeight] = useState(54);
-  const list = p.etas?.map((e, i) => ({ e, where: p.whereLabels?.[i] ?? null })) ?? null;
+  // 尾班車：實時班次入面認到邊班係尾班就標「尾班」，提示行改用實時時間（同網頁一樣）
+  const lastIdx = p.etas && p.lastBus ? lastBusEtaIndex(p.etas, p.lastBus) : -1;
+  const list = p.etas?.map((e, i) => ({ e, where: p.whereLabels?.[i] ?? null, isLast: i === lastIdx })) ?? null;
   const isMine = (e: Eta) => !p.selectedVariantId || !e.variant?.variantId || e.variant.variantId === p.selectedVariantId;
   const next = list?.find((x) => isMine(x.e)) ?? null;
   const rest = list?.filter((x) => x !== next) ?? [];
-  const last = lastBusText(p.lastBus, p.now);
+  const last = lastBusText(p.lastBus, p.now, lastIdx >= 0 ? Date.parse(p.etas![lastIdx]!.eta!) : null);
   const minsOf = (e: Eta) => Math.max(0, Math.round((Date.parse(e.eta!) - p.now) / 60000));
   // 設定「到站時間顯示」：鐘數模式大字係鐘數，旁邊細字先係分鐘
   const clock = usePrefs().etaFormat === 'clock';
@@ -175,14 +177,14 @@ export const StopRow = memo(function StopRow(p: Props) {
                   )}
                 </Text>
                 <Text style={{ color: t.muted, fontSize: 15, ...tabular }}>{clock && minsOf(next.e) > 0 ? `${minsOf(next.e)} 分鐘` : next.e.eta!.slice(11, 16)}</Text>
-                <EtaTags e={next.e} multiCompany={p.multiCompany} />
+                <EtaTags e={next.e} multiCompany={p.multiCompany} isLast={next.isLast} />
               </View>
             </View>
           )}
           {next?.where && <Text style={{ fontSize: 14, fontWeight: '600', color: t.text }}>{next.where}</Text>}
           {rest.length > 0 && (
             <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: t.line, gap: 6 }}>
-              {rest.map(({ e, where }, i) => {
+              {rest.map(({ e, where, isLast }, i) => {
                 const v = e.variant;
                 const other = !isMine(e);
                 return (
@@ -190,7 +192,7 @@ export const StopRow = memo(function StopRow(p: Props) {
                     <Text style={{ width: 52, fontSize: 17, fontWeight: '700', color: t.text, ...tabular }}>{minsOf(e) === 0 ? '即將' : clock ? e.eta!.slice(11, 16) : `${minsOf(e)} 分`}</Text>
                     <Text style={{ width: 44, fontSize: 13, color: t.muted, ...tabular }}>{clock && minsOf(e) > 0 ? `${minsOf(e)} 分` : e.eta!.slice(11, 16)}</Text>
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                      <EtaTags e={e} multiCompany={p.multiCompany} />
+                      <EtaTags e={e} multiCompany={p.multiCompany} isLast={isLast} />
                       {other && v?.name && <Pill label={`${v.special ? shortName({ name: v.name }) : '正常路線'}${v.confidence === 'likely' ? '（推斷）' : ''}`} special={v.special} />}
                       {where && (
                         <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 13, color: t.muted }}>
@@ -231,9 +233,15 @@ export const StopRow = memo(function StopRow(p: Props) {
   );
 });
 
-function EtaTags({ e, multiCompany }: { e: Eta; multiCompany: boolean }) {
+function EtaTags({ e, multiCompany, isLast = false }: { e: Eta; multiCompany: boolean; isLast?: boolean }) {
+  const t = useTheme();
   return (
     <>
+      {isLast && (
+        <Text accessibilityLabel="尾班車" style={{ fontSize: 11, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, overflow: 'hidden', backgroundColor: t.specialSoft, color: t.special }}>
+          尾班
+        </Text>
+      )}
       {multiCompany && <CompanyTag companies={[e.company]} compact />}
       {e.scheduled && <ScheduledTag />}
     </>

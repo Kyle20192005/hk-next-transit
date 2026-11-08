@@ -1,6 +1,6 @@
 'use client';
 import { forwardRef } from 'react';
-import { formatDistance, lastBusText, shortName, type Eta, type LastBus } from '@hknt/core';
+import { formatDistance, lastBusEtaIndex, lastBusText, shortName, type Eta, type LastBus } from '@hknt/core';
 import BusIcon from './BusIcon';
 import CompanyTag from './CompanyTag';
 import { COMPANIES } from '@/lib/company';
@@ -77,12 +77,14 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
   { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, lastBus, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav, here },
   ref,
 ) {
-  const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null })) ?? null;
+  // 尾班車：實時班次入面認到邊班係尾班就標「尾班」，提示行改用實時時間
+  const lastIdx = etas && lastBus ? lastBusEtaIndex(etas, lastBus) : -1;
+  const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null, isLast: i === lastIdx })) ?? null;
   // 下一班：揀咗嘅走法（或者推斷唔到走法）最早嗰班；其餘列喺下面
   const isMine = (e: Eta) => !selectedVariantId || !e.variant?.variantId || e.variant.variantId === selectedVariantId;
   const next = list?.find((x) => isMine(x.e)) ?? null;
   const rest = list?.filter((x) => x !== next) ?? [];
-  const last = lastBusText(lastBus, now);
+  const last = lastBusText(lastBus, now, lastIdx >= 0 ? Date.parse(etas![lastIdx]!.eta!) : null);
   const minsOf = (e: Eta) => Math.max(0, Math.round((Date.parse(e.eta!) - now) / 60000));
   // 設定「到站時間顯示」：鐘數模式大字係鐘數，旁邊細字先係分鐘
   const clock = usePrefs().etaFormat === 'clock';
@@ -139,13 +141,13 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                 )}
               </span>
               <span className="eta-time">{clock ? (minsOf(next.e) === 0 ? next.e.eta!.slice(11, 16) : `${minsOf(next.e)} 分鐘`) : next.e.eta!.slice(11, 16)}</span>
-              <EtaTags e={next.e} multiCompany={multiCompany} />
+              <EtaTags e={next.e} multiCompany={multiCompany} isLast={next.isLast} />
               {next.where && <span className="where">{next.where}</span>}
             </div>
           )}
           {rest.length > 0 && (
             <ul className="eta-more">
-              {rest.map(({ e, where }, i) => {
+              {rest.map(({ e, where, isLast }, i) => {
                 const v = e.variant;
                 const other = !isMine(e);
                 return (
@@ -154,7 +156,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                     <span className="eta-time">{clock ? (minsOf(e) === 0 ? e.eta!.slice(11, 16) : `${minsOf(e)} 分`) : e.eta!.slice(11, 16)}</span>
                     {/* 第三欄：公司、原定、走法、位置包埋一格，太長喺格入面斷行，唔會走去分鐘下面 */}
                     <span className="eta-meta">
-                      <EtaTags e={e} multiCompany={multiCompany} />
+                      <EtaTags e={e} multiCompany={multiCompany} isLast={isLast} />
                       {/* 揀咗嘅走法唔使再標；其他走法先標出嚟 */}
                       {other && v?.name && (
                         <span className={`badge${v.special ? ' special' : ''}`} title={v.reason}>
@@ -197,9 +199,14 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
 export default StopRow;
 
 /** 班次標籤：聯營線標公司；九巴「原定班次」標「原定」（時間表時間，唔係實時） */
-function EtaTags({ e, multiCompany }: { e: Eta; multiCompany: boolean }) {
+function EtaTags({ e, multiCompany, isLast = false }: { e: Eta; multiCompany: boolean; isLast?: boolean }) {
   return (
     <>
+      {isLast && (
+        <span className="last-tag" title="尾班車（按時間表估算邊班係尾班）">
+          尾班
+        </span>
+      )}
       {multiCompany && <CompanyTag company={e.company} compact />}
       {e.scheduled && (
         <span className="scheduled" title="原定班次：時間表時間，唔係實時">

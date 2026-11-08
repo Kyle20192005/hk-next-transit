@@ -1,4 +1,4 @@
-import type { Calendar, Variant } from './types';
+import type { Calendar, Eta, Variant } from './types';
 import { addDays, hkParts } from './time';
 
 /** 某一日（香港時間）有效嘅 serviceId */
@@ -139,6 +139,8 @@ export interface LastBus {
   last: number | null;
   /** 尾班過咗之後，下一班（頭班）幾時到（毫秒）；未過尾班就 null */
   nextFirst: number | null;
+  /** 尾班前一班（同一服務日，毫秒）：用嚟分實時班次邊班先係尾班（`lastBusEtaIndex`） */
+  prev?: number | null;
 }
 
 /**
@@ -166,10 +168,13 @@ export function lastBusAt(variants: Variant[], stopId: string, dir: string, cale
   if (!any) return null;
   const max = (xs: number[]) => (xs.length ? Math.max(...xs) : null);
   const lastYesterday = max(perDay[0]!);
-  const last = lastYesterday !== null && lastYesterday > now ? lastYesterday : max(perDay[1]!);
-  if (last !== null && last > now) return { last, nextFirst: null };
+  const day = lastYesterday !== null && lastYesterday > now ? perDay[0]! : perDay[1]!;
+  const last = max(day);
+  // 前一班：早過尾班 1 分鐘以上（唔同走法同一時間開出當同一班）
+  const prev = last === null ? null : max(day.filter((t) => t < last - 60_000));
+  if (last !== null && last > now) return { last, nextFirst: null, prev };
   const upcoming = perDay.flat().filter((t) => t > now);
-  return { last, nextFirst: upcoming.length ? Math.min(...upcoming) : null };
+  return { last, nextFirst: upcoming.length ? Math.min(...upcoming) : null, prev };
 }
 
 /** 香港時間 HH:MM */
@@ -178,14 +183,48 @@ const clock = (t: number) => {
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 };
 
+/** 實時班次同時間表尾班最多相差幾耐都當係同一班（時間表到中途站係估算，夜晚塞車少，15 分鐘夠） */
+const LAST_BUS_TOLERANCE_MS = 15 * 60_000;
+
+/**
+ * 實時班次入面邊一班係尾班車（index；認唔到 -1）。
+ * 用最遲嗰班實時班次：同時間表尾班相差 15 分鐘內，而且近尾班多過近前一班（`prev`）先算。
+ * 營辦商每間公司最多俾 3 班：嗰間已經 3 班，後面可能仲有車未列出，所以要差唔多到估計嘅尾班（2 分鐘內或者更遲）先算。
+ * 尾班過咗估計時間但仲有實時班次（例如遲咗）都認得。
+ */
+export function lastBusEtaIndex(etas: readonly Pick<Eta, 'eta' | 'company'>[], info: LastBus | null): number {
+  if (!info || info.last === null) return -1;
+  let idx = -1;
+  let latest = -Infinity;
+  etas.forEach((e, i) => {
+    const t = e.eta ? Date.parse(e.eta) : NaN;
+    if (t > latest) {
+      latest = t;
+      idx = i;
+    }
+  });
+  if (idx < 0) return -1;
+  const diff = latest - info.last;
+  if (Math.abs(diff) > LAST_BUS_TOLERANCE_MS) return -1;
+  if (info.prev != null && Math.abs(latest - info.prev) <= Math.abs(diff)) return -1;
+  const co = etas[idx]!.company;
+  if (etas.filter((e) => e.eta && e.company === co).length >= 3 && diff < -2 * 60_000) return -1;
+  return idx;
+}
+
 /**
  * 尾班車提示文字：
  * - 尾班未到：「尾班約 23:45」；30 分鐘內「尾班約 23:45 · 仲有 12 分鐘」（urgent）
  * - 過咗：「今日已經冇車 · 下次頭班約 06:10」（聽日嘅加「聽日」）
- * 時間係時間表估算，所以寫「約」。
+ * 時間係時間表估算，所以寫「約」；有 `actual`（`lastBusEtaIndex` 認到嗰班嘅實時時間）就用實時：「尾班車 00:00 · 仲有 27 分鐘」（嗰班同時標「尾班」）。
  */
-export function lastBusText(info: LastBus | null, now: number): { text: string; urgent: boolean; gone: boolean } | null {
+export function lastBusText(info: LastBus | null, now: number, actual?: number | null): { text: string; urgent: boolean; gone: boolean } | null {
   if (!info) return null;
+  // 認到邊班實時班次係尾班：用實時時間（唔再寫「約」）
+  if (actual != null && actual > now) {
+    const mins = Math.round((actual - now) / 60_000);
+    return { text: `尾班車 ${clock(actual)}${mins <= 30 ? ` · 仲有 ${mins} 分鐘` : ''}`, urgent: mins <= 30, gone: false };
+  }
   if (info.last !== null && info.last > now) {
     const mins = Math.round((info.last - now) / 60_000);
     return mins <= 30
