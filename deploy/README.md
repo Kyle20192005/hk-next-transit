@@ -102,7 +102,8 @@ data.gov.hk 冇公開請求上限，全部請求由 VPS 一個 IP 發出。喺 t
 node dist/probe.js
 ```
 
-由每秒 5 個開始，每級 30 秒逐級加，一出錯或者 429／403 就停，最後話你 `UPSTREAM_RPS` 設幾多。
+四間公司一齊試，按伺服器分開計（`rt.data.gov.hk` = 城巴＋新大嶼山＋港鐵巴士；`data.etabus.gov.hk` = 九巴），兩部同時問；
+每個網址只問一次（唔會撞中 cache）。由每秒 5 個開始，每級 30 秒逐級加，任何一部出錯或者 429／403 就停，最後話你 `UPSTREAM_RPS` 設幾多。
 預設最多試到每秒 20 個（`PROBE_MAX_RPS=40 node dist/probe.js` 可以試高啲）。揀夜晚人少嗰陣跑。
 結果記入 `docs/realtime-backend.md`。
 
