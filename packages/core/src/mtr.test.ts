@@ -59,3 +59,30 @@ describe('mtr map', () => {
     expect(adm.lines.sort()).toEqual(['EAL', 'ISL', 'SIL', 'TWL']);
   });
 });
+
+describe('mtr map geometry', () => {
+  const dist = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!);
+  it('every station sits on its own line, away from corners (so bends can be rounded)', () => {
+    for (const l of MTR_MAP_LINES) {
+      for (const [code, p] of Object.entries(l.stations)) {
+        const segs = l.paths.flatMap((path) => path.slice(1).map((b, i) => [path[i]!, b] as const));
+        const on = segs.some(([a, b]) => Math.abs(dist(a, p) + dist(p, b) - dist(a, b)) < 0.01);
+        expect(on, `${l.line} ${code} on line`).toBe(true);
+        for (const path of l.paths)
+          for (let i = 1; i < path.length - 1; i++) {
+            // 支綫起點（例如上水）喺主綫中間，唔當轉角
+            const d = dist(path[i]!, p);
+            expect(d === 0 || d >= 0.3, `${l.line} ${code} too close to corner ${path[i]}`).toBe(true);
+          }
+      }
+    }
+  });
+  it('interchange points line up horizontally or vertically', () => {
+    for (const s of mtrMapStations()) {
+      if (s.pts.length < 2) continue;
+      const sameX = s.pts.every((p) => Math.abs(p[0] - s.pts[0]![0]) < 1e-9);
+      const sameY = s.pts.every((p) => Math.abs(p[1] - s.pts[0]![1]) < 1e-9);
+      expect(sameX || sameY, `${s.code} ${JSON.stringify(s.pts)}`).toBe(true);
+    }
+  });
+});
