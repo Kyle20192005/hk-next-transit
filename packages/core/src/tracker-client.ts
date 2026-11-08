@@ -7,6 +7,13 @@
 export const busesPath = (co: string, route: string, variantId: string) =>
   `/api/buses?co=${co}&route=${encodeURIComponent(route)}&v=${encodeURIComponent(variantId)}`;
 
+/**
+ * 「一個站所有路線」同「喺度搭得、首頁下班車」要唔要經 tracker。
+ * 2026-11-08 實測：首頁一次問 8 個站頭，中環一個位置要成 90 個上游請求；tracker UPSTREAM_RPS=8 頂唔順，
+ * 結果兩邊都做一次（浪費一倍）。量完 data.gov.hk 上限、調高 UPSTREAM_RPS 之後先改 true（tracker 已經有呢兩個 API）。
+ */
+export const AREA_ETAS_VIA_TRACKER = false;
+
 export const etaPath = (co: string, route: string, stopId: string) =>
   `/api/eta?co=${co}&route=${encodeURIComponent(route)}&stop=${encodeURIComponent(stopId)}`;
 
@@ -22,6 +29,8 @@ export function createLiveClient(opts: {
   timeoutMs?: number;
   downMs?: number;
   now?: () => number;
+  /** 覆蓋 AREA_ETAS_VIA_TRACKER（測試用） */
+  areaViaTracker?: boolean;
 }) {
   const f = opts.fetcher ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
   const tracker = opts.trackerBase?.replace(/\/+$/, '') || null;
@@ -75,15 +84,18 @@ export function createLiveClient(opts: {
     });
   }
 
+  // 一次問好多個站嘅（附近、喺度搭得）：AREA_ETAS_VIA_TRACKER 未開就直接用後備
+  const area = (path: string) => (opts.areaViaTracker ?? AREA_ETAS_VIA_TRACKER ? get(path) : f(`${opts.fallbackBase}${path}`));
+
   return {
     /** 成條線嘅巴士位置；回傳 Response（同 fetch 一樣用） */
     buses: (co: string, route: string, variantId: string) => get(busesPath(co, route, variantId)),
     /** 某路線喺某站嘅到站時間（tracker 追蹤緊呢條線就直接用佢 cache 住嘅，唔使再問巴士公司） */
     eta: (co: string, route: string, stopId: string) => get(etaPath(co, route, stopId)),
     /** 一個站所有路線嘅下一兩班（附近車站） */
-    stopEtas: (co: string, stopId: string) => get(`/api/stop-etas?co=${co}&stop=${encodeURIComponent(stopId)}`),
+    stopEtas: (co: string, stopId: string) => area(`/api/stop-etas?co=${co}&stop=${encodeURIComponent(stopId)}`),
     /** 呢個位置可以搭嘅所有路線（喺度搭得、首頁下班車） */
-    here: (lat: number, lng: number) => get(`/api/here?lat=${lat}&lng=${lng}`),
+    here: (lat: number, lng: number) => area(`/api/here?lat=${lat}&lng=${lng}`),
     /** 而家係咪用緊 tracker（除錯用） */
     usingTracker: () => Boolean(tracker) && now() >= downUntil,
   };

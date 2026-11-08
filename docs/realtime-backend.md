@@ -387,8 +387,10 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
       前端（網頁、App）所有「某站到站時間」同巴士位置一律 tracker 優先、Vercel 後備（core `createLiveClient`）
 - [x] 計巴士位置搬入 core `computeBuses`（Vercel 同 tracker 共用，唔再抄兩份）
 - [x] App 預設用 tracker（`https://rt.kyle05.dev`）
-- [x] 附近（`/api/stop-etas`）、喺度搭得同首頁下班車（`/api/here`）都經 tracker（2026-11-08）：低優先 + 太忙回 503 → 前端用 Vercel；
-      邏輯搬入 core `stop-live.ts`。實時巴士數據全部由 tracker 負責，Vercel 只係後備同靜態數據
+- [x] tracker 加 `/api/stop-etas`、`/api/here`（低優先；一俾人話忙成個請求即刻 503）；邏輯搬入 core `stop-live.ts`（Vercel 同 tracker 共用）
+- [ ] 前端改經 tracker：**暫時關**（`AREA_ETAS_VIA_TRACKER = false`）。2026-11-08 正式環境實測：首頁一次 8 個站頭，
+      中環一個位置要成 90 個上游請求，`UPSTREAM_RPS=8` 下 tracker 排隊十幾秒，前端 1.5 秒後同時問 Vercel → 兩邊都做（浪費一倍）。
+      量完上限、調高 `UPSTREAM_RPS` 再開；或者先做「九巴成條線一次過」同按站合併請求，減少每個位置要問幾多次
 - 之後：九巴改用 `route-eta`（成條線一次）代替逐站，請求量大減
 
 ### 階段 1b：WebSocket 推送

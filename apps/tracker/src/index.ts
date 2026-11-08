@@ -95,7 +95,10 @@ const server = createServer(async (req, res) => {
     // 附近、喺度搭得：一次問好多個站，用低優先；tracker 忙就回 503，前端改問 Vercel（唔好俾用戶見到唔完整嘅「冇班次」）
     if (url.pathname === '/api/stop-etas' || url.pathname === '/api/here') {
       let busy = false;
-      const deps: StopLiveDeps = { getRoute, getIndex, getAllStops, fetcher: upstream.lowFetch(() => (busy = true)) };
+      const low = upstream.lowFetch(() => (busy = true));
+      // 一俾人話忙就成個請求放棄（唔好再排其他站），即刻回 503
+      const fetcher: typeof fetch = (input, init) => (busy ? Promise.reject(new BusyError()) : low(input, init));
+      const deps: StopLiveDeps = { getRoute, getIndex, getAllStops, fetcher };
       let body: unknown;
       if (url.pathname === '/api/stop-etas') {
         const co = url.searchParams.get('co') ?? 'ctb';
