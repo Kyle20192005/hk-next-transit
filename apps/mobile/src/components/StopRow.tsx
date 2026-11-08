@@ -1,9 +1,9 @@
 import { memo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { COMPANIES, formatDistance, lastBusText, shortName, type Company, type Eta, type LastBus } from '@hknt/core';
+import { COMPANIES, formatDistance, lastBusText, updatedAgo, shortName, type Company, type Eta, type LastBus } from '@hknt/core';
 import { tabular, useTheme } from '@/lib/theme';
 import { useFavorite, type Favorite } from '@/lib/favorites';
-import { BusGlyph, Icon } from './Icon';
+import { BusGlyph, Icon, type IconName } from './Icon';
 import { CompanyTag, Pill, ScheduledTag } from './ui';
 import { HereButton, type HereTarget } from './HereSheet';
 import { usePrefs } from '@/lib/prefs';
@@ -49,6 +49,18 @@ type Props = {
   fav: Omit<Favorite, 'at'> | null;
   /** 「喺度搭得」：呢個站嘅位置同而家睇緊嘅路線 */
   here: HereTarget | null;
+  /** 落車站（同網頁一樣）：揀緊時下面嘅站撳得；呢個站係落車站；打開咗嘅站嘅摘要 */
+  pickable: boolean;
+  isAlight: boolean;
+  alight: { name: string; summary: string } | null;
+  picking: boolean;
+  onPickAlight: () => void;
+  onClearAlight: () => void;
+  /** 到站時間幾時攞到；clockNow 每 5 秒更新 */
+  updatedAt: number | null;
+  clockNow: number;
+  onRefresh: () => void;
+  onShare: () => void;
 };
 
 const SEQ_W = 34;
@@ -74,7 +86,7 @@ export const StopRow = memo(function StopRow(p: Props) {
   const clock = usePrefs().etaFormat === 'clock';
 
   return (
-    <View onLayout={(e) => setHeight(e.nativeEvent.layout.height)} style={{ backgroundColor: p.open ? t.brandSoft : 'transparent' }}>
+    <View onLayout={(e) => setHeight(e.nativeEvent.layout.height)} style={{ backgroundColor: p.open || p.isAlight ? t.brandSoft : p.pickable ? t.surface2 : 'transparent' }}>
       {/* 豎線：畫喺成個站嘅高度（連打開咗嘅到站時間），行與行之間唔會斷 */}
       <View
         style={{
@@ -144,6 +156,11 @@ export const StopRow = memo(function StopRow(p: Props) {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingLeft: 6, paddingRight: 8, paddingVertical: 1, borderRadius: 999, backgroundColor: t.brand }}>
                 <Icon name="pin" size={12} color={t.onBrand} />
                 <Text style={{ fontSize: 12, fontWeight: '700', color: t.onBrand, ...tabular }}>最近 · {formatDistance(p.nearestMetres)}</Text>
+              </View>
+            )}
+            {p.isAlight && (
+              <View style={{ paddingHorizontal: 8, paddingVertical: 1, borderRadius: 999, backgroundColor: t.brand }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: t.onBrand }}>落車</Text>
               </View>
             )}
           </View>
@@ -224,6 +241,32 @@ export const StopRow = memo(function StopRow(p: Props) {
               <Text style={{ flex: 1, fontSize: last.gone ? 15 : 13, fontWeight: '600', color: last.urgent ? t.special : last.gone ? t.text : t.muted }}>{last.text}</Text>
             </View>
           )}
+          {/* 落車站摘要（同網頁一樣） */}
+          {p.alight && !p.picking && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, backgroundColor: t.card }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: t.text }}>落車：{p.alight.name}</Text>
+                <Text style={{ fontSize: 13, color: t.muted, ...tabular }}>{p.alight.summary}</Text>
+              </View>
+              <Pressable onPress={p.onClearAlight} accessibilityLabel="取消落車站" hitSlop={6} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
+                <Icon name="close" size={16} color={t.muted} />
+              </Pressable>
+            </View>
+          )}
+          {p.picking && (
+            <View style={{ marginTop: 10, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: t.accent, alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>撳下面一個站做落車站</Text>
+            </View>
+          )}
+          {p.updatedAt !== null && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <Text style={{ fontSize: 12, color: t.muted }}>{updatedAgo(p.updatedAt, Math.max(p.clockNow, p.updatedAt))}</Text>
+              <Pressable onPress={p.onRefresh} hitSlop={8} accessibilityRole="button" accessibilityLabel="重新整理到站時間" style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <Icon name="refresh" size={14} color={t.accent} />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: t.accent }}>重新整理</Text>
+              </Pressable>
+            </View>
+          )}
           {p.failed.length > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, padding: 8, borderRadius: 10, backgroundColor: t.specialSoft }}>
               <Icon name="warning" size={16} color={t.special} />
@@ -237,6 +280,8 @@ export const StopRow = memo(function StopRow(p: Props) {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
               {p.here && <HereButton target={p.here} />}
               {p.fav && <FavStop target={p.fav} />}
+              {p.fav && <ChipButton icon="pin" label={p.picking ? '取消揀落車站' : p.alight ? '改落車站' : '揀落車站'} on={p.picking} onPress={p.onPickAlight} />}
+              <ChipButton icon="share" label="分享" onPress={p.onShare} />
             </View>
           )}
         </View>
@@ -257,6 +302,22 @@ function EtaTags({ e, multiCompany, isLast = false }: { e: Eta; multiCompany: bo
       {multiCompany && <CompanyTag companies={[e.company]} compact />}
       {e.scheduled && <ScheduledTag />}
     </>
+  );
+}
+
+/** 動作列細掣（同「收藏呢個站」一樣樣） */
+function ChipButton({ icon, label, onPress, on = false }: { icon: IconName; label: string; onPress: () => void; on?: boolean }) {
+  const t = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: on ? t.brand : t.line, backgroundColor: on ? t.brand : t.card }}
+    >
+      <Icon name={icon} size={16} color={on ? t.onBrand : t.accent} />
+      <Text style={{ fontSize: 13, fontWeight: '700', color: on ? t.onBrand : t.accent }}>{label}</Text>
+    </Pressable>
   );
 }
 

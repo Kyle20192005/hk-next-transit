@@ -16,6 +16,8 @@ export interface VariantItem {
   statusShort: string;
   /** 例如「今日 06:00–09:54 由總站開出」 */
   window: string | null;
+  /** 全程大約幾多分鐘（core routeMinutes） */
+  duration?: number | null;
 }
 
 /** 走法選擇：平時只顯示揀咗嘅走法，撳先展開（蓋住地圖，唔會推郁版面） */
@@ -86,6 +88,7 @@ function Row({ item, n, compact = false }: { item: VariantItem; n: number; compa
         <span className="variant-line">
           <strong className={item.special ? 'special' : undefined}>{item.label}</strong>
           <span className={`variant-status ${item.running ? 'running' : item.unknown ? 'unknown' : 'idle'}`}>{item.statusShort}</span>
+          {item.duration ? <span className="variant-duration">全程約 {item.duration} 分</span> : null}
         </span>
       </>
     );
@@ -99,7 +102,11 @@ function Row({ item, n, compact = false }: { item: VariantItem; n: number; compa
           <strong>{item.label}</strong>
         </span>
         <span className={`variant-status ${item.running ? 'running' : item.unknown ? 'unknown' : 'idle'}`}>{item.status}</span>
-        {item.window && <span className="muted">{item.window}</span>}
+        {(item.window || item.duration) && (
+          <span className="muted">
+            {[item.window, item.duration ? `全程約 ${item.duration} 分鐘` : null].filter(Boolean).join(' · ')}
+          </span>
+        )}
       </span>
     </>
   );

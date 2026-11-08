@@ -36,3 +36,12 @@ export function publishFocus(index: number) {
 export function latestFocus(): number | null {
   return lastFocus;
 }
+
+/** 而家打開咗邊個站（轉方向時搵返對面最近嘅站用）；閂咗或者離開路線頁 = null */
+let openNow: number | null = null;
+export function setOpenStopIndex(i: number | null) {
+  openNow = i;
+}
+export function openStopIndex(): number | null {
+  return openNow;
+}

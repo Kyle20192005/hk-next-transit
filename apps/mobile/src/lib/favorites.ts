@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useSyncExternalStore } from 'react';
 import type { Company } from '@hknt/core';
 import type { Co } from './api';
+import { haptic } from './haptics';
 
 /**
  * 收藏（同網頁版 lib/favorites.ts 一樣嘅格式）：路線（某個方向）或者路線上嘅某個站。
@@ -68,6 +69,7 @@ export function useFavorite(target: Omit<Favorite, 'at'>): [boolean, () => void]
   const key = favKey(target);
   const on = all.some((f) => favKey(f) === key);
   const toggle = useCallback(() => {
+    haptic.tap();
     write(list.some((f) => favKey(f) === key) ? list.filter((f) => favKey(f) !== key) : [{ ...target, at: Date.now() }, ...list]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);

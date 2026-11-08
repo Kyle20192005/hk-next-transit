@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { THEME_SCRIPT } from '@/lib/prefs';
+import OfflineBanner from '@/components/OfflineBanner';
 
 export const metadata: Metadata = {
   applicationName: '下一程',
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body>
+        <OfflineBanner />
         {children}
       </body>
     </html>

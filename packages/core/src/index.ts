@@ -27,3 +27,4 @@ export * from './stop-live';
 export * from './fav-groups';
 export * from './nearby-cache';
 export * from './stop-search';
+export * from './route-extras';

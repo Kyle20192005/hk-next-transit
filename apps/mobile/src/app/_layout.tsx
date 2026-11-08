@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { LaunchOverlay } from '@/components/LaunchOverlay';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '@/lib/theme';
@@ -27,6 +28,7 @@ export default function RootLayout() {
         {/* iOS 26 起預設成個畫面向右掃都返上一頁，會搶咗拖住工具左右移排位置（PanResponder）；只保留由左邊邊緣掃返 */}
         <Stack.Screen name="tools" options={{ fullScreenGestureEnabled: false }} />
       </Stack>
+      <OfflineBanner />
       <LaunchOverlay />
     </SafeAreaProvider>
   );

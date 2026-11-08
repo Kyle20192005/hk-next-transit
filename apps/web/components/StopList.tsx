@@ -2,8 +2,8 @@
 import { getPrefs } from '@/lib/prefs';
 import { busesClient } from '@/lib/buses';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BusStabilizer, LIVE_REFRESH, type LastBus, parseLiveBuses, busDistanceTo, busFraction, formatDistance, adjustLastBus, labelEtas, lastBusEtaIndex, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
-import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
+import { alightSummary, COMPANIES, matchStops, shareText, BusStabilizer, LIVE_REFRESH, type LastBus, parseLiveBuses, busDistanceTo, busFraction, formatDistance, adjustLastBus, labelEtas, lastBusEtaIndex, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
+import { OPEN_STOP_EVENT, publishBuses, publishFocus, setOpenStopIndex } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
 import { companyColor, companyInk } from '@/lib/company';
 import type { Co } from '@/lib/data';
@@ -56,11 +56,21 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
   const [now, setNow] = useState(() => Date.now());
   const [live, setLive] = useState<{ buses: TrackedBus[]; segSeconds: number[] } | null>(null);
   const rows = useRef<(HTMLLIElement | null)[]>([]);
+  // 落車站：打開站之後撳「揀落車站」，再撳下面一個站
+  const [alight, setAlight] = useState<number | null>(null);
+  const [picking, setPicking] = useState(false);
+  // 到站時間幾時攞到（「N 秒前更新」）；撳「重新整理」即刻再攞
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [shareNote, setShareNote] = useState<string | null>(null);
 
   const openStop = (i: number | null) => {
     setOpenIndex(i);
     setEtas(null);
     setError(null);
+    setFetchedAt(null);
+    setPicking(false);
+    setAlight((a) => (i !== null && a !== null && a > i ? a : null));
     if (i === null) return;
     publishFocus(i);
     // 將打開咗嘅站嘅站名對齊列表頂部（只捲站點列表，唔郁成頁）
@@ -72,6 +82,12 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
       box.scrollTo({ top: Math.max(0, top - 4), behavior: 'smooth' });
     });
   };
+
+  // 轉方向（SwapLink）要知而家打開咗邊個站
+  useEffect(() => {
+    setOpenStopIndex(openIndex);
+  }, [openIndex]);
+  useEffect(() => () => setOpenStopIndex(null), []);
 
   // 一開頁就打開指定嘅站
   useEffect(() => {
@@ -176,6 +192,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
         setEtas((body.etas as Eta[]).filter((e) => e.dir === open.dir && e.eta).slice(0, MAX_ETAS));
         setFailed((body.failed as string[] | undefined) ?? []);
         setError(null);
+        setFetchedAt(Date.now());
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       }
@@ -187,7 +204,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
       cancelled = true;
       clearInterval(t);
     };
-  }, [openIndex, open, co, route]);
+  }, [openIndex, open, co, route, refreshKey]);
 
   const isMine = (e: Eta) => !selectedVariantId || !e.variant?.variantId || e.variant.variantId === selectedVariantId;
   const seg = live?.segSeconds ?? avgSeg;
@@ -284,9 +301,87 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
     return out;
   }, [live, stable, busNow, stops, multiCompany, company, lastStable?.id]);
 
+  // 落車站摘要（打開咗嘅站顯示）
+  const alightInfo =
+    openIndex !== null && alight !== null && alight > openIndex
+      ? {
+          name: stops[alight]?.name ?? '',
+          summary: alightSummary({
+            nextAt: nextAtOpen,
+            travelSeconds: travel?.[alight] ?? null,
+            stops: alight - openIndex,
+            metres: (cumMetres[alight] ?? 0) - (cumMetres[openIndex] ?? 0) || null,
+          }),
+        }
+      : null;
+  const companyLabel = companies.map((c) => COMPANIES[c]?.name ?? c).join('・');
+  const share = async () => {
+    if (openIndex === null) return;
+    const s = stops[openIndex]!;
+    const url = `${location.origin}/${co}/${route}?dir=${s.dir}&stop=${s.stopId}`;
+    const text = shareText({ company: companyLabel, route, dest: stops[stops.length - 1]?.name ?? '', stop: s.name, nextAt: nextAtOpen, now: Date.now() });
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${route} 到站時間`, text, url });
+        return;
+      }
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      setShareNote('已複製連結');
+    } catch {
+      setShareNote('複製唔到，請手動複製網址');
+    }
+    setTimeout(() => setShareNote(null), 2500);
+  };
+
+  // 站名搜尋（長途線好多站）：打字即刻列出撞中嘅站，撳一個就打開
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  const found = useMemo(() => matchStops(stops.map((s) => s.name), query), [stops, query]);
+  const pick = (i: number) => {
+    setSearching(false);
+    setQuery('');
+    openStop(i);
+  };
+
   return (
     <>
     <div className="nearest-bar" role="status">
+      {searching ? (
+        <div className="stop-search">
+          <Icon name="search" size={18} className="nearest-icon" />
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && found[0] !== undefined) pick(found[0]);
+              if (e.key === 'Escape') setSearching(false);
+            }}
+            placeholder="搵站名，例如 黃竹坑"
+            aria-label="搵站"
+          />
+          <button className="link-btn" onClick={() => (setSearching(false), setQuery(''))}>
+            取消
+          </button>
+          {query.trim() && (
+            <ul className="stop-search-results" role="listbox">
+              {found.length === 0 && <li className="muted">呢條線冇站撞中「{query.trim()}」</li>}
+              {found.map((i) => (
+                <li key={i}>
+                  <button onClick={() => pick(i)}>
+                    <span className="seq">{i + 1}</span> {stops[i]!.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
+      <>
       <Icon name="pin" size={18} className="nearest-icon" />
       <span className="nearest-text">
         {locating === 'busy' && '搵緊最近嘅站…'}
@@ -304,6 +399,11 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
         <button className="link-btn" onClick={() => findNearest(true)}>
           {nearest ? '重新定位' : '定位'}
         </button>
+      )}
+      <button className="bar-icon-btn" onClick={() => setSearching(true)} aria-label="搵站">
+        <Icon name="search" size={18} />
+      </button>
+      </>
       )}
     </div>
     {/* 「最近」嗰行喺捲動區外面：放喺入面用 sticky 嘅話，iPhone 喺頂部拉落去會跟住列表彈 */}
@@ -323,7 +423,26 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
             terminus={i === 0 || i === stops.length - 1}
             buses={rowBuses.get(i) ?? []}
             open={openIndex === i}
-            onToggle={() => openStop(openIndex === i ? null : i)}
+            onToggle={() => {
+              // 揀緊落車站：撳下面嘅站 = 揀佢；撳其他 = 取消
+              if (picking) {
+                setPicking(false);
+                if (openIndex !== null && i > openIndex) setAlight(i);
+                return;
+              }
+              openStop(openIndex === i ? null : i);
+            }}
+            pickable={picking && openIndex !== null && i > openIndex}
+            isAlight={alight === i && openIndex !== null && i > openIndex}
+            alight={openIndex === i ? alightInfo : null}
+            picking={openIndex === i && picking}
+            onPickAlight={() => setPicking((p) => !p)}
+            onClearAlight={() => setAlight(null)}
+            updatedAt={openIndex === i ? fetchedAt : null}
+            clockNow={busNow}
+            onRefresh={() => setRefreshKey((k) => k + 1)}
+            onShare={share}
+            shareNote={openIndex === i ? shareNote : null}
             etas={openIndex === i ? etas : null}
             whereLabels={openIndex === i ? whereLabels : null}
             error={openIndex === i ? error : null}

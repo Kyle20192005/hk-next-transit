@@ -7,6 +7,7 @@ import { ToolSlot, ToolTile } from '@/components/ToolTile';
 import { AppBar, BarButton } from '@/components/ui';
 import { saveTools, useTools } from '@/lib/news';
 import { radius, useTheme } from '@/lib/theme';
+import { haptic } from '@/lib/haptics';
 
 /**
  * 自訂常用工具（參考港鐵 App，同網頁 components/home/ToolEditor.tsx 一樣）：頂部黃色區係揀咗嘅（紅色「−」移除；手指拖住左右移排位置），
@@ -61,6 +62,7 @@ export default function ToolsScreen() {
       <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: insets.bottom + 12, backgroundColor: t.card }}>
         <Pressable
           onPress={() => {
+            haptic.done();
             saveTools(tools);
             back();
           }}
@@ -114,6 +116,7 @@ type Live = {
 function DragTile({ id, index, live, dx, lifted, dragging, onRemove }: { id: ToolId; index: number; live: RefObject<Live>; dx: number; lifted: boolean; dragging: boolean; onRemove?: () => void }) {
   const [responder] = useState(() => {
     const end = () => {
+      haptic.pick();
       const { tools, to, onChange, setDrag } = live.current;
       onChange(moveTool(tools, tools.indexOf(id), to));
       setDrag(null);
@@ -122,7 +125,10 @@ function DragTile({ id, index, live, dx, lifted, dragging, onRemove }: { id: Too
       // 橫向移動先算拖（輕撳唔會觸發）；開始之後唔放俾其他手勢
       onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => live.current.setDrag({ id, from: live.current.tools.indexOf(id), dx: 0 }),
+      onPanResponderGrant: () => {
+        haptic.pick();
+        live.current.setDrag({ id, from: live.current.tools.indexOf(id), dx: 0 });
+      },
       onPanResponderMove: (_, g) => {
         const { tools, step, setDrag } = live.current;
         const from = tools.indexOf(id);

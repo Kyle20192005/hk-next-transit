@@ -14,6 +14,8 @@ export interface VariantItem {
   status: string;
   statusShort: string;
   window: string | null;
+  /** 全程大約幾多分鐘（core routeMinutes） */
+  duration?: number | null;
 }
 
 /** 走法選擇：平時只顯示揀咗嘅一行，撳先展開（蓋住地圖，唔推郁版面） */
@@ -41,6 +43,11 @@ export function VariantPicker({ items, selectedId, onSelect }: { items: VariantI
           <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 14, fontWeight: '600', color: statusColor(t, selected) }}>
             {selected.statusShort}
           </Text>
+          {selected.duration ? (
+            <Text numberOfLines={1} style={{ flexShrink: 0, fontSize: 13, color: t.muted }}>
+              全程約 {selected.duration} 分
+            </Text>
+          ) : null}
         </View>
         {items.length > 1 && (
           <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
@@ -71,7 +78,7 @@ export function VariantPicker({ items, selectedId, onSelect }: { items: VariantI
                       <Text style={{ fontWeight: '700', color: t.text }}>{x.label}</Text>
                     </View>
                     <Text style={{ fontSize: 14, fontWeight: '600', color: statusColor(t, x) }}>{x.status}</Text>
-                    {x.window && <Text style={{ fontSize: 13, color: t.muted }}>{x.window}</Text>}
+                    {(x.window || x.duration) && <Text style={{ fontSize: 13, color: t.muted }}>{[x.window, x.duration ? `全程約 ${x.duration} 分鐘` : null].filter(Boolean).join(' · ')}</Text>}
                   </View>
                 </Pressable>
               );

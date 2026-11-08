@@ -17,6 +17,8 @@ export type IconName =
   | 'close'
   | 'plus'
   | 'folder'
+  | 'share'
+  | 'refresh'
   | 'minus'
   | 'info'
   | 'route'
@@ -113,6 +115,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
   close: <path d="M6 6l12 12M18 6L6 18" />,
   plus: <path d="M12 5v14M5 12h14" />,
   folder: <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />,
+  share: <path d="M12 3.5v11M7.5 8 12 3.5 16.5 8M5 12.5v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />,
+  refresh: <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4" />,
   minus: <path d="M5 12h14" />,
   info: (
     <>

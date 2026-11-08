@@ -306,6 +306,15 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   （網頁 `StopList` → `publishBuses({ lastBus })` → `RouteMap`；App 路線頁 `lastStableId`）。
   過咗寫「尾班車已經開走 · 下一班約 06:00」（唔講「今日」，凌晨會混淆；繁忙時間線日間收車段都會咁寫）。
   網頁 page.tsx 喺伺服器計好傳落 `StopList`／`StopRow`（`lastBus`）；App 路線頁即場計。終點站唔顯示。
+- **路線頁小功能**（2026-11，core `route-extras.ts`，網頁 `StopList`／`StopRow`、App 路線頁／`StopRow` 一樣）：
+  - 落車站：打開站之後撳「揀落車站」→ 撳下面一個站；打開咗嘅站顯示 `alightSummary`（約幾點到、幾多個站、距離、車程），落車站標「落車」。
+  - 轉方向（⇅）：打開咗站就用 `nearestStopIndex` 搵對面方向 500 米內最近嘅站，轉過去即刻打開（網頁 `SwapLink` + `lib/events` 嘅 `openStopIndex`）。
+  - 走法顯示「全程約 N 分」（`routeMinutes`：實測行車時間加埋，冇就用時間表 offsets）。
+  - 分享（`shareText`）：網頁 `navigator.share`，冇就複製連結；App `Share.share`（連結用 `API_BASE`）。
+  - 到站時間下面「N 秒前更新 · 重新整理」（`updatedAgo`，撳即刻再攞）。
+  - 「最近」嗰行右邊搵站（`matchStops`），撳結果打開嗰個站。
+  - 冇網絡：頂部提示（網頁 `OfflineBanner` 用 online/offline 事件；App 用 `expo-network` 嘅 `useNetworkState`）。
+  - App 震動回饋（`src/lib/haptics.ts`，`expo-haptics`）：收藏、轉方向、揀落車站、重新整理、拖常用工具、儲存；網頁預覽冇。
 - 時間線豎線畫喺 `li.stop::before`（成個站嘅高度），唔好畫喺按鈕入面，否則行與行之間同打開咗嘅到站時間部分會斷線。
 - 車費：GTFS `fare_attributes` 分段收費（fare_id = route-方向-上車站序-落車站序），上車車費 = 由嗰個站去任何站嘅最高收費；
   pipeline 存做 `variant.fares[站ID]`（冇分段就用 JSON_BUS 嘅 `fullFare`）。站點列表右邊顯示，終點站唔顯示。

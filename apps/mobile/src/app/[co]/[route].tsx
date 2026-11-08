@@ -1,9 +1,14 @@
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, FlatList, Pressable, Share, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  alightSummary,
+  matchStops,
+  nearestStopIndex,
+  routeMinutes,
+  shareText,
   BusStabilizer,
   defaultDir,
   pickVariant,
@@ -41,10 +46,11 @@ import {
   type RouteData,
   type TrackedBus,
 } from '@hknt/core';
-import { api, cachedRoute, calendarOnce, freshRoute, isCo, type Co } from '@/lib/api';
+import { api, API_BASE, cachedRoute, calendarOnce, freshRoute, isCo, type Co } from '@/lib/api';
+import { haptic } from '@/lib/haptics';
 import { useFavorite } from '@/lib/favorites';
 import { addRecent } from '@/lib/recent';
-import { radius, shadow, tabular, useTheme } from '@/lib/theme';
+import { radius, shadow, shadowLg, tabular, useTheme } from '@/lib/theme';
 import { Icon } from '@/components/Icon';
 import { BarButton } from '@/components/ui';
 import { StopRow, type RowBus } from '@/components/StopRow';
@@ -214,6 +220,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
       status: statusText(status),
       statusShort: statusText(status, true),
       window: w ? `今日 ${fmtMinutes(w[0])}–${w[1] >= 1440 ? '翌日 ' : ''}${fmtMinutes(w[1])} 由總站開出` : null,
+      duration: routeMinutes(v),
     };
   });
 
@@ -268,12 +275,21 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
   const [etaError, setEtaError] = useState<string | null>(null);
   const [etaNow, setEtaNow] = useState(() => Date.now());
   const list = useRef<FlatList<StopItem>>(null);
+  // 落車站（同網頁 StopList 一樣）：打開站之後撳「揀落車站」，再撳下面一個站
+  const [alight, setAlight] = useState<number | null>(null);
+  const [picking, setPicking] = useState(false);
+  // 到站時間幾時攞到；撳「重新整理」即刻再攞
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const openStop = useCallback((i: number | null) => {
     setOpenIndex(i);
     setEtas(null);
     setEtaError(null);
     setFailed([]);
+    setFetchedAt(null);
+    setPicking(false);
+    setAlight((a) => (i !== null && a !== null && a > i ? a : null));
     if (i !== null) requestAnimationFrame(() => list.current?.scrollToIndex({ index: i, animated: true, viewPosition: 0 }));
   }, []);
 
@@ -297,6 +313,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
         setEtas(body.etas.filter((e) => e.dir === open.dir && e.eta).slice(0, MAX_ETAS));
         setFailed(body.failed ?? []);
         setEtaError(null);
+        setFetchedAt(Date.now());
       } catch (e) {
         if (!cancelled) setEtaError((e as Error).message);
       }
@@ -308,7 +325,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
       cancelled = true;
       clearInterval(id);
     };
-  }, [open, co, data.route]);
+  }, [open, co, data.route, refreshKey]);
 
   // ---------- 成條線嘅巴士位置 ----------
   // 記低屬邊個走法：換咗走法，舊走法嘅巴士唔好畫上新走法
@@ -489,12 +506,59 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
   const [timetable, setTimetable] = useState(false);
   const [fav, toggleFav] = useFavorite({ co, route: data.route, dir, dest, companies });
   const other = dirs.find((d) => d !== dir);
+  // 轉方向：打開咗站就搵對面方向最近（500 米內）嘅站，轉過去即刻打開（同網頁 SwapLink 一樣）
+  const [pendingStop, setPendingStop] = useState<string | null>(null);
   const changeDir = (d: Dir) => {
+    haptic.tap();
+    let target: string | null = null;
+    if (openIndex !== null) {
+      const sel = pickVariant(sortVariants(variantsForDir(data, d), calendar, now), d, {});
+      const otherStops = (sel ? variantStops(sel) : (data.directions[d] ?? []).map((stopId) => ({ stopId }))).map((x) => ({ stopId: x.stopId, lat: data.stops[x.stopId]?.lat, lng: data.stops[x.stopId]?.lng }));
+      const k = nearestStopIndex(stops[openIndex], otherStops);
+      if (k >= 0) target = otherStops[k]!.stopId;
+    }
     setDir(d);
     setVariantId(null);
-    setStopParam(null);
+    setStopParam(target);
+    setPendingStop(target);
     setNearest(null);
     openStop(null);
+  };
+  useEffect(() => {
+    if (!pendingStop) return;
+    const i = stops.findIndex((x) => x.stopId === pendingStop);
+    if (i < 0) return;
+    const id = setTimeout(() => {
+      setPendingStop(null);
+      openStop(i);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [pendingStop, stops, openStop]);
+
+  // 落車站摘要（打開咗嘅站顯示）
+  const alightInfo =
+    openIndex !== null && alight !== null && alight > openIndex
+      ? {
+          name: stops[alight]?.name ?? '',
+          summary: alightSummary({ nextAt: nextAtOpen, travelSeconds: travel?.[alight] ?? null, stops: alight - openIndex, metres: (cumMetres[alight] ?? 0) - (cumMetres[openIndex] ?? 0) || null }),
+        }
+      : null;
+  // 分享：系統分享面板（路線、站、下一班、連結）
+  const share = () => {
+    if (openIndex === null) return;
+    const s = stops[openIndex]!;
+    const url = `${API_BASE}/${co}/${data.route}?dir=${s.dir}&stop=${s.stopId}`;
+    const text = shareText({ company: companyNames(companies), route: data.route, dest, stop: s.name, nextAt: nextAtOpen, now: Date.now() });
+    Share.share({ message: `${text}\n${url}` }).catch(() => {});
+  };
+  // 站名搜尋（長途線好多站）
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  const found = useMemo(() => matchStops(stops.map((x) => x.name), query), [stops, query]);
+  const pickFound = (i: number) => {
+    setSearching(false);
+    setQuery('');
+    openStop(i);
   };
   const mapH = Math.max(150, Math.min(280, winH * 0.26));
   const hasTimetable = sorted.some((x) => x.variant.schedules.length);
@@ -536,6 +600,40 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
 
       {/* 只有站點列表捲動 */}
       <View style={{ flex: 1, marginHorizontal: 12, backgroundColor: t.card, borderTopLeftRadius: radius.l, borderTopRightRadius: radius.l, overflow: 'hidden', ...shadow }}>
+        {searching ? (
+          <View style={{ zIndex: 5 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.line }}>
+              <Icon name="search" size={18} color={t.accent} />
+              <TextInput
+                autoFocus
+                value={query}
+                onChangeText={setQuery}
+                onSubmitEditing={() => found[0] !== undefined && pickFound(found[0])}
+                placeholder="搵站名，例如 黃竹坑"
+                placeholderTextColor={t.muted}
+                returnKeyType="search"
+                accessibilityLabel="搵站"
+                style={{ flex: 1, fontSize: 16, color: t.text, paddingVertical: 8 }}
+              />
+              <Pressable onPress={() => (setSearching(false), setQuery(''))} hitSlop={6} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: t.brandSoft }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: t.accent }}>取消</Text>
+              </Pressable>
+            </View>
+            {query.trim() !== '' && (
+              <View style={{ position: 'absolute', top: '100%', left: 8, right: 8, marginTop: 6, padding: 6, borderRadius: 14, backgroundColor: t.card, ...shadowLg }}>
+                {found.length === 0 && <Text style={{ padding: 10, fontSize: 14, color: t.muted }}>呢條線冇站撞中「{query.trim()}」</Text>}
+                {found.map((i) => (
+                  <Pressable key={i} onPress={() => pickFound(i)} accessibilityRole="button" style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10, backgroundColor: pressed ? t.surface2 : 'transparent' })}>
+                    <Text style={{ minWidth: 22, textAlign: 'right', fontSize: 13, color: t.muted, ...tabular }}>{i + 1}</Text>
+                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, color: t.text }}>
+                      {stops[i]!.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: t.line }}>
           <Icon name="pin" size={18} color={t.accent} />
           <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, color: t.muted }}>
@@ -555,12 +653,16 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
               <Text style={{ fontSize: 14, fontWeight: '600', color: t.accent }}>{nearest ? '重新定位' : '定位'}</Text>
             </Pressable>
           )}
+          <Pressable onPress={() => setSearching(true)} accessibilityRole="button" accessibilityLabel="搵站" hitSlop={4} style={{ width: 32, height: 32, marginLeft: 2, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
+            <Icon name="search" size={18} color={t.text} />
+          </Pressable>
         </View>
+        )}
         <FlatList
           ref={list}
           data={stops}
           keyExtractor={(s, i) => `${s.dir}-${s.stopId}-${i}`}
-          extraData={[openIndex, etas, etaNow, rowBuses, whereLabels, nearest, failed]}
+          extraData={[openIndex, etas, etaNow, rowBuses, whereLabels, nearest, failed, alight, picking, fetchedAt, busNow]}
           contentContainerStyle={{ paddingVertical: 6, paddingBottom: insets.bottom }}
           onScrollToIndexFailed={({ averageItemLength, index }) => list.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
           renderItem={({ item: s, index: i }) => {
@@ -576,7 +678,34 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
                 lineColor={color}
                 multiCompany={multiCompany}
                 open={openIndex === i}
-                onToggle={() => openStop(openIndex === i ? null : i)}
+                onToggle={() => {
+                  // 揀緊落車站：撳下面嘅站 = 揀佢；撳其他 = 取消
+                  if (picking) {
+                    setPicking(false);
+                    if (openIndex !== null && i > openIndex) {
+                      haptic.pick();
+                      setAlight(i);
+                    }
+                    return;
+                  }
+                  openStop(openIndex === i ? null : i);
+                }}
+                pickable={picking && after}
+                isAlight={alight === i && after}
+                alight={openIndex === i ? alightInfo : null}
+                picking={openIndex === i && picking}
+                onPickAlight={() => {
+                  haptic.tap();
+                  setPicking((x) => !x);
+                }}
+                onClearAlight={() => setAlight(null)}
+                updatedAt={openIndex === i ? fetchedAt : null}
+                clockNow={busNow}
+                onRefresh={() => {
+                  haptic.tap();
+                  setRefreshKey((k) => k + 1);
+                }}
+                onShare={share}
                 etas={openIndex === i ? etas : null}
                 whereLabels={openIndex === i ? whereLabels : null}
                 error={openIndex === i ? etaError : null}

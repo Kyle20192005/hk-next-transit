@@ -1,6 +1,6 @@
 'use client';
 import { forwardRef } from 'react';
-import { formatDistance, lastBusText, shortName, type Eta, type LastBus } from '@hknt/core';
+import { formatDistance, lastBusText, shortName, updatedAgo, type Eta, type LastBus } from '@hknt/core';
 import BusIcon from './BusIcon';
 import CompanyTag from './CompanyTag';
 import { COMPANIES } from '@/lib/company';
@@ -71,6 +71,23 @@ type Props = {
   fav: Omit<Favorite, 'at'> | null;
   /** 「喺度搭得」：呢個站嘅位置同而家睇緊嘅路線 */
   here: { lat: number; lng: number; name: string; current: { co: Co; route: string; dir: 'O' | 'I' } } | null;
+  /** 揀緊落車站：呢個站撳得（喺打開咗嘅站下面） */
+  pickable: boolean;
+  /** 呢個站係揀咗嘅落車站 */
+  isAlight: boolean;
+  /** 打開咗嘅站：落車站摘要 */
+  alight: { name: string; summary: string } | null;
+  /** 打開咗嘅站：揀緊落車站 */
+  picking: boolean;
+  onPickAlight: () => void;
+  onClearAlight: () => void;
+  /** 到站時間幾時攞到（毫秒）；clockNow 每 5 秒更新，用嚟寫「N 秒前更新」 */
+  updatedAt: number | null;
+  clockNow: number;
+  onRefresh: () => void;
+  onShare: () => void;
+  /** 分享之後嘅提示（例如「已複製連結」） */
+  shareNote: string | null;
 };
 
 const hhmm = (ms: number) =>
@@ -78,7 +95,7 @@ const hhmm = (ms: number) =>
 
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, lastBus, lastEtaIndex, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav, here },
+  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, lastBus, lastEtaIndex, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav, here, pickable, isAlight, alight, picking, onPickAlight, onClearAlight, updatedAt, clockNow, onRefresh, onShare, shareNote },
   ref,
 ) {
   // 尾班車：實時班次入面認到邊班係尾班就標「尾班」，提示行改用實時時間
@@ -94,7 +111,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
   const clock = usePrefs().etaFormat === 'clock';
 
   return (
-    <li className={`stop${open ? ' open' : ''}${terminus ? ' terminus' : ''}`} ref={ref}>
+    <li className={`stop${open ? ' open' : ''}${terminus ? ' terminus' : ''}${pickable ? ' pickable' : ''}${isAlight ? ' alight' : ''}`} ref={ref}>
       {buses.map((b) => (
         <span key={b.key} className={`tl-bus${b.schedule ? ' is-schedule' : ''}${b.last ? ' is-last' : ''}`} style={{ top: busTop(b), ...(b.color ? { background: b.color, color: b.ink } : {}) }} title={b.label} aria-hidden="true">
           <BusIcon />
@@ -113,6 +130,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                 <Icon name="pin" size={12} /> 最近 · {formatDistance(nearestMetres)}
               </span>
             )}
+            {isAlight && <span className="nearest-tag alight-tag">落車</span>}
           </span>
           {travelSeconds !== null && travelSeconds > 0 && (
             <span className="travel" title="由打開咗嘅站出發（行車時間係實測平均，僅供參考）">
@@ -182,6 +200,28 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
               <Icon name="clock" size={15} /> {last.text}
             </div>
           )}
+          {/* 落車站：摘要（幾點到、幾多個站、車程） */}
+          {alight && !picking && (
+            <div className="alight-line">
+              <span>
+                <b>落車：{alight.name}</b>
+                <br />
+                <span className="muted">{alight.summary}</span>
+              </span>
+              <button className="alight-clear" onClick={onClearAlight} aria-label="取消落車站">
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+          )}
+          {picking && <div className="alight-line picking">撳下面一個站做落車站</div>}
+          {updatedAt !== null && (
+            <div className="eta-updated">
+              {updatedAgo(updatedAt, Math.max(clockNow, updatedAt))}
+              <button className="link-btn" onClick={onRefresh} aria-label="重新整理到站時間">
+                <Icon name="refresh" size={14} /> 重新整理
+              </button>
+            </div>
+          )}
           {failed.length > 0 && (
             <div className="eta-failed" role="status">
               <Icon name="warning" size={16} /> {failed.map((c) => COMPANIES[c as keyof typeof COMPANIES]?.name ?? c).join('、')}資料暫時攞唔到，可能少咗班次，稍後會自動再試
@@ -192,6 +232,15 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
             <div className="etas-actions">
               {here && <HereDrawer lat={here.lat} lng={here.lng} name={here.name} current={here.current} />}
               {fav && <FavButton target={fav} variant="inline" />}
+              {fav && (
+                <button className={`fav-inline${picking ? ' on' : ''}`} onClick={onPickAlight} aria-pressed={picking}>
+                  <Icon name="pin" size={15} /> {picking ? '取消揀落車站' : alight ? '改落車站' : '揀落車站'}
+                </button>
+              )}
+              <button className="fav-inline" onClick={onShare}>
+                <Icon name="share" size={15} /> 分享
+              </button>
+              {shareNote && <span className="share-note" role="status">{shareNote}</span>}
             </div>
           )}
         </div>

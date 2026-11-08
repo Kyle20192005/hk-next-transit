@@ -6,6 +6,7 @@ import {
   fmtMinutes,
   serviceWindow,
   runMinutes,
+  routeMinutes,
   formatFare,
   joyYouFare,
   smoothLine,
@@ -23,6 +24,7 @@ import {
 import { getCalendar, getRoute, isCo, type Co } from '@/lib/data';
 import { COMPANIES } from '@/lib/company';
 import StopList from '@/components/StopList';
+import SwapLink from '@/components/SwapLink';
 import TimetableDrawer from '@/components/TimetableDrawer';
 import FavButton from '@/components/FavButton';
 import { RecordRecent } from '@/lib/recent';
@@ -80,6 +82,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
       status: statusText(status),
       statusShort: statusText(status, true),
       window: w ? `今日 ${fmtMinutes(w[0])}–${w[1] >= 1440 ? '翌日 ' : ''}${fmtMinutes(w[1])} 由總站開出` : null,
+      duration: routeMinutes(v),
     };
   });
 
@@ -112,6 +115,13 @@ export default async function RoutePage({ params, searchParams }: Props) {
   // 平均行車時間：攞到即時數據之前先用
   const segSeconds = selected?.segSeconds ?? null;
   const other = dirs.find((d) => d !== dir);
+  // 轉方向時搵返對面最近嘅站：對面方向預設走法嘅站（同轉過去之後路線頁揀嘅一樣）
+  const otherSel = other ? pickVariant(sortVariants(variantsForDir(data, other), calendar, now), other, {}) : null;
+  const otherStops = (otherSel ? variantStops(otherSel) : other ? (data.directions[other] ?? []).map((stopId) => ({ stopId })) : []).map((s) => ({
+    stopId: s.stopId,
+    lat: data.stops[s.stopId]?.lat,
+    lng: data.stops[s.stopId]?.lng,
+  }));
   const initialOpen = stopParam ? stops.findIndex((s) => s.stopId === stopParam) : -1;
   // 尾班車：呢個方向所有走法（經過呢個站嘅）一齊計；終點站唔使（唔會喺度上車）
   const dirVariants = variantsForDir(data, dir);
@@ -168,15 +178,12 @@ export default async function RoutePage({ params, searchParams }: Props) {
             calendar={drawerCalendar}
           />
           {other && (
-            <Link
-              className="swap"
-              href={`?dir=${other}`}
-              replace
-              scroll={false}
-              aria-label={`轉方向：往 ${data.stops[data.directions[other]!.at(-1)!]?.nameTc}`}
-            >
-              <Icon name="swap" />
-            </Link>
+            <SwapLink
+              other={other}
+              label={`轉方向：往 ${data.stops[data.directions[other]!.at(-1)!]?.nameTc}`}
+              stops={stops.map(({ lat, lng }) => ({ lat, lng }))}
+              otherStops={otherStops}
+            />
           )}
         </header>
 
