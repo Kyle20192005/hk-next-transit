@@ -162,58 +162,51 @@ export function minutesToStop(v: Variant, stopId: string, dir: string): number |
 }
 
 export interface LastBus {
-  /** 呢個服務日喺呢個站嘅尾班（毫秒）；今日冇班次就 null */
+  /** 尾班（收車前最後一班）到呢個站嘅時間（毫秒）；冇就 null */
   last: number | null;
-  /** 尾班過咗之後，下一班（頭班）幾時到（毫秒）；未過尾班就 null */
+  /** 尾班過咗之後，下一班幾時到（毫秒）；未過尾班就 null */
   nextFirst: number | null;
-  /** 尾班前一班（同一服務日，毫秒）：用嚟分實時班次邊班先係尾班（`lastBusEtaIndex`） */
+  /** 尾班前一班（毫秒）：用嚟分實時班次邊班先係尾班（`lastBusEtaIndex`） */
   prev?: number | null;
   /** 時間表估計由總站去到呢個站要幾多分鐘（尾班嗰個走法）：`adjustLastBus` 用實測行車時間校正 */
   offsetMin?: number;
 }
 
+/** 兩班車相隔幾耐以上當係「收咗車」（尾班同下一班之間）。970X 通宵 01:30 尾班、05:30 頭班相隔 4 個鐘；日間最疏都唔夠 3 個鐘 */
+export const LAST_BUS_GAP_MS = 3 * 3600_000;
+
 /**
- * 呢個站嘅尾班車（所有經過呢個站、同方向嘅走法一齊計；用政府時間表 + 由總站開出嘅估計時間）。
- * 服務日：琴日嘅班次過咗午夜仲未完（例如 01:00 仲有 00:45 開出嗰班）就當仲係琴日嘅服務日。
- * 冇任何走法有時間表 → null（唔好亂講）。
+ * 呢個站嘅尾班車（所有經過呢個站、同方向嘅走法一齊計，包埋特別班；用政府時間表 + 由總站開出嘅估計時間）。
+ * 唔按日曆日切：將琴日、今日、聽日嘅到站時間排成一行，**收車 = 兩班之間相隔 3 個鐘以上**，尾班 = 收車前最後一班。
+ * 所以通宵線（例如 970X 00:40–01:30 每 25 分鐘）00:25 嘅尾班係 01:30 嗰班，唔係琴日最後嗰班。
+ * 全日有車（搵唔到收車）或者冇時間表 → null（唔好亂講）。
  */
 export function lastBusAt(variants: Variant[], stopId: string, dir: string, calendar: Calendar, now: number): LastBus | null {
   const today = hkMidnight(now);
-  const days = [-1, 0, 1].map((d) => today + d * DAY_MS);
-  const perDay: number[][] = [[], [], []];
-  let any = false;
   const offOf = new Map<number, number>(); // 到站時間 → 嗰班嘅「總站去呢個站」分鐘
   for (const v of variants) {
     const off = minutesToStop(v, stopId, dir);
     if (off === null || !v.schedules.some((s) => s.departures.length)) continue;
-    any = true;
-    days.forEach((dayStart, k) => {
+    for (const d of [-1, 0, 1, 2]) {
+      const dayStart = today + d * DAY_MS;
       const active = activeServiceIds(calendar, new Date(dayStart + 12 * 3600_000));
       for (const s of v.schedules) {
         if (!active.has(s.serviceId)) continue;
-        for (const m of s.departures) {
-          const t = dayStart + (m + off) * 60_000;
-          perDay[k]!.push(t);
-          offOf.set(t, off);
-        }
+        for (const m of s.departures) offOf.set(dayStart + (m + off) * 60_000, off);
       }
-    });
+    }
   }
-  if (!any) return null;
-  const max = (xs: number[]) => (xs.length ? Math.max(...xs) : null);
-  const lastYesterday = max(perDay[0]!);
-  const min = (xs: number[]) => (xs.length ? Math.min(...xs) : null);
-  const firstToday = min(perDay[1]!);
-  // 服務日：琴日嘅班次未行完、或者今日頭班都未開（例如凌晨 00:03，琴晚 23:45 尾班已過）→ 仲係琴日
-  const yesterday = lastYesterday !== null && (lastYesterday > now || firstToday === null || now < firstToday);
-  const day = yesterday ? perDay[0]! : perDay[1]!;
-  const last = max(day);
-  // 前一班：早過尾班 1 分鐘以上（唔同走法同一時間開出當同一班）
-  const prev = last === null ? null : max(day.filter((t) => t < last - 60_000));
-  const offsetMin = last === null ? undefined : offOf.get(last);
-  if (last !== null && last > now) return { last, nextFirst: null, prev, offsetMin };
-  const upcoming = perDay.flat().filter((t) => t > now);
-  return { last, nextFirst: upcoming.length ? Math.min(...upcoming) : null, prev, offsetMin };
+  if (!offOf.size) return null;
+  const times = [...offOf.keys()].sort((a, b) => a - b);
+  const result = (k: number, nextFirst: number | null): LastBus => ({ last: times[k]!, nextFirst, prev: k > 0 ? times[k - 1]! : null, offsetMin: offOf.get(times[k]!) });
+  const u = times.findIndex((t) => t > now);
+  if (u < 0) return result(times.length - 1, null);
+  // 而家喺收車時段入面（上一班同下一班相隔 3 個鐘以上）：尾班已過
+  if (u > 0 && times[u]! - times[u - 1]! >= LAST_BUS_GAP_MS) return result(u - 1, times[u]!);
+  if (u === 0 && times[0]! - now >= LAST_BUS_GAP_MS) return { last: null, nextFirst: times[0]!, prev: null };
+  // 仲有車：向後搵第一個收車位
+  for (let j = u; j < times.length - 1; j++) if (times[j + 1]! - times[j]! >= LAST_BUS_GAP_MS) return result(j, null);
+  return null;
 }
 
 /**
@@ -267,7 +260,7 @@ export function lastBusEtaIndex(etas: readonly Pick<Eta, 'eta' | 'company'>[], i
 /**
  * 尾班車提示文字：
  * - 尾班未到：「尾班約 23:45」；30 分鐘內「尾班約 23:45 · 仲有 12 分鐘」（urgent）
- * - 過咗：「尾班車已經開走 · 下次頭班約 06:10」（聽日嘅加「聽日」）
+ * - 過咗：「尾班車已經開走 · 下一班約 06:10」（聽日嘅加「聽日」）
  * 時間係時間表估算，所以寫「約」；有 `actual`（`lastBusEtaIndex` 認到嗰班嘅實時時間）就用實時：「尾班車 00:00 · 仲有 27 分鐘」（嗰班同時標「尾班」）。
  */
 export function lastBusText(info: LastBus | null, now: number, actual?: number | null): { text: string; urgent: boolean; gone: boolean } | null {
@@ -287,5 +280,5 @@ export function lastBusText(info: LastBus | null, now: number, actual?: number |
   // 過咗午夜講「今日」會混淆（凌晨 00:03 嘅「今日」其實係琴晚），所以講「尾班車已經開走」
   if (info.nextFirst === null) return { text: '尾班車已經開走', urgent: false, gone: true };
   const tomorrow = hkMidnight(info.nextFirst) > hkMidnight(now);
-  return { text: `尾班車已經開走 · 下次頭班約 ${tomorrow ? '聽日 ' : ''}${clock(info.nextFirst)}`, urgent: false, gone: true };
+  return { text: `尾班車已經開走 · 下一班約 ${tomorrow ? '聽日 ' : ''}${clock(info.nextFirst)}`, urgent: false, gone: true };
 }
