@@ -16,6 +16,8 @@ interface Line {
   route: string;
   variant: string;
   snapshot: BusesSnapshot | null;
+  /** 快照幾時計好（fetchedAt 係開始計嘅時間） */
+  storedAt: number;
   computing: Promise<BusesSnapshot> | null;
   lastAsked: number;
   /** 問過幾多次（1 = 只係預先 fetch） */
@@ -40,6 +42,7 @@ export function createLines(fetcher: typeof fetch) {
       const now = new Date();
       const snap = await computeBuses(data, v, calendar, fetcher, await hourlyTimesFor(variantStops(v), calendar, now), now);
       line.snapshot = snap;
+      line.storedAt = Date.now();
       line.polls++;
       line.lastError = null;
       return snap;
@@ -81,14 +84,15 @@ export function createLines(fetcher: typeof fetch) {
     const key = `${co}:${route.toUpperCase()}:${variant}`;
     let line = lines.get(key);
     if (!line) {
-      line = { key, co, route, variant, snapshot: null, computing: null, lastAsked: 0, asks: 0, timer: null, polls: 0, lastError: null };
+      line = { key, co, route, variant, snapshot: null, storedAt: 0, computing: null, lastAsked: 0, asks: 0, timer: null, polls: 0, lastError: null };
       lines.set(key, line);
     }
     line.lastAsked = Date.now();
     line.asks++;
-    const fresh = line.snapshot && Date.now() - Date.parse(line.snapshot.fetchedAt) < config.pollMs + 5000;
+    // 有唔太舊嘅快照（背景 poll 緊）就即刻俾，唔好等緊新一輪計完（計一條長線可以要幾秒）
+    const usable = line.snapshot && Date.now() - line.storedAt < config.pollMs * 3;
     try {
-      const snap = fresh ? line.snapshot! : await compute(line);
+      const snap = usable ? line.snapshot! : await compute(line);
       startPolling(line);
       return snap;
     } catch (e) {

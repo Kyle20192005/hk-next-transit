@@ -50,7 +50,8 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 已經做咗（2026-11-08，部署步驟 **`deploy/README.md`**）：
 - **分工**：前端（網頁、App）只負責顯示同互動，**從來唔直接問巴士公司**。實時巴士數據（巴士位置 `/api/buses`、某站到站時間 `/api/eta`）
   一律先問 **tracker**，出錯先退返 Vercel 同名 API（core `createLiveClient`；網頁 `lib/buses.ts` 嘅 `liveClient`、`NEXT_PUBLIC_TRACKER_URL`；
-  App `lib/api.ts`，預設 `https://rt.kyle05.dev`，`EXPO_PUBLIC_TRACKER_URL` 可改、空白 = 唔用）。超時 5 秒只係今次用後備；連唔到或 5xx 先停用 60 秒。
+  App `lib/api.ts`，預設 `https://rt.kyle05.dev`，`EXPO_PUBLIC_TRACKER_URL` 可改、空白 = 唔用）。tracker 1.5 秒未覆就同時問後備、邊個先返用邊個（冷門線第一次計要幾秒）；連唔到或 5xx 先停用 60 秒。
+  tracker 有 45 秒內嘅快照就即刻俾（背景照 poll），唔等新一輪計完。
   其他（路線資料、附近、`/api/here`、`/api/stop-etas`、消息）暫時留 Vercel（分散 IP）。
 - `apps/tracker`：`GET /api/buses`、`/api/eta`（同 Vercel 一樣格式）、`/health`、`/`。有人問先計，背景每 15 秒 poll，3 分鐘冇人問就停；
   上游 fetch 包一層（10 秒 cache、合併同時請求、限流 `UPSTREAM_RPS` 每個伺服器各自計、每間公司統計）；`node dist/probe.js` 量上游上限。
