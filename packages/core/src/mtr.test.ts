@@ -35,7 +35,7 @@ describe('mtr', () => {
   });
 });
 
-import { MTR_MAP_BEND, MTR_MAP_LINES, MTR_MAP_VIEW, MTR_MAP_WATER, mtrMapStations } from './mtr-map';
+import { MTR_MAP_BEND, MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LINES, MTR_MAP_VIEW, MTR_MAP_WATER, mtrMapStations } from './mtr-map';
 import { MTR_LINE_STATIONS } from './mtr-data';
 
 describe('mtr map', () => {
@@ -90,12 +90,23 @@ describe('mtr map geometry', () => {
           expect(dist(p, b), `${l.line} after ${p}`).toBeGreaterThanOrEqual(MTR_MAP_BEND - 1e-6);
         }
   });
-  it('interchange points line up horizontally or vertically', () => {
+  it('interchange points line up horizontally, vertically or at 45°, circles touching (G apart)', () => {
     for (const s of mtrMapStations()) {
       if (s.pts.length < 2) continue;
-      const sameX = s.pts.every((p) => Math.abs(p[0] - s.pts[0]![0]) < 1e-9);
-      const sameY = s.pts.every((p) => Math.abs(p[1] - s.pts[0]![1]) < 1e-9);
-      expect(sameX || sameY, `${s.code} ${JSON.stringify(s.pts)}`).toBe(true);
+      const a = s.pts[0]!;
+      const b = s.pts.reduce((m, p) => (Math.hypot(p[0] - a[0], p[1] - a[1]) > Math.hypot(m[0] - a[0], m[1] - a[1]) ? p : m), a);
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const ok = Math.abs(dx) < 1e-6 || Math.abs(dy) < 1e-6 || Math.abs(Math.abs(dx) - Math.abs(dy)) < 1e-6;
+      expect(ok, `${s.code} ${JSON.stringify(s.pts)}`).toBe(true);
+      for (const p of s.pts) expect(Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx), `${s.code} ${p}`).toBeLessThan(1e-6);
+      // 相鄰兩個圈中心相隔 G（貼住，唔會疊埋一個）
+      const sorted = [...s.pts].sort((p, q) => (p[0] - a[0]) * dx + (p[1] - a[1]) * dy - ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy));
+      for (let i = 1; i < sorted.length; i++) {
+        const d = Math.hypot(sorted[i]![0] - sorted[i - 1]![0], sorted[i]![1] - sorted[i - 1]![1]);
+        expect(d, s.code).toBeGreaterThan(MTR_MAP_GAP - 0.01);
+        expect(d, s.code).toBeLessThan(2 * MTR_MAP_DOT_R + 0.01);
+      }
     }
   });
 

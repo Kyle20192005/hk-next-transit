@@ -799,9 +799,9 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .mtr-line { fill: none; stroke-width: 0.24; stroke-linecap: round; stroke-linejoin: round; }
 .mtr-hit { fill: transparent; }
 .mtr-sta { cursor: pointer; }
-.mtr-dot { fill: #fff; stroke-width: 0.075; }
-.mtr-dot.inter { stroke: #23262b; stroke-width: 0.065; }
-.mtr-sta.on .mtr-dot { fill: var(--brand); }
+.mtr-ring { fill: #23262b; }
+.mtr-fill { fill: #fff; }
+.mtr-sta.on .mtr-fill { fill: var(--brand); }
 .mtr-zh, .mtr-en { paint-order: stroke; stroke: var(--card); stroke-width: 0.09px; stroke-linejoin: round; }
 .mtr-zh { font-size: 0.3px; font-weight: 700; fill: var(--text); }
 .mtr-en { font-size: 0.18px; font-weight: 500; fill: var(--muted); }

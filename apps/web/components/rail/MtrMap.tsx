@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MTR_MAP_LINES, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
+import { MTR_MAP_DOT_R, MTR_MAP_LINES, MTR_MAP_RING, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
 import Icon from '../Icon';
 
 type View = { x: number; y: number; w: number };
@@ -135,8 +135,6 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
             <path key={l.key} d={l.d} className="mtr-line" stroke={l.color} />
           ))}
           {stations.map((s) => {
-            const inter = s.lines.length > 1;
-            const r = Math.min(s.box.w, s.box.h) / 2;
             const lp = mtrLabelPos(s.box, s.label, 0.14 + s.labelGap);
             const zhY = lp.baseline === 'top' ? lp.y + 0.3 : lp.baseline === 'bottom' ? lp.y - 0.22 : lp.y - 0.02;
             const enY = zhY + 0.25;
@@ -145,7 +143,13 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
               <g key={s.code} data-sta={s.code} className={`mtr-sta${on ? ' on' : ''}`} role="button" aria-label={`${mtrStationName(s.code)}站`}>
                 {/* 撳得嘅範圍大過站粒 */}
                 <rect x={s.box.x - 0.25} y={s.box.y - 0.25} width={s.box.w + 0.5} height={s.box.h + 0.5} className="mtr-hit" />
-                <rect x={s.box.x} y={s.box.y} width={s.box.w} height={s.box.h} rx={r} className={inter ? 'mtr-dot inter' : 'mtr-dot'} stroke={inter ? undefined : mtrLine(s.lines[0]!)?.color} />
+                {/* 每條綫正中一個黑邊白圈；轉車站幾個圈貼住：先畫晒黑圈，再畫白心（中間剩一條黑邊） */}
+                {s.pts.map((p, i) => (
+                  <circle key={`r${i}`} cx={p[0]} cy={p[1]} r={MTR_MAP_DOT_R} className="mtr-ring" />
+                ))}
+                {s.pts.map((p, i) => (
+                  <circle key={`f${i}`} cx={p[0]} cy={p[1]} r={MTR_MAP_DOT_R - MTR_MAP_RING} className="mtr-fill" />
+                ))}
                 <text x={lp.x} y={zhY} textAnchor={lp.anchor} className="mtr-zh">
                   {mtrStationName(s.code)}
                 </text>
