@@ -25,3 +25,4 @@ export * from './live';
 export * from './ids';
 export * from './stop-live';
 export * from './fav-groups';
+export * from './nearby-cache';

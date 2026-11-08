@@ -32,7 +32,9 @@ pnpm -r typecheck
 或者有結構錯誤就唔發佈，網站繼續用舊數據；真係大量路線取消就人手 Run workflow 剔「強制發佈」（`--force`）。
 `data` 分支要有 `apps/web/vercel.json`（`{"ignoreCommand": "exit 0"}`）：Vercel 會將 data 分支當預覽部署，
 冇 `apps/web` 目錄就報 Build Failed。人手發佈數據都要加。
-網頁版本地開發讀 `pipeline/out/`，所以要先跑 pipeline。上線時用 `DATA_BASE_URL` 指去數據位置。
+網頁版本地開發讀 `pipeline/out/`，所以要先跑 pipeline。
+網頁 `lib/data.ts`：Next.js fetch cache 每項最多 2MB，`stops.json`（約 2.6MB）cache 唔到，所以幾個大嘅共用檔（`MEMO_FILES`）
+另外留喺記憶體（key 有數據版本），否則 `/api/nearby` 每次重新下載，慢 2–3 秒。上線時用 `DATA_BASE_URL` 指去數據位置。
 私人 repo 再加 `DATA_TOKEN`：raw.githubusercontent 網址會自動改用 GitHub Contents API。
 數據讀唔到時開 `/api/health` 睇原因。
 
@@ -236,6 +238,9 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     卡掃到先載入，每 30 秒更新。結構通用（core `DepartureRow`，有月台欄），將來港鐵站卡（綫色、800 米、排第一）用同一款。
   - **附近車站唔係分頁**：由首頁「附近 › 更多」或者巴士路線頁頂「附近巴士站」捷徑入，有返回掣（網頁 Home 入面嘅 view，App `src/app/nearby.tsx` stack）。
     定位邏輯 `useNearbyStops`（網頁 `components/home/Nearby.tsx`、App `components/Nearby.tsx`）。
+    **唔好每次都等定位**（core `nearby-cache.ts`）：上次結果記喺 localStorage／AsyncStorage `hknt.nearby.v1`，1 分鐘內直接用、
+    15 分鐘內即刻顯示再背景靜靜雞更新（App 背景唔彈權限）；定位分兩步：先快（網頁 `enableHighAccuracy: false`、App `getLastKnownPositionAsync`），
+    再準（GPS），同顯示緊／問緊嘅位置相差 40 米內就唔再問 `/api/nearby`。
   - 收藏（`lib/favorites.ts`，localStorage，try/catch）：路線頁標題列星號收藏路線（某方向），打開站撳「收藏呢個站」；
     收藏頁同首頁直接顯示收藏咗嘅站嘅下一班（`/api/eta`，同方向；App `components/FavItem.tsx`）。
   - **收藏分組**（core `fav-groups.ts`，`hknt.favGroups.v1`；網頁 `lib/fav-groups.ts`、App `src/lib/fav-groups.ts`）：例如「返工」「返屋企」，

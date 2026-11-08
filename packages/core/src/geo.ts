@@ -8,6 +8,11 @@ export interface Arrow {
   bearing: number;
 }
 
+/** 兩點直線距離（米，近似；香港範圍夠準） */
+export function metresBetween(a: LatLng, b: LatLng): number {
+  return metres(a, b);
+}
+
 function metres(a: LatLng, b: LatLng): number {
   const dy = (a[0] - b[0]) * 111320;
   const dx = (a[1] - b[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);

@@ -37,20 +37,29 @@ async function dataVersion(): Promise<string> {
   }
 }
 
+/**
+ * 記憶體 cache（同一個 Vercel instance 重用）：Next.js fetch cache 每項最多 2MB，`stops.json`（約 2.6MB）cache 唔到，
+ * 每次「附近」都要重新下載同 parse，慢成 2–3 秒。只 cache 幾個大嘅共用檔（呼叫者唔會改佢哋）；
+ * key 有數據版本，數據一更新就換新，舊版本嗰份順手清走。
+ */
+const MEMO_FILES = new Set(['stops.json', 'places.json', 'index.json', 'calendar.json', 'ctb/stops.json']);
+const memo = new Map<string, Promise<unknown>>();
+
 async function load<T>(file: string): Promise<T | null> {
   if (BASE) {
-    const { url: base, headers } = remote(file);
     const isIndex = file === 'ctb/index.json';
     const version = isIndex ? '' : await dataVersion();
-    const url = version ? `${base}${base.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}` : base;
-    const res = await fetch(url, { headers, next: { revalidate: isIndex ? VERSION_REVALIDATE_S : 86400 } });
-    if (res.status === 404) {
-      // 私人 repo 冇權限時 GitHub 都係回 404，所以要寫 log，唔好靜靜雞當冇數據
-      console.warn(`[data] ${file}：404（檔案唔存在，或者冇權限讀取）`);
-      return null;
+    if (!version || !MEMO_FILES.has(file)) return fetchRemote<T>(file, version);
+    const key = `${version}|${file}`;
+    let hit = memo.get(key) as Promise<T | null> | undefined;
+    if (!hit) {
+      for (const k of memo.keys()) if (k.endsWith(`|${file}`)) memo.delete(k);
+      hit = fetchRemote<T>(file, version);
+      memo.set(key, hit);
+      // 出錯唔好記住，下次再試
+      hit.catch(() => memo.delete(key));
     }
-    if (!res.ok) throw new Error(`讀取 ${file} 失敗：HTTP ${res.status}`);
-    return (await res.json()) as T;
+    return hit;
   }
   try {
     return JSON.parse(await readFile(path.join(LOCAL, file), 'utf-8')) as T;
@@ -58,6 +67,20 @@ async function load<T>(file: string): Promise<T | null> {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw e;
   }
+}
+
+async function fetchRemote<T>(file: string, version: string): Promise<T | null> {
+  const { url: base, headers } = remote(file);
+  const isIndex = file === 'ctb/index.json';
+  const url = version ? `${base}${base.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}` : base;
+  const res = await fetch(url, { headers, next: { revalidate: isIndex ? VERSION_REVALIDATE_S : 86400 } });
+  if (res.status === 404) {
+    // 私人 repo 冇權限時 GitHub 都係回 404，所以要寫 log，唔好靜靜雞當冇數據
+    console.warn(`[data] ${file}：404（檔案唔存在，或者冇權限讀取）`);
+    return null;
+  }
+  if (!res.ok) throw new Error(`讀取 ${file} 失敗：HTTP ${res.status}`);
+  return (await res.json()) as T;
 }
 
 

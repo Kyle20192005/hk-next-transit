@@ -3,8 +3,8 @@ import { getPrefs, usePrefs } from '@/lib/prefs';
 import Link from 'next/link';
 import CompanyTag from '@/components/CompanyTag';
 import type { Co } from '@/lib/data';
-import { useCallback, useEffect, useState } from 'react';
-import { formatDistance, radiusLabel, type Company } from '@hknt/core';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatDistance, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, radiusLabel, type Company, type NearbyCache } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import EtaInline from '@/components/EtaInline';
@@ -29,43 +29,109 @@ const REFRESH_MS = 30_000;
 
 export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[]; lat: number; lng: number; area: { n: string; en: string | null } | null };
 
-/** 定位 + 搵附近嘅站（範圍跟設定，預設 600 米；首頁同附近頁共用）；auto = 一開就定位（設定關咗自動定位就唔會） */
+/** 上次「附近」結果（core nearby-cache.ts）：localStorage，只喺呢部機 */
+function readCache(): NearbyCache<NearStop> | null {
+  try {
+    return parseNearbyCache<NearStop>(localStorage.getItem(NEARBY_CACHE_KEY));
+  } catch {
+    return null;
+  }
+}
+function writeCache(c: NearbyCache<NearStop>) {
+  try {
+    localStorage.setItem(NEARBY_CACHE_KEY, JSON.stringify(c));
+  } catch {
+    /* 私人瀏覽等：唔記都得 */
+  }
+}
+
+/**
+ * 定位 + 搵附近嘅站（範圍跟設定，預設 600 米；首頁同附近頁共用）；auto = 一開就定位（設定關咗自動定位就唔會）。
+ * 快：上次結果 15 分鐘內即刻顯示（1 分鐘內唔再定位，否則背景靜靜雞更新）；
+ * 定位分兩步：先攞網絡／上次位置（幾百毫秒）顯示，再等 GPS，郁咗超過 40 米先再問 /api/nearby。
+ */
 export function useNearbyStops(auto = false) {
   const [state, setState] = useState<NearbyState>({ kind: 'idle' });
+  /** 而家顯示緊嘅結果係邊個位置 */
+  const shown = useRef<{ lat: number; lng: number } | null>(null);
+  /** 每次定位一個號碼、每次問 /api/nearby 一個號碼：遲返嚟嘅舊結果唔好蓋過新嘅 */
+  const runRef = useRef(0);
+  const fetchRef = useRef(0);
+  /** 問緊 /api/nearby 嘅位置（快、準兩個位置差唔多就唔使問兩次） */
+  const pending = useRef<{ lat: number; lng: number } | null>(null);
 
-  const locate = useCallback(() => {
-    if (!('geolocation' in navigator)) {
-      setState({ kind: 'error', message: '呢部機唔支援定位' });
-      return;
-    }
-    setState({ kind: 'locating' });
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+  const show = useCallback((c: NearbyCache<NearStop>) => {
+    shown.current = { lat: c.lat, lng: c.lng };
+    setState({ kind: 'ok', stops: c.stops, lat: c.lat, lng: c.lng, area: c.area });
+  }, []);
+
+  const locate = useCallback(
+    (quiet = false) => {
+      if (!('geolocation' in navigator)) {
+        if (!quiet) setState({ kind: 'error', message: '呢部機唔支援定位' });
+        return;
+      }
+      if (!quiet) setState((s) => (s.kind === 'ok' ? s : { kind: 'locating' }));
+      const run = ++runRef.current;
+      let best = Infinity; // 用咗嘅位置準確度（米），越細越準
+      let got = false;
+      const onFix = async (pos: GeolocationPosition) => {
+        if (run !== runRef.current) return;
+        const acc = pos.coords.accuracy || 9999;
+        if (acc > best) return; // 已經有更準嘅
+        best = acc;
+        got = true;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const radius = getPrefs().nearbyRadius;
+        // 同顯示緊（或者問緊）嘅位置比較
+        const cur = pending.current ?? shown.current;
+        if (cur && !nearbyMoved(cur, { lat, lng })) {
+          // 冇郁過：唔使再問，只更新時間
+          const c = readCache();
+          if (c && c.radius === radius) writeCache({ ...c, at: Date.now() });
+          return;
+        }
+        const mine = ++fetchRef.current;
+        pending.current = { lat, lng };
         try {
-          const res = await fetch(`/api/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}&r=${getPrefs().nearbyRadius}`);
+          const res = await fetch(`/api/nearby?lat=${lat}&lng=${lng}&r=${radius}`);
           const body = await res.json();
           if (!res.ok) throw new Error(body.error ?? res.statusText);
-          setState({ kind: 'ok', stops: body.stops, lat: pos.coords.latitude, lng: pos.coords.longitude, area: body.area ?? null });
+          if (mine !== fetchRef.current) return;
+          const c: NearbyCache<NearStop> = { at: Date.now(), radius, lat, lng, stops: body.stops, area: body.area ?? null };
+          writeCache(c);
+          show(c);
         } catch (e) {
-          setState({ kind: 'error', message: (e as Error).message });
+          if (!quiet && mine === fetchRef.current && !shown.current) setState({ kind: 'error', message: (e as Error).message });
+        } finally {
+          if (mine === fetchRef.current) pending.current = null;
         }
-      },
-      (err) =>
-        setState({
-          kind: 'error',
-          message: err.code === err.PERMISSION_DENIED ? '冇定位權限：請喺瀏覽器設定容許呢個網站使用位置' : '攞唔到位置，請再試',
-        }),
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
-    );
-  }, []);
+      };
+      const onError = (err: GeolocationPositionError) => {
+        if (quiet || got || shown.current) return;
+        setState({ kind: 'error', message: err.code === err.PERMISSION_DENIED ? '冇定位權限：請喺瀏覽器設定容許呢個網站使用位置' : '攞唔到位置，請再試' });
+      };
+      // 1. 快：網絡定位或者兩分鐘內嘅位置
+      navigator.geolocation.getCurrentPosition((p) => void onFix(p), () => {}, { enableHighAccuracy: false, timeout: 5_000, maximumAge: 120_000 });
+      // 2. 準：GPS（郁咗先更新）
+      navigator.geolocation.getCurrentPosition((p) => void onFix(p), onError, { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 });
+    },
+    [show],
+  );
 
   useEffect(() => {
     if (!auto || !getPrefs().autoLocate) return;
-    const id = setTimeout(locate, 0);
+    const id = setTimeout(() => {
+      const c = readCache();
+      const use = nearbyCacheUse(c, Date.now(), getPrefs().nearbyRadius);
+      if (use) show(c!);
+      if (use !== 'fresh') locate(use === 'stale');
+    }, 0);
     return () => clearTimeout(id);
-  }, [auto, locate]);
+  }, [auto, locate, show]);
 
-  return { state, locate };
+  return { state, locate: useCallback(() => locate(false), [locate]) };
 }
 
 /** 附近車站（由首頁或者巴士路線頁撳入嚟，唔係分頁）：定位搵附近（設定範圍）嘅站，顯示每條路線下一班車 */
