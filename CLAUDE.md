@@ -48,11 +48,13 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 帳戶（登入、收藏同步）用 Supabase 雲端版（新加坡），唔登入照用得。計劃、數據表、訊息格式、同步規則同階段：**`docs/realtime-backend.md`**。做嘅時候照住佢，改咗設計就更新嗰份文件。
 
 已經做咗（2026-11-08，部署步驟 **`deploy/README.md`**）：
-- **分工**：前端（網頁、App）只負責顯示同互動，**從來唔直接問巴士公司**。實時巴士數據（巴士位置 `/api/buses`、某站到站時間 `/api/eta`）
-  一律先問 **tracker**，出錯先退返 Vercel 同名 API（core `createLiveClient`；網頁 `lib/buses.ts` 嘅 `liveClient`、`NEXT_PUBLIC_TRACKER_URL`；
+- **分工**：前端（網頁、App）只負責顯示同互動，**從來唔直接問巴士公司**。實時巴士數據（巴士位置 `/api/buses`、某站到站時間 `/api/eta`、
+  一個站所有路線 `/api/stop-etas`、喺度搭得／首頁下班車 `/api/here`）一律先問 **tracker**，出錯先退返 Vercel 同名 API（core `createLiveClient`；網頁 `lib/buses.ts` 嘅 `liveClient`、`NEXT_PUBLIC_TRACKER_URL`；
   App `lib/api.ts`，預設 `https://rt.kyle05.dev`，`EXPO_PUBLIC_TRACKER_URL` 可改、空白 = 唔用）。tracker 1.5 秒未覆就同時問後備、邊個先返用邊個（冷門線第一次計要幾秒）；連唔到或 5xx 先停用 60 秒。
   tracker 有 45 秒內嘅快照就即刻俾（背景照 poll），唔等新一輪計完。
-  其他（路線資料、附近、`/api/here`、`/api/stop-etas`、消息）暫時留 Vercel（分散 IP）。
+  靜態／非巴士公司數據（路線資料、日曆、`/api/nearby` 搵附近站、交通消息）留 Vercel。
+  `/api/stop-etas`、`/api/here` 一次問好多個站：tracker 用**低優先**（追蹤緊嘅路線先行），排隊超過大約 2 秒嘅量就回 **503**，
+  前端即刻改問 Vercel（503 唔當 tracker 死咗），唔會俾用戶見到唔完整嘅「冇班次」。邏輯喺 core `stop-live.ts`（`routesAtStop`、`stopEtas`、`hereRoutes`），Vercel 同 tracker 共用。
 - `apps/tracker`：`GET /api/buses`、`/api/eta`（同 Vercel 一樣格式）、`/health`、`/`。有人問先計，背景每 15 秒 poll，3 分鐘冇人問就停；
   上游 fetch 包一層（10 秒 cache、合併同時請求、限流 `UPSTREAM_RPS` 每個伺服器各自計、每間公司統計）；`node dist/probe.js` 量上游上限。
   只問過一次嘅線（多數係撳落路線嘅預先 fetch）45 秒冇人再問就停；冇 poll 又耐冇人問嘅線定時清走。

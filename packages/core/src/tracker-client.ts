@@ -39,8 +39,9 @@ export function createLiveClient(opts: {
     try {
       const res = await f(`${tracker}${path}`, { signal: ctl.signal });
       if (res.ok) return res;
-      if (res.status >= 500) downUntil = now() + downMs;
-      return null; // 4xx（例如數據版本未同步）：今次用後備，唔當佢死咗
+      // 503 = tracker 忙（低優先請求排唔到）；4xx（例如數據版本未同步）：今次用後備，唔當佢死咗
+      if (res.status >= 500 && res.status !== 503) downUntil = now() + downMs;
+      return null;
     } catch {
       if (!ctl.signal.aborted) downUntil = now() + downMs;
       return null;
@@ -79,6 +80,10 @@ export function createLiveClient(opts: {
     buses: (co: string, route: string, variantId: string) => get(busesPath(co, route, variantId)),
     /** 某路線喺某站嘅到站時間（tracker 追蹤緊呢條線就直接用佢 cache 住嘅，唔使再問巴士公司） */
     eta: (co: string, route: string, stopId: string) => get(etaPath(co, route, stopId)),
+    /** 一個站所有路線嘅下一兩班（附近車站） */
+    stopEtas: (co: string, stopId: string) => get(`/api/stop-etas?co=${co}&stop=${encodeURIComponent(stopId)}`),
+    /** 呢個位置可以搭嘅所有路線（喺度搭得、首頁下班車） */
+    here: (lat: number, lng: number) => get(`/api/here?lat=${lat}&lng=${lng}`),
     /** 而家係咪用緊 tracker（除錯用） */
     usingTracker: () => Boolean(tracker) && now() >= downUntil,
   };

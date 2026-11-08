@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createUpstream, TokenBucket } from './upstream';
+import { BusyError, createUpstream, TokenBucket } from './upstream';
 
 describe('upstream fetch', () => {
   it('caches, merges concurrent requests and keeps errors out of cache', async () => {
@@ -46,5 +46,32 @@ describe('TokenBucket', () => {
     await Promise.all(Array.from({ length: 15 }, () => b.take()));
     // 頭 10 個即刻有，之後 5 個要等大約 0.5 秒
     expect(Date.now() - t0).toBeGreaterThanOrEqual(400);
+  });
+});
+
+describe('priority', () => {
+  it('serves high priority before low, and rejects low when the queue is long', async () => {
+    const b = new TokenBucket(2); // 每秒 2 個，一開始有 2 個 token
+    const order: string[] = [];
+    await Promise.all([b.take(), b.take()]); // 用晒
+    const low = b.take(true, 10).then(() => order.push('low'));
+    const high = b.take().then(() => order.push('high'));
+    await Promise.all([low, high]);
+    expect(order).toEqual(['high', 'low']);
+    // 排隊上限 = rps × maxLowWait = 2：已經有 2 個排緊，低優先直接拒絕
+    void b.take();
+    void b.take();
+    await expect(b.take(true, 1)).rejects.toBeInstanceOf(BusyError);
+  });
+
+  it('lowFetch reports busy', async () => {
+    let busy = false;
+    const up = createUpstream({ ttlMs: 10_000, rps: 1, fetchImpl: async () => new Response('{}') });
+    const f = up.lowFetch(() => (busy = true));
+    await up.fetch('https://rt.data.gov.hk/a'); // 用咗唯一嗰個 token
+    void up.fetch('https://rt.data.gov.hk/b'); // 排緊一個（高優先）
+    void up.fetch('https://rt.data.gov.hk/c');
+    await expect(f('https://rt.data.gov.hk/d')).rejects.toBeInstanceOf(BusyError);
+    expect(busy).toBe(true);
   });
 });

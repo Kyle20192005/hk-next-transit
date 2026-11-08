@@ -17,6 +17,14 @@ const live = createLiveClient({ trackerBase: TRACKER_URL, fallbackBase: API_BASE
 /** 路線檔位置（core 共用） */
 export { isCo, type Co };
 
+/** 實時數據（tracker 優先）回應轉 JSON；出錯拋返伺服器講嘅原因 */
+async function liveJson<T>(p: Promise<Response>): Promise<T> {
+  const res = await p;
+  const body = await res.json();
+  if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+  return body as T;
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   const body = await res.json();
@@ -63,29 +71,16 @@ export const api = {
   calendar: () => get<Calendar>('/api/calendar'),
   route: (co: Co, route: string) => get<RouteData>(`/api/route/${co}/${q(route)}`),
   /** 成條線嘅巴士位置同同 ETA 一致嘅每段行車時間 */
-  buses: async (co: Co, route: string, variantId: string) => {
-    // 設咗 EXPO_PUBLIC_TRACKER_URL 就先問 tracker（香港 VPS），出錯自動退返網站 /api/buses
-    const res = await live.buses(co, route, variantId);
-    const body = await res.json();
-    if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
-    return body as { buses: LiveBus[]; segSeconds: number[]; fetchedAt: string };
-  },
+  buses: (co: Co, route: string, variantId: string) => liveJson<{ buses: LiveBus[]; segSeconds: number[]; fetchedAt: string }>(live.buses(co, route, variantId)),
   /** 某站到站時間；failed = 攞唔到數據嘅公司（唔好當佢冇車） */
-  eta: async (co: Co, route: string, stop: string) => {
-    const res = await live.eta(co, route, stop);
-    const body = await res.json();
-    if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
-    return body as { etas: Eta[]; failed?: Company[]; fetchedAt: string };
-  },
+  eta: (co: Co, route: string, stop: string) => liveJson<{ etas: Eta[]; failed?: Company[]; fetchedAt: string }>(live.eta(co, route, stop)),
   /** 喺度搭得：呢個位置可以搭嘅所有路線同下一兩班 */
-  here: (lat: number, lng: number) => get<{ routes: HereRoute[]; radius: number }>(`/api/here?lat=${lat}&lng=${lng}`),
+  here: (lat: number, lng: number) => liveJson<{ routes: HereRoute[]; radius: number }>(live.here(lat, lng)),
   news: (pos: { lat: number; lng: number } | null) => get<{ items: NewsItem[] }>(`/api/news${pos ? `?lat=${pos.lat.toFixed(4)}&lng=${pos.lng.toFixed(4)}` : ''}`),
   nearby: (lat: number, lng: number, r = 600) => get<{ stops: NearStop[]; area?: { n: string; en: string | null } | null }>(`/api/nearby?lat=${lat}&lng=${lng}&r=${r}`),
   /** 一個站所有路線嘅下一班 */
   stopEtas: (co: Co, stop: string) =>
-    get<{ routes: { route: string; dir: 'O' | 'I'; etas: { eta: string; company: Company; scheduled: boolean }[] }[] }>(
-      `/api/stop-etas?co=${co}&stop=${q(stop)}`,
-    ),
+    liveJson<{ routes: { route: string; dir: 'O' | 'I'; etas: { eta: string; company: Company; scheduled: boolean }[] }[] }>(live.stopEtas(co, stop)),
 };
 
 // ---------- 路線資料同日曆嘅快取：開過嘅即刻顯示，背景再更新 ----------

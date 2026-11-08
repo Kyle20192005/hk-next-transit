@@ -1,15 +1,17 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { APP_VERSION, etasAtStopDetailed } from '@hknt/core';
+import { APP_VERSION, etasAtStopDetailed, hereRoutes, inHongKong, stopEtas, type StopLiveDeps } from '@hknt/core';
 import { config } from './config';
-import { dataVersion, getCalendar, getRoute, isCo, SAFE_ROUTE, SAFE_STOP } from './data';
+import { dataVersion, getAllStops, getCalendar, getIndex, getRoute, isCo, SAFE_ROUTE, SAFE_STOP } from './data';
 import { createLines, NotFound } from './lines';
-import { createUpstream } from './upstream';
+import { BusyError, createUpstream } from './upstream';
 
 /**
  * tracker 第一版（docs/realtime-backend.md 階段 1a）：
  * 背景 poll 有人睇嘅線，用同網頁 /api/buses 一樣嘅格式俾巴士位置；所有人共用同一份上游請求。
  *   GET /api/buses?co=ctb&route=38&v=1540-1   巴士位置
  *   GET /api/eta?co=ctb&route=101&stop=001152  某站到站時間（同網站 /api/eta 一樣格式；追蹤緊嘅線直接用 cache，唔使再問巴士公司）
+ *   GET /api/stop-etas?co=ctb&stop=001106      一個站所有路線嘅下一兩班（附近）
+ *   GET /api/here?lat=22.28&lng=114.15          呢個位置可以搭嘅路線（喺度搭得、首頁下班車）
  *   GET /health
  */
 const upstream = createUpstream({ ttlMs: config.upstreamTtlMs, rps: config.upstreamRps });
@@ -45,6 +47,8 @@ const server = createServer(async (req, res) => {
           '/health': '狀態：每間公司請求數、出錯率、而家追蹤緊邊幾條線',
           '/api/buses?co=ctb&route=38&v=1000304-1': '一個走法嘅巴士位置（同網站 /api/buses 一樣格式）',
           '/api/eta?co=ctb&route=101&stop=001152': '某路線喺某站嘅到站時間（同網站 /api/eta 一樣格式）',
+          '/api/stop-etas?co=ctb&stop=001106': '一個站所有路線嘅下一兩班（附近車站）',
+          '/api/here?lat=22.3045&lng=114.1838': '呢個位置可以搭嘅所有路線（喺度搭得、首頁下班車）',
         },
       });
     }
@@ -88,9 +92,31 @@ const server = createServer(async (req, res) => {
       return send(req, res, 200, { route: data.route, stop, fetchedAt: new Date().toISOString(), etas, failed }, { 'Cache-Control': 'no-store' });
     }
 
+    // 附近、喺度搭得：一次問好多個站，用低優先；tracker 忙就回 503，前端改問 Vercel（唔好俾用戶見到唔完整嘅「冇班次」）
+    if (url.pathname === '/api/stop-etas' || url.pathname === '/api/here') {
+      let busy = false;
+      const deps: StopLiveDeps = { getRoute, getIndex, getAllStops, fetcher: upstream.lowFetch(() => (busy = true)) };
+      let body: unknown;
+      if (url.pathname === '/api/stop-etas') {
+        const co = url.searchParams.get('co') ?? 'ctb';
+        const stop = url.searchParams.get('stop') ?? '';
+        if (!isCo(co) || !SAFE_STOP.test(stop)) return send(req, res, 400, { error: 'co 或 stop 格式唔啱' });
+        body = await stopEtas(co, stop, deps);
+        if (!body) return send(req, res, 404, { error: '搵唔到呢個站' });
+      } else {
+        const lat = Number(url.searchParams.get('lat'));
+        const lng = Number(url.searchParams.get('lng'));
+        if (!inHongKong(lat, lng)) return send(req, res, 400, { error: '位置唔喺香港範圍' });
+        body = await hereRoutes(lat, lng, Number(url.searchParams.get('r')) || null, deps);
+      }
+      if (busy) return send(req, res, 503, { error: 'tracker 忙，請用後備' }, { 'Cache-Control': 'no-store' });
+      return send(req, res, 200, body, { 'Cache-Control': 'no-store' });
+    }
+
     send(req, res, 404, { error: '冇呢個網址' });
   } catch (e) {
     if (e instanceof NotFound) return send(req, res, 404, { error: e.message });
+    if (e instanceof BusyError) return send(req, res, 503, { error: 'tracker 忙，請用後備' });
     console.error(`[http] ${req.url}：`, e);
     send(req, res, 502, { error: `計唔到：${(e as Error).message}` });
   }

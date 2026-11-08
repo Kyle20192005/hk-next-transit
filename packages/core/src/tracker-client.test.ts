@@ -58,6 +58,23 @@ describe('createBusesClient', () => {
     await c.buses('ctb', '38', 'x');
     expect(calls.pop()).toBe('https://rt/api/buses?co=ctb&route=38&v=x');
   });
+  it('503 (busy) falls back without marking tracker down', async () => {
+    const calls: string[] = [];
+    let busy = true;
+    const fake: typeof fetch = async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.startsWith('https://rt') && busy) return new Response('{}', { status: 503 });
+      return new Response('{}');
+    };
+    const c = createBusesClient({ trackerBase: 'https://rt', fallbackBase: '', fetcher: fake });
+    await c.here(22.3, 114.18);
+    expect(calls.slice(-2)).toEqual(['https://rt/api/here?lat=22.3&lng=114.18', '/api/here?lat=22.3&lng=114.18']);
+    expect(c.usingTracker()).toBe(true);
+    busy = false;
+    await c.stopEtas('ctb', '001106');
+    expect(calls.pop()).toBe('https://rt/api/stop-etas?co=ctb&stop=001106');
+  });
   it('eta goes through tracker too', async () => {
     const calls: string[] = [];
     const c = createBusesClient({ trackerBase: 'https://rt', fallbackBase: '', fetcher: async (i) => (calls.push(String(i)), new Response('{}')) });

@@ -7,6 +7,7 @@ import Icon from './Icon';
 import { warmRoute } from '@/lib/prefetch';
 import type { Co } from '@/lib/data';
 import EtaInline from './EtaInline';
+import { liveClient } from '@/lib/buses';
 
 interface HereRoute {
   co: Co;
@@ -37,7 +38,7 @@ export default function HereDrawer({ lat, lng, name, current }: { lat: number; l
     let cancelled = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/here?lat=${lat}&lng=${lng}`);
+        const res = await liveClient.here(lat, lng);
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? res.statusText);
         if (!cancelled) {

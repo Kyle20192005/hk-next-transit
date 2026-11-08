@@ -8,6 +8,7 @@ import { formatDistance, radiusLabel, type Company } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import EtaInline from '@/components/EtaInline';
+import { liveClient } from '@/lib/buses';
 
 export interface NearStop {
   id: string;
@@ -132,7 +133,7 @@ export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boole
     let cancelled = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/stop-etas?co=${stop.co}&stop=${stop.id}`);
+        const res = await liveClient.stopEtas(stop.co, stop.id);
         if (res.ok && !cancelled) setEtas(await res.json());
       } catch {
         /* 下次再試 */

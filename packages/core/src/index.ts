@@ -23,3 +23,4 @@ export * from './area';
 export * from './tracker-client';
 export * from './live';
 export * from './ids';
+export * from './stop-live';

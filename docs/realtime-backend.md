@@ -387,6 +387,8 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
       前端（網頁、App）所有「某站到站時間」同巴士位置一律 tracker 優先、Vercel 後備（core `createLiveClient`）
 - [x] 計巴士位置搬入 core `computeBuses`（Vercel 同 tracker 共用，唔再抄兩份）
 - [x] App 預設用 tracker（`https://rt.kyle05.dev`）
+- [x] 附近（`/api/stop-etas`）、喺度搭得同首頁下班車（`/api/here`）都經 tracker（2026-11-08）：低優先 + 太忙回 503 → 前端用 Vercel；
+      邏輯搬入 core `stop-live.ts`。實時巴士數據全部由 tracker 負責，Vercel 只係後備同靜態數據
 - 之後：九巴改用 `route-eta`（成條線一次）代替逐站，請求量大減
 
 ### 階段 1b：WebSocket 推送

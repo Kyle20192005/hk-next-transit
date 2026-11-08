@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { dataFileRequest, isCo, SAFE_ROUTE, SAFE_STOP, type Calendar, type Co, type RouteData, type RouteIndex } from '@hknt/core';
+import { dataFileRequest, isCo, SAFE_ROUTE, SAFE_STOP, type AnyStopEntry, type Calendar, type Co, type RouteData, type RouteIndex } from '@hknt/core';
 import { config } from './config';
 
 /**
@@ -69,4 +69,16 @@ export async function getRoute(co: Co, route: string): Promise<RouteData | null>
 export async function getCalendar(): Promise<Calendar> {
   await dataVersion();
   return (await cached<Calendar>('calendar.json')) ?? {};
+}
+
+/** 統一路線索引（聯營線判斷、公司名） */
+export async function getIndex(): Promise<RouteIndex> {
+  await dataVersion();
+  return (await cached<RouteIndex>('index.json')) ?? { generatedAt: '', routes: [] };
+}
+
+/** 統一站點索引（約 2.6MB，載入一次放記憶體）：附近、喺度搭得用 */
+export async function getAllStops(): Promise<AnyStopEntry[]> {
+  await dataVersion();
+  return (await cached<{ stops: AnyStopEntry[] }>('stops.json'))?.stops ?? [];
 }

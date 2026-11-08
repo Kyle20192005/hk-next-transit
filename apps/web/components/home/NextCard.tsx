@@ -159,7 +159,7 @@ function useHeadRows(heads: StopHead<NearStop>[]): Record<string, { rows: Depart
       headsRef.current.forEach(async (h) => {
         let rows: DepartureRow[] = [];
         try {
-          const res = await fetch(`/api/here?lat=${h.lat}&lng=${h.lng}`);
+          const res = await liveClient.here(h.lat, h.lng);
           const body = (await res.json()) as { routes?: HereRouteLike[] };
           if (res.ok) rows = busDepartureRows(body.routes ?? [], Date.now(), ROWS);
         } catch {

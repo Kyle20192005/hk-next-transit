@@ -1,7 +1,7 @@
 import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { CO_LIST, dataFileRequest, isCo, SAFE_ROUTE, type Calendar, type Co, type Place, type RouteData, type RouteIndex } from '@hknt/core';
+import { CO_LIST, dataFileRequest, type AnyStopEntry, isCo, SAFE_ROUTE, type Calendar, type Co, type Place, type RouteData, type RouteIndex } from '@hknt/core';
 
 /**
  * 讀 pipeline 輸出嘅數據。
@@ -96,15 +96,8 @@ export async function getIndex(): Promise<RouteIndex> {
   return (await load<RouteIndex>('index.json')) ?? (await getCtbIndex());
 }
 
-/** 統一站點索引項目：r = [路線檔位置, 路線, 方向, 往邊度] */
-export interface AnyStopEntry {
-  id: string;
-  co: Co;
-  n: string;
-  lat: number;
-  lng: number;
-  r: [co: Co, route: string, dir: 'O' | 'I', destTc: string][];
-}
+/** 統一站點索引項目（core 共用） */
+export type { AnyStopEntry };
 
 /** 統一站點索引（城巴站 + 九巴站）；舊數據冇就用城巴站 */
 export async function getAllStops(): Promise<AnyStopEntry[]> {

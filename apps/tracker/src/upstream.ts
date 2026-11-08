@@ -6,10 +6,19 @@
  * - 統計：每間公司請求數、出錯數、平均回應時間（/health 顯示，用嚟及早發現俾人限流）
  */
 
+/** 低優先請求排隊太長（tracker 忙）：唔排，即刻話佢知，等前端用 Vercel 後備 */
+export class BusyError extends Error {
+  constructor() {
+    super('tracker 忙');
+  }
+}
+
 export class TokenBucket {
   private tokens: number;
   private last: number;
+  /** 高優先（追蹤緊嘅路線、某站到站時間）先行，低優先（附近、喺度搭得：一次問好多個站）之後 */
   private queue: (() => void)[] = [];
+  private low: (() => void)[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -26,25 +35,26 @@ export class TokenBucket {
     this.last = t;
   }
 
-  /** 攞一個 token；冇就排隊等 */
-  take(): Promise<void> {
+  /** 攞一個 token；冇就排隊等。低優先：前面排緊太多（maxLowWait 秒嘅量）就直接 BusyError */
+  take(lowPriority = false, maxLowWait = 2): Promise<void> {
+    if (lowPriority && this.queue.length + this.low.length >= this.rps * maxLowWait) return Promise.reject(new BusyError());
     return new Promise((resolve) => {
-      this.queue.push(resolve);
+      (lowPriority ? this.low : this.queue).push(resolve);
       this.drain();
     });
   }
 
   get waiting() {
-    return this.queue.length;
+    return this.queue.length + this.low.length;
   }
 
   private drain() {
     this.refill();
-    while (this.queue.length && this.tokens >= 1) {
+    while ((this.queue.length || this.low.length) && this.tokens >= 1) {
       this.tokens -= 1;
-      this.queue.shift()!();
+      (this.queue.length ? this.queue : this.low).shift()!();
     }
-    if (this.queue.length && !this.timer) {
+    if ((this.queue.length || this.low.length) && !this.timer) {
       const wait = Math.ceil(((1 - this.tokens) / this.rps) * 1000);
       this.timer = setTimeout(() => {
         this.timer = null;
@@ -102,7 +112,7 @@ export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: t
 
   const toResponse = (s: Stored) => new Response(s.body, { status: s.status, headers: { 'content-type': s.contentType } });
 
-  const upstreamFetch: typeof fetch = async (input, init) => {
+  const makeFetch = (lowPriority: boolean, onBusy?: () => void): typeof fetch => async (input, init) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const body = typeof init?.body === 'string' ? init.body : '';
     const key = `${init?.method ?? 'GET'} ${url} ${body}`;
@@ -116,7 +126,12 @@ export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: t
     let p = inflight.get(key);
     if (!p) {
       p = (async () => {
-        await bucketFor(url).take();
+        try {
+          await bucketFor(url).take(lowPriority);
+        } catch (e) {
+          onBusy?.();
+          throw e;
+        }
         const s = stat(co);
         const t0 = now();
         s.requests++;
@@ -153,5 +168,14 @@ export function createUpstream(opts: { ttlMs: number; rps: number; fetchImpl?: t
   };
 
   const queued = () => [...buckets.values()].reduce((n, b) => n + b.waiting, 0);
-  return { fetch: upstreamFetch, stats, queued, sweep, cacheSize: () => cache.size };
+  return {
+    /** 高優先：追蹤緊嘅路線、某站到站時間 */
+    fetch: makeFetch(false),
+    /** 低優先（附近、喺度搭得）：排隊太長會 BusyError；onBusy 用嚟知道今次請求有冇俾人拒絕 */
+    lowFetch: (onBusy: () => void) => makeFetch(true, onBusy),
+    stats,
+    queued,
+    sweep,
+    cacheSize: () => cache.size,
+  };
 }
