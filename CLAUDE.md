@@ -293,7 +293,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 預先 fetch（網頁 `lib/prefetch.ts`、App `src/lib/prefetch.ts`）：撳落路線（未放手）`warmRoute` 預熱
   `/api/buses`（伺服器 cache 10 秒），候選 ≤ 3 條停 0.4 秒 `preloadRoute` 只攞路線資料。預設方向同走法一律用 core
   `defaultDir`／`pickVariant`（路線頁、預熱共用），否則預熱網址同路線頁唔同，cache 唔會命中。
-- **尾班車提示**（打開站之後，到站時間下面）：core `lastBusAt`（呢個方向所有經過呢個站嘅走法、政府時間表 + `offsets` 估算到站；
+- **尾班車提示**（打開站之後，到站時間下面）：core `lastBusAt`（呢個方向所有經過呢個站嘅走法，**包埋特別班**、政府時間表 + `offsets` 估算到站；城巴獨有站用 `minutesToStop` 按 `expSeq` 前後政府站插值；
   琴日過咗午夜仲未完嘅班次當仲係琴日嘅服務日）、`lastBusText`：「尾班約 23:45」、30 分鐘內「· 仲有 N 分鐘」（紅色）、
   過咗而且冇班次「尾班車已經開走 · 下次頭班約（聽日）06:10」（取代「暫時冇班次」；仲有實時班次就唔講冇車）。冇時間表嘅走法唔計，全部冇就唔顯示。
   **邊班係尾班**（core `lastBusEtaIndex`）：最遲嗰班實時班次同時間表尾班相差 15 分鐘內、而且近尾班多過近前一班（`LastBus.prev`）就標「尾班」，

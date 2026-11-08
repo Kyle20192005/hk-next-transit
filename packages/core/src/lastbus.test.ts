@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adjustLastBus, lastBusAt, lastBusEtaIndex, lastBusText } from './schedule';
+import { adjustLastBus, lastBusAt, lastBusEtaIndex, lastBusText, minutesToStop } from './schedule';
 import type { Calendar, Variant } from './types';
 
 // 每日都有嘅服務
@@ -109,5 +109,15 @@ describe('adjustLastBus (107 at night: estimate 00:45, real 00:28)', () => {
     const info = lastBusAt(vs, 'B', 'O', calendar, hk(0, 15) + 86_400_000);
     expect(adjustLastBus(info, null)).toBe(info);
     expect(adjustLastBus({ last: 1, nextFirst: null, offsetMin: 2 }, 1)?.last).toBe(1);
+  });
+});
+
+describe('minutesToStop: 城巴獨有站', () => {
+  it('interpolates between neighbouring government stops by CTB order', () => {
+    // 政府站 A(0)、C(600 秒)；城巴獨有站 B 喺中間
+    const vv = { id: 'x', stops: ['A', 'C'], stopDirs: ['O', 'O'], offsets: [0, 600], expSeq: { 'O:A': 1, 'O:B': 2, 'O:C': 3 }, schedules: [{ serviceId: 'D', departures: [360, 1410] }] } as unknown as Variant;
+    expect(minutesToStop(vv, 'B', 'O')).toBe(5);
+    expect(lastBusAt([vv], 'B', 'O', calendar, hk(20))?.last).toBe(hk(23, 35));
+    expect(minutesToStop(vv, 'Z', 'O')).toBeNull();
   });
 });

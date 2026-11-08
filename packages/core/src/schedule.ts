@@ -127,11 +127,38 @@ const HK_OFFSET_MS = 8 * 3600_000;
 /** 包含 `t` 嗰日嘅香港午夜（毫秒） */
 const hkMidnight = (t: number) => Math.floor((t + HK_OFFSET_MS) / DAY_MS) * DAY_MS - HK_OFFSET_MS;
 
-/** 由總站開出到呢個站要幾多分鐘（時間表估算）；呢個走法唔經呢個站 → null */
+/**
+ * 由總站開出到呢個站要幾多分鐘（時間表估算）；呢個走法唔經呢個站 → null。
+ * 城巴獨有站（政府冇，例如 101 嘅九龍城–宋皇臺遊樂場）冇自己嘅 offset：用城巴站序（`expSeq`）前後兩個政府站按站數插值。
+ */
 export function minutesToStop(v: Variant, stopId: string, dir: string): number | null {
-  const idx = v.stops.findIndex((s, i) => s === stopId && v.stopDirs[i] === dir);
-  if (idx >= 0) return (v.offsets[idx] ?? 0) / 60;
-  return null;
+  const own = (id: string, d: string) => {
+    const i = v.stops.findIndex((s, k) => s === id && v.stopDirs[k] === d);
+    return i >= 0 ? (v.offsets[i] ?? 0) : undefined;
+  };
+  const direct = own(stopId, dir);
+  if (direct !== undefined) return direct / 60;
+  if (v.expSeq?.[`${dir}:${stopId}`] === undefined) return null;
+  // 同 variant.ts 嘅 variantStops 一樣次序（唔 import，避免循環引用）
+  const dirOrder: string[] = [];
+  for (const d of v.stopDirs) if (d && !dirOrder.includes(d)) dirOrder.push(d);
+  const list = dirOrder.flatMap((d) =>
+    Object.entries(v.expSeq)
+      .filter(([key]) => key.startsWith(`${d}:`))
+      .map(([key, seq]) => ({ dir: d, stopId: key.slice(2), seq }))
+      .sort((x, y) => x.seq - y.seq),
+  );
+  const k = list.findIndex((x) => x.dir === dir && x.stopId === stopId);
+  if (k < 0) return null;
+  let a = k - 1;
+  while (a >= 0 && own(list[a]!.stopId, list[a]!.dir) === undefined) a--;
+  let b = k + 1;
+  while (b < list.length && own(list[b]!.stopId, list[b]!.dir) === undefined) b++;
+  const oa = a >= 0 ? own(list[a]!.stopId, list[a]!.dir)! : undefined;
+  const ob = b < list.length ? own(list[b]!.stopId, list[b]!.dir)! : undefined;
+  if (oa !== undefined && ob !== undefined) return (oa + ((ob - oa) * (k - a)) / (b - a)) / 60;
+  const one = oa ?? ob;
+  return one === undefined ? null : one / 60;
 }
 
 export interface LastBus {
