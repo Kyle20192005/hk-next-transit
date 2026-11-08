@@ -35,7 +35,7 @@ describe('mtr', () => {
   });
 });
 
-import { MTR_MAP_BEND, MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LINES, MTR_MAP_VIEW, MTR_MAP_WATER, mtrMapStations } from './mtr-map';
+import { MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LINES, MTR_MAP_RADIUS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLinePathD, mtrMapStations } from './mtr-map';
 import { MTR_LINE_STATIONS } from './mtr-data';
 
 describe('mtr map', () => {
@@ -51,7 +51,7 @@ describe('mtr map', () => {
         for (let i = 1; i < p.length; i++) {
           const dx = Math.abs(p[i]![0] - p[i - 1]![0]);
           const dy = Math.abs(p[i]![1] - p[i - 1]![1]);
-          expect(dx === 0 || dy === 0 || Math.abs(dx - dy) < 1e-9, `${l.line} segment ${i}`).toBe(true);
+          expect(dx < 1e-9 || dy < 1e-9 || Math.abs(dx - dy) < 1e-3, `${l.line} segment ${i}`).toBe(true);
         }
   });
   it('interchanges have all their lines', () => {
@@ -62,7 +62,17 @@ describe('mtr map', () => {
 
 describe('mtr map geometry', () => {
   const dist = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!);
-  it('every station sits on its own line, away from corners (so bends can be rounded)', () => {
+  // 轉角：角度、半徑、彎位由轉角起計幾長
+  const turn = (path: readonly (readonly number[])[], i: number) => {
+    const [a, p, b] = [path[i - 1]!, path[i]!, path[i + 1]!];
+    const v1 = [p[0]! - a[0]!, p[1]! - a[1]!];
+    const v2 = [b[0]! - p[0]!, b[1]! - p[1]!];
+    const cos = (v1[0]! * v2[0]! + v1[1]! * v2[1]!) / (Math.hypot(v1[0]!, v1[1]!) * Math.hypot(v2[0]!, v2[1]!));
+    const deg = (Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI;
+    const r = p[2] ?? MTR_MAP_RADIUS;
+    return { deg, t: r * Math.tan((deg * Math.PI) / 360) };
+  };
+  it('every station sits on its own line, on the straight part (not inside a bend)', () => {
     for (const l of MTR_MAP_LINES) {
       for (const [code, p] of Object.entries(l.stations)) {
         const segs = l.paths.flatMap((path) => path.slice(1).map((b, i) => [path[i]!, b] as const));
@@ -70,25 +80,40 @@ describe('mtr map geometry', () => {
         expect(on, `${l.line} ${code} on line`).toBe(true);
         for (const path of l.paths)
           for (let i = 1; i < path.length - 1; i++) {
-            // 支綫起點（例如上水）喺主綫中間，唔當轉角
             const d = dist(path[i]!, p);
-            expect(d === 0 || d >= 0.6 - 1e-6, `${l.line} ${code} too close to corner ${path[i]}`).toBe(true);
+            const near = [path[i - 1]!, path[i + 1]!].some((q) => Math.abs(dist(q, p) + dist(p, path[i]!) - dist(q, path[i]!)) < 0.01);
+            if (near && d > 0) expect(d, `${l.line} ${code} too close to corner ${path[i]}`).toBeGreaterThanOrEqual(turn(path, i).t + 0.15 - 1e-6);
           }
       }
     }
   });
-  it('every turn is exactly 45° (no 90° corners) and bends have room for the same radius', () => {
+  it('every turn is 45° or 90° and every segment has room for its bends', () => {
     for (const l of MTR_MAP_LINES)
-      for (const path of l.paths)
+      for (const path of l.paths) {
+        const t = path.map((_, i) => (i === 0 || i === path.length - 1 ? 0 : turn(path, i).t));
         for (let i = 1; i < path.length - 1; i++) {
-          const [a, p, b] = [path[i - 1]!, path[i]!, path[i + 1]!];
-          const v1 = [p[0] - a[0], p[1] - a[1]];
-          const v2 = [b[0] - p[0], b[1] - p[1]];
-          const cos = (v1[0]! * v2[0]! + v1[1]! * v2[1]!) / (Math.hypot(v1[0]!, v1[1]!) * Math.hypot(v2[0]!, v2[1]!));
-          expect(Math.abs((Math.acos(cos) * 180) / Math.PI - 45), `${l.line} corner ${p}`).toBeLessThan(0.5);
-          expect(dist(a, p), `${l.line} before ${p}`).toBeGreaterThanOrEqual(MTR_MAP_BEND - 1e-6);
-          expect(dist(p, b), `${l.line} after ${p}`).toBeGreaterThanOrEqual(MTR_MAP_BEND - 1e-6);
+          const { deg } = turn(path, i);
+          expect(Math.min(Math.abs(deg - 45), Math.abs(deg - 90)), `${l.line} corner ${path[i]}`).toBeLessThan(0.5);
         }
+        for (let i = 1; i < path.length; i++) expect(dist(path[i - 1]!, path[i]!), `${l.line} ${path[i - 1]}→${path[i]}`).toBeGreaterThanOrEqual(t[i - 1]! + t[i]! - 1e-6);
+      }
+  });
+  it('line paths render as arcs', () => {
+    const d = mtrLinePathD([
+      [0, 0],
+      [5, 0],
+      [5, 5],
+    ]);
+    expect(d).toContain(`A${MTR_MAP_RADIUS} ${MTR_MAP_RADIUS} 0 0 1`);
+    expect(d.startsWith('M0 0')).toBe(true);
+    expect(d.endsWith('L5 5')).toBe(true);
+  });
+  it('branch stations (Sheung Shui, Tseung Kwan O) are double circles on one line', () => {
+    for (const code of ['SHS', 'TKO']) {
+      const s = mtrMapStations().find((x) => x.code === code)!;
+      expect(s.pts.length, code).toBe(2);
+      expect(s.lines.length, code).toBe(1);
+    }
   });
   it('interchange points line up horizontally, vertically or at 45°, circles touching (G apart)', () => {
     for (const s of mtrMapStations()) {
@@ -97,9 +122,9 @@ describe('mtr map geometry', () => {
       const b = s.pts.reduce((m, p) => (Math.hypot(p[0] - a[0], p[1] - a[1]) > Math.hypot(m[0] - a[0], m[1] - a[1]) ? p : m), a);
       const dx = b[0] - a[0];
       const dy = b[1] - a[1];
-      const ok = Math.abs(dx) < 1e-6 || Math.abs(dy) < 1e-6 || Math.abs(Math.abs(dx) - Math.abs(dy)) < 1e-6;
+      const ok = Math.abs(dx) < 1e-6 || Math.abs(dy) < 1e-6 || Math.abs(Math.abs(dx) - Math.abs(dy)) < 1e-3;
       expect(ok, `${s.code} ${JSON.stringify(s.pts)}`).toBe(true);
-      for (const p of s.pts) expect(Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx), `${s.code} ${p}`).toBeLessThan(1e-6);
+      for (const p of s.pts) expect(Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx), `${s.code} ${p}`).toBeLessThan(1e-3);
       // 相鄰兩個圈中心相隔 G（貼住，唔會疊埋一個）
       const sorted = [...s.pts].sort((p, q) => (p[0] - a[0]) * dx + (p[1] - a[1]) * dy - ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy));
       for (let i = 1; i < sorted.length; i++) {

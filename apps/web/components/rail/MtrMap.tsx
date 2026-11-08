@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MTR_MAP_DOT_R, MTR_MAP_LINES, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
+import { MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LINES, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
 import Icon from '../Icon';
 
 type View = { x: number; y: number; w: number };
@@ -20,9 +20,9 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
   const stations = useMemo(() => mtrMapStations(), []);
   // 海：所有環一條 path（evenodd：海入面嘅島係陸地）
   const waterD = useMemo(() => MTR_MAP_WATER.map((w) => `${mtrRoundPathD(w, [], 0.3)} Z`).join(' '), []);
-  // 綫：轉角圓角（似港鐵圖），每條綫只避開自己嘅站
+  // 綫：轉角圓弧（並排綫同心）
   const linePaths = useMemo(
-    () => MTR_MAP_LINES.flatMap((l) => l.paths.map((p, i) => ({ key: `${l.line}-${i}`, color: mtrLine(l.line)?.color, d: mtrRoundPathD(p, Object.values(l.stations)) }))),
+    () => MTR_MAP_LINES.flatMap((l) => l.paths.map((p, i) => ({ key: `${l.line}-${i}`, color: mtrLine(l.line)?.color, d: mtrLinePathD(p) }))),
     [],
   );
 
@@ -132,11 +132,12 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
             </g>
           ))}
           {linePaths.map((l) => (
-            <path key={l.key} d={l.d} className="mtr-line" stroke={l.color} />
+            <path key={l.key} d={l.d} className="mtr-line" stroke={l.color} strokeWidth={MTR_MAP_GAP} />
           ))}
           {stations.map((s) => {
             const lp = mtrLabelPos(s.box, s.label, 0.14 + s.labelGap);
-            const inter = s.pts.length > 1;
+            // 轉車站先有綫色短棒（分岔站雙圈但同一條綫，唔使）
+            const inter = s.lines.length > 1;
             // 「8」字方向（由第一點去最遠嗰點）：短棒沿住呢個方向
             const far = s.pts.reduce((m, p) => (Math.hypot(p[0] - s.pts[0]![0], p[1] - s.pts[0]![1]) > Math.hypot(m[0] - s.pts[0]![0], m[1] - s.pts[0]![1]) ? p : m), s.pts[0]!);
             const len = Math.hypot(far[0] - s.pts[0]![0], far[1] - s.pts[0]![1]) || 1;
