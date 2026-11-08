@@ -363,7 +363,8 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
       GitHub Actions 每次換 IP 所以以前冇事）。改：所有 `rt.data.gov.hk` 請求共用限速 `RT_RPS`（預設每秒 8）、線程減到 6、
       403／429 退避 5–80 秒再試；城巴站資料 cache 喺 `/state/ctb-stops.json`（Dokploy volume），每次只問新站 + 最舊 400 個。
       教訓：tracker 同 pipeline 共用 VPS IP，上游限流要計埋兩邊；tracker 預設 `UPSTREAM_RPS` 改做 10。
-- [ ] Dokploy 部署、GitHub fine-grained token（Contents 讀寫）、第一次跑成功
+- [x] Dokploy 部署、GitHub fine-grained token（Contents 讀寫）；2026-11-08 16:06 第一次成功（9 分鐘，城巴冇 cache 佔 7.5 分鐘），網站即刻用新數據
+- [ ] 確認 04:17 排程自己跑到；`/state` volume
 - [ ] 停用 GitHub Actions `data.yml`
 
 ### 階段 1a：tracker 第一版（HTTP，2026-11-08 程式寫好，未部署）
