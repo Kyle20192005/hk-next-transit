@@ -17,7 +17,7 @@ export const config = {
   /** 營辦商回應 cache 幾耐（毫秒）；跟來源更新節奏（城巴約 20 秒、九巴約 25 秒） */
   upstreamTtlMs: num('UPSTREAM_TTL_MS', 10_000),
   /** 全局限流：所有去營辦商嘅請求，每秒最多幾多個 */
-  upstreamRps: num('UPSTREAM_RPS', 20),
+  upstreamRps: num('UPSTREAM_RPS', 10),
   /** 同時最多幾多條線 poll 緊（超出嘅照計，但唔會背景 poll） */
   maxLines: num('MAX_LINES', 60),
   /** CORS：准邊啲網站 call（逗號分隔）；冇設定就全部准 */

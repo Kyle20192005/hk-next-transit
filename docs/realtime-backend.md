@@ -359,6 +359,10 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
 - [x] `deploy/pipeline/`：Dockerfile + `run.sh`（同 data.yml 一樣：clone → fetch → build → check → 推 data 分支）
       + `scheduler.py`（每日 04:17 香港時間、`RUN_ON_START`、`PING_URL` 監察、`/state/last-run.json`）
 - [x] 本地用假 repo 跑通成個流程（約 2 分 15 秒）
+- [x] **2026-11-08 第一次喺 VPS 跑：城巴 `stop/{id}` 回 403 Forbidden**（fetch.py 用 32 條線程，同一個 IP 問得太密俾人擋；
+      GitHub Actions 每次換 IP 所以以前冇事）。改：所有 `rt.data.gov.hk` 請求共用限速 `RT_RPS`（預設每秒 8）、線程減到 6、
+      403／429 退避 5–80 秒再試；城巴站資料 cache 喺 `/state/ctb-stops.json`（Dokploy volume），每次只問新站 + 最舊 400 個。
+      教訓：tracker 同 pipeline 共用 VPS IP，上游限流要計埋兩邊；tracker 預設 `UPSTREAM_RPS` 改做 10。
 - [ ] Dokploy 部署、GitHub fine-grained token（Contents 讀寫）、第一次跑成功
 - [ ] 停用 GitHub Actions `data.yml`
 

@@ -19,7 +19,8 @@ git clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" src
 cd src
 
 echo "[pipeline] 下載原始數據"
-python3 pipeline/fetch.py
+# 城巴站資料存喺 /state（掛 volume 先會跨重新部署保留），每次只問新站同一部分舊站
+CTB_STOP_CACHE="${CTB_STOP_CACHE:-/state/ctb-stops.json}" python3 pipeline/fetch.py
 echo "[pipeline] 生成數據"
 python3 pipeline/build.py
 

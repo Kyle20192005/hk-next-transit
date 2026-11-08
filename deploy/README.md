@@ -27,14 +27,21 @@ Dokploy 要連到 GitHub（Settings → Git → GitHub，裝 Dokploy 嘅 GitHub 
 
    `RUN_ON_START=1` 第一次部署即刻跑一次（大約 2–3 分鐘），睇 Logs 見到 `[pipeline] … 完成` 就得，之後可以拎走。
    想監察：喺 healthchecks.io 開一個 check（每日一次，寬限 1 個鐘），加 `PING_URL=<佢俾嘅網址>`，冇更新到會電郵通知。
-4. Deploy。記憶體：build.py 最高用約 1.6GB，Advanced → Resources 唔好限少過 2GB。
-5. 人手再跑（例如真係大量路線取消要強制發佈）：Dokploy 嗰個 Application 嘅 Terminal（或者 `docker exec`）：
+4. **Advanced → Volumes / Mounts**：加一個 Volume Mount，Volume 名 `pipeline-state`，Mount Path `/state`。
+   城巴站資料會存喺度，之後每日只問新站同一部分舊站（請求少好多）；冇呢個，每次重新部署都要全部重新問。
+5. Deploy。記憶體：build.py 最高用約 1.6GB，Advanced → Resources 唔好限少過 2GB。
+
+> **data.gov.hk 會擋問得太密嘅 IP（403 Forbidden）**：2026-11-08 第一次喺 VPS 跑，城巴 32 條線程同時問，即刻俾人擋。
+> 而家所有 `rt.data.gov.hk` 請求共用限速（`RT_RPS`，預設每秒 8 個），403 會等 5–80 秒再試。
+> 第一次（冇站 cache）城巴部分大約 7–8 分鐘，之後大約 2–3 分鐘。再見到 403 就喺 Environment 加 `RT_RPS=4`。
+> tracker 同 pipeline 用同一個 IP：俾人擋嗰陣 tracker 都會攞唔到城巴數據（前端會退返 Vercel）。
+6. 人手再跑（例如真係大量路線取消要強制發佈）：Dokploy 嗰個 Application 嘅 Terminal（或者 `docker exec`）：
 
    ```bash
    /opt/pipeline/run.sh --force
    ```
 
-6. 確認 VPS 版每日跑得之後，喺 GitHub 停用 `.github/workflows/data.yml`（Actions → 揀 workflow → Disable），免得兩邊一齊推。
+7. 確認 VPS 版每日跑得之後，喺 GitHub 停用 `.github/workflows/data.yml`（Actions → 揀 workflow → Disable），免得兩邊一齊推。
 
 pipeline 每次都 clone 最新 `main`，改 pipeline 程式唔使重新部署呢個 Application。
 
@@ -46,7 +53,7 @@ pipeline 每次都 clone 最新 `main`，改 pipeline 程式唔使重新部署�
    ```
    DATA_BASE_URL=<同 Vercel 嘅 DATA_BASE_URL 一樣>
    DATA_TOKEN=<同 Vercel 一樣；公開 repo 唔使>
-   UPSTREAM_RPS=20
+   UPSTREAM_RPS=10
    CORS_ORIGINS=https://eta.kyle05.dev
    ```
 
