@@ -18,6 +18,7 @@ import {
   joyYouFare,
   labelEtas,
   LIVE_REFRESH,
+  adjustLastBus,
   lastBusAt,
   lastBusEtaIndex,
   parseLiveBuses,
@@ -357,24 +358,38 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
 
   // 打開咗嘅站嘅尾班車（終點站唔使）
   const lastBusStop = openIndex !== null && openIndex < stops.length - 1 ? stops[openIndex] : undefined;
-  const openLastBus = useMemo(() => (lastBusStop ? lastBusAt(dirVariants, lastBusStop.stopId, lastBusStop.dir, calendar, etaNow) : null), [lastBusStop, dirVariants, calendar, etaNow]);
+  // 時間表估計再用實測行車時間校正（夜晚車快，中途站估計會遲成十幾分鐘；同網頁 StopList 一樣）
+  const openLastBus = useMemo(() => {
+    if (!lastBusStop || openIndex === null) return null;
+    const liveMin = live ? live.segSeconds.slice(0, openIndex).reduce((a, b) => a + b, 0) / 60 : null;
+    return adjustLastBus(lastBusAt(dirVariants, lastBusStop.stopId, lastBusStop.dir, calendar, etaNow), liveMin);
+  }, [lastBusStop, openIndex, live, dirVariants, calendar, etaNow]);
+  const lastByTime = useMemo(() => (etas ? lastBusEtaIndex(etas, openLastBus) : -1), [etas, openLastBus]);
 
   // 每班車而家喺邊（「原定班次」唔係實時，唔配對）；同時認邊架車係尾班（同網頁 StopList 一樣）
   const matched = useMemo(() => {
     if (!live || openIndex === null || !etas) return null;
     const mine = etas.filter((e) => isMine(e) && !e.scheduled);
     const labels = labelEtas(live.buses, openIndex, mine.map((e) => Date.parse(e.eta!)), live.segSeconds, etaNow);
-    const li = lastBusEtaIndex(etas, openLastBus);
-    const lk = li >= 0 ? mine.indexOf(etas[li]!) : -1;
+    const lk = lastByTime >= 0 ? mine.indexOf(etas[lastByTime]!) : -1;
     const ll = lk >= 0 ? labels[lk] : undefined;
     return { mine, labels, lastTracked: ll && ll.kind !== 'notDeparted' ? ll.bus : null };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live, openIndex, etas, selected?.id, etaNow, openLastBus]);
+  }, [live, openIndex, etas, selected?.id, etaNow, lastByTime]);
   // 尾班車：認到之後記住佢（穩定 id），閂咗個站都繼續標，直至佢行完全程
   const [lastId, setLastId] = useState<number | null>(null);
   const trackedId = matched?.lastTracked ? (stable.find((x) => x.bus === matched.lastTracked)?.id ?? null) : null;
   if (trackedId !== null && trackedId !== lastId) setLastId(trackedId);
-  const lastStableId = stable.find((x) => x.id === (trackedId ?? lastId))?.id ?? null;
+  const lastStable = stable.find((x) => x.id === (trackedId ?? lastId)) ?? null;
+  const lastStableId = lastStable?.id ?? null;
+  // 呢個站邊班係尾班：追蹤緊嘅尾班車就係嚟緊呢度嗰架就用佢（最準），否則按時間認
+  const lastEtaIndex = useMemo(() => {
+    if (etas && matched && lastStable) {
+      const k = matched.labels.findIndex((l) => l.kind !== 'notDeparted' && l.bus === lastStable.bus);
+      if (k >= 0) return etas.indexOf(matched.mine[k]!);
+    }
+    return lastByTime;
+  }, [etas, matched, lastStable, lastByTime]);
 
   const whereLabels = useMemo(() => {
     if (!live || openIndex === null || !etas || !matched) return null;
@@ -570,6 +585,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
                 selectedVariantId={selected?.id ?? null}
                 fare={fares[i] ?? null}
                 lastBus={openIndex === i ? openLastBus : null}
+                lastEtaIndex={openIndex === i ? lastEtaIndex : -1}
                 nearestMetres={nearest?.index === i ? nearest.metres : null}
                 travelSeconds={after ? tr : null}
                 travelMetres={after ? (cumMetres[i] ?? 0) - (cumMetres[openIndex!] ?? 0) : null}

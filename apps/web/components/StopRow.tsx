@@ -1,6 +1,6 @@
 'use client';
 import { forwardRef } from 'react';
-import { formatDistance, lastBusEtaIndex, lastBusText, shortName, type Eta, type LastBus } from '@hknt/core';
+import { formatDistance, lastBusText, shortName, type Eta, type LastBus } from '@hknt/core';
 import BusIcon from './BusIcon';
 import CompanyTag from './CompanyTag';
 import { COMPANIES } from '@/lib/company';
@@ -55,6 +55,8 @@ type Props = {
   travelSeconds: number | null;
   /** 打開咗先有：呢個站嘅尾班車（時間表估算） */
   lastBus: LastBus | null;
+  /** etas 入面邊班係尾班（StopList 計：追蹤緊嘅尾班車優先，否則按時間認）；-1 = 冇 */
+  lastEtaIndex: number;
   /** 呢個站上車嘅車費；joyYou = null 即係唔適用樂悠咭 */
   fare: { adult: string; joyYou: string | null } | null;
   /** 呢個係用戶最近嘅站：同用戶相距幾多米 */
@@ -76,11 +78,11 @@ const hhmm = (ms: number) =>
 
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, lastBus, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav, here },
+  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, lastBus, lastEtaIndex, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav, here },
   ref,
 ) {
   // 尾班車：實時班次入面認到邊班係尾班就標「尾班」，提示行改用實時時間
-  const lastIdx = etas && lastBus ? lastBusEtaIndex(etas, lastBus) : -1;
+  const lastIdx = etas ? lastEtaIndex : -1;
   const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null, isLast: i === lastIdx })) ?? null;
   // 下一班：揀咗嘅走法（或者推斷唔到走法）最早嗰班；其餘列喺下面
   const isMine = (e: Eta) => !selectedVariantId || !e.variant?.variantId || e.variant.variantId === selectedVariantId;

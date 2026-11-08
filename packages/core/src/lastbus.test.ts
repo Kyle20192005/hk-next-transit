@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lastBusAt, lastBusEtaIndex, lastBusText } from './schedule';
+import { adjustLastBus, lastBusAt, lastBusEtaIndex, lastBusText } from './schedule';
 import type { Calendar, Variant } from './types';
 
 // 每日都有嘅服務
@@ -13,7 +13,7 @@ describe('lastBusAt', () => {
   it('before last bus', () => {
     // 尾班 23:30 由總站開，去 B 站要 10 分鐘 → 23:40
     const info = lastBusAt([v([360, 1410])], 'B', 'O', calendar, hk(20));
-    expect(info).toEqual({ last: hk(23, 40), nextFirst: null, prev: hk(6, 10) });
+    expect(info).toEqual({ last: hk(23, 40), nextFirst: null, prev: hk(6, 10), offsetMin: 10 });
     expect(lastBusText(info, hk(20))).toEqual({ text: '尾班約 23:40', urgent: false, gone: false });
     expect(lastBusText(info, hk(23, 20))).toEqual({ text: '尾班約 23:40 · 仲有 20 分鐘', urgent: true, gone: false });
   });
@@ -87,5 +87,27 @@ describe('after midnight (bug 2026-11-09)', () => {
   });
   it('after first bus of the day, today is the service day', () => {
     expect(lastBusAt(vs, 'B', 'O', calendar, hk(7))?.last).toBe(hk(23, 45));
+  });
+});
+
+describe('adjustLastBus (107 at night: estimate 00:45, real 00:28)', () => {
+  // 尾班 23:55 開，時間表估 50 分鐘到呢個站 → 00:45；前一班 23:35 → 00:25
+  const vs = [v([360, 1415, 1435], 3000)];
+  it('scales the estimate by live travel time', () => {
+    const info = lastBusAt(vs, 'B', 'O', calendar, hk(0, 15) + 86_400_000);
+    expect(info?.last).toBe(hk(0, 45) + 86_400_000);
+    // 實測而家只要 33 分鐘
+    const adj = adjustLastBus(info, 33)!;
+    expect(adj.last).toBe(hk(0, 28) + 86_400_000);
+    const iso = (t: number) => new Date(t + 8 * 3600_000).toISOString().replace('Z', '+08:00');
+    // 冇校正：00:28 近前一班（00:25）多過尾班（00:45）→ 認唔到；校正後認到
+    const etas = [{ eta: iso(hk(0, 28) + 86_400_000), company: 'CTB' as const }];
+    expect(lastBusEtaIndex(etas, info)).toBe(-1);
+    expect(lastBusEtaIndex(etas, adj)).toBe(0);
+  });
+  it('no live data or tiny offsets → unchanged', () => {
+    const info = lastBusAt(vs, 'B', 'O', calendar, hk(0, 15) + 86_400_000);
+    expect(adjustLastBus(info, null)).toBe(info);
+    expect(adjustLastBus({ last: 1, nextFirst: null, offsetMin: 2 }, 1)?.last).toBe(1);
   });
 });

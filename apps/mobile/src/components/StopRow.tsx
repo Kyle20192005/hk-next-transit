@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { COMPANIES, formatDistance, lastBusEtaIndex, lastBusText, shortName, type Company, type Eta, type LastBus } from '@hknt/core';
+import { COMPANIES, formatDistance, lastBusText, shortName, type Company, type Eta, type LastBus } from '@hknt/core';
 import { tabular, useTheme } from '@/lib/theme';
 import { useFavorite, type Favorite } from '@/lib/favorites';
 import { BusGlyph, Icon } from './Icon';
@@ -39,6 +39,8 @@ type Props = {
   fare: { adult: string; joyYou: string | null } | null;
   /** 打開咗先有：呢個站嘅尾班車（時間表估算，同網頁一樣） */
   lastBus: LastBus | null;
+  /** etas 入面邊班係尾班（路線頁計：追蹤緊嘅尾班車優先，否則按時間認）；-1 = 冇 */
+  lastEtaIndex: number;
   nearestMetres: number | null;
   travelSeconds: number | null;
   travelMetres: number | null;
@@ -61,7 +63,7 @@ export const StopRow = memo(function StopRow(p: Props) {
   const t = useTheme();
   const [height, setHeight] = useState(54);
   // 尾班車：實時班次入面認到邊班係尾班就標「尾班」，提示行改用實時時間（同網頁一樣）
-  const lastIdx = p.etas && p.lastBus ? lastBusEtaIndex(p.etas, p.lastBus) : -1;
+  const lastIdx = p.etas ? p.lastEtaIndex : -1;
   const list = p.etas?.map((e, i) => ({ e, where: p.whereLabels?.[i] ?? null, isLast: i === lastIdx })) ?? null;
   const isMine = (e: Eta) => !p.selectedVariantId || !e.variant?.variantId || e.variant.variantId === p.selectedVariantId;
   const next = list?.find((x) => isMine(x.e)) ?? null;

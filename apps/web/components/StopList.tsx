@@ -2,7 +2,7 @@
 import { getPrefs } from '@/lib/prefs';
 import { busesClient } from '@/lib/buses';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BusStabilizer, LIVE_REFRESH, type LastBus, parseLiveBuses, busDistanceTo, busFraction, formatDistance, labelEtas, lastBusEtaIndex, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
+import { BusStabilizer, LIVE_REFRESH, type LastBus, parseLiveBuses, busDistanceTo, busFraction, formatDistance, adjustLastBus, labelEtas, lastBusEtaIndex, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
 import { companyColor, companyInk } from '@/lib/company';
@@ -198,6 +198,14 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
     return secondsFrom(cum, openIndex);
   }, [seg, openIndex]);
 
+  // 打開咗嘅站嘅尾班：時間表估計再用實測行車時間校正（夜晚車快，中途站估計會遲成十幾分鐘）
+  const openLast = useMemo(() => {
+    if (openIndex === null) return null;
+    const liveMin = live ? live.segSeconds.slice(0, openIndex).reduce((a, b) => a + b, 0) / 60 : null;
+    return adjustLastBus(lastBus[openIndex] ?? null, liveMin);
+  }, [openIndex, lastBus, live]);
+  const lastByTime = useMemo(() => (etas ? lastBusEtaIndex(etas, openLast) : -1), [etas, openLast]);
+
   // 每班車而家喺邊：用成條線追蹤到嘅巴士對應返呢個站嘅 ETA
   const matched = useMemo(() => {
     if (!live || openIndex === null || !etas) return null;
@@ -205,12 +213,11 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
     const mine = etas.filter((e) => isMine(e) && !e.scheduled);
     const labels = labelEtas(live.buses, openIndex, mine.map((e) => Date.parse(e.eta!)), live.segSeconds, now);
     // 尾班車：認到邊班 ETA 係尾班，又對到架車，就記住佢（地圖、時間線標「尾班」）
-    const li = lastBusEtaIndex(etas, lastBus[openIndex] ?? null);
-    const lk = li >= 0 ? mine.indexOf(etas[li]!) : -1;
+    const lk = lastByTime >= 0 ? mine.indexOf(etas[lastByTime]!) : -1;
     const ll = lk >= 0 ? labels[lk] : undefined;
     const lastTracked = ll && ll.kind !== 'notDeparted' ? ll.bus : null;
     return { mine, labels, lastTracked };
-  }, [live, openIndex, etas, selectedVariantId, now, lastBus]);
+  }, [live, openIndex, etas, selectedVariantId, now, lastByTime]);
   const whereLabels = useMemo(() => {
     if (!live || openIndex === null || !etas || !matched) return null;
     const { mine, labels } = matched;
@@ -245,6 +252,14 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
   const trackedId = matched?.lastTracked ? (stable.find((x) => x.bus === matched.lastTracked)?.id ?? null) : null;
   if (trackedId !== null && trackedId !== lastId) setLastId(trackedId);
   const lastStable = stable.find((x) => x.id === (trackedId ?? lastId)) ?? null;
+  // 呢個站邊班係尾班：追蹤緊嘅尾班車就係嚟緊呢度嗰架就用佢（最準），否則按時間認
+  const lastEtaIndex = useMemo(() => {
+    if (etas && matched && lastStable) {
+      const k = matched.labels.findIndex((l) => l.kind !== 'notDeparted' && l.bus === lastStable.bus);
+      if (k >= 0) return etas.indexOf(matched.mine[k]!);
+    }
+    return lastByTime;
+  }, [etas, matched, lastStable, lastByTime]);
 
   // 通知地圖
   useEffect(() => {
@@ -319,7 +334,8 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
             here={s.lat !== undefined && s.lng !== undefined ? { lat: s.lat, lng: s.lng, name: s.name, current: { co, route, dir: s.dir } } : null}
             fav={i < stops.length - 1 ? { co, route, dir: s.dir, dest: stops[stops.length - 1]?.name ?? '', companies, stopId: s.stopId, stopName: s.name } : null}
             fare={fares[i] ?? null}
-            lastBus={openIndex === i ? (lastBus[i] ?? null) : null}
+            lastBus={openIndex === i ? openLast : null}
+            lastEtaIndex={openIndex === i ? lastEtaIndex : -1}
             travelSeconds={openIndex !== null && i > openIndex ? tr : null}
             travelMetres={openIndex !== null && i > openIndex ? (cumMetres[i] ?? 0) - (cumMetres[openIndex] ?? 0) : null}
             nextArrival={openIndex !== null && i > openIndex && tr !== null && nextAtOpen !== null ? nextAtOpen + tr * 1000 : null}

@@ -141,6 +141,8 @@ export interface LastBus {
   nextFirst: number | null;
   /** 尾班前一班（同一服務日，毫秒）：用嚟分實時班次邊班先係尾班（`lastBusEtaIndex`） */
   prev?: number | null;
+  /** 時間表估計由總站去到呢個站要幾多分鐘（尾班嗰個走法）：`adjustLastBus` 用實測行車時間校正 */
+  offsetMin?: number;
 }
 
 /**
@@ -153,6 +155,7 @@ export function lastBusAt(variants: Variant[], stopId: string, dir: string, cale
   const days = [-1, 0, 1].map((d) => today + d * DAY_MS);
   const perDay: number[][] = [[], [], []];
   let any = false;
+  const offOf = new Map<number, number>(); // 到站時間 → 嗰班嘅「總站去呢個站」分鐘
   for (const v of variants) {
     const off = minutesToStop(v, stopId, dir);
     if (off === null || !v.schedules.some((s) => s.departures.length)) continue;
@@ -161,7 +164,11 @@ export function lastBusAt(variants: Variant[], stopId: string, dir: string, cale
       const active = activeServiceIds(calendar, new Date(dayStart + 12 * 3600_000));
       for (const s of v.schedules) {
         if (!active.has(s.serviceId)) continue;
-        for (const m of s.departures) perDay[k]!.push(dayStart + (m + off) * 60_000);
+        for (const m of s.departures) {
+          const t = dayStart + (m + off) * 60_000;
+          perDay[k]!.push(t);
+          offOf.set(t, off);
+        }
       }
     });
   }
@@ -176,9 +183,23 @@ export function lastBusAt(variants: Variant[], stopId: string, dir: string, cale
   const last = max(day);
   // 前一班：早過尾班 1 分鐘以上（唔同走法同一時間開出當同一班）
   const prev = last === null ? null : max(day.filter((t) => t < last - 60_000));
-  if (last !== null && last > now) return { last, nextFirst: null, prev };
+  const offsetMin = last === null ? undefined : offOf.get(last);
+  if (last !== null && last > now) return { last, nextFirst: null, prev, offsetMin };
   const upcoming = perDay.flat().filter((t) => t > now);
-  return { last, nextFirst: upcoming.length ? Math.min(...upcoming) : null, prev };
+  return { last, nextFirst: upcoming.length ? Math.min(...upcoming) : null, prev, offsetMin };
+}
+
+/**
+ * 用實測行車時間校正尾班到站時間：時間表只有總站開車時間，中途站按走線長度估，夜晚車少快好多
+ * （例如 107 去到香港仔隧道巴士轉乘站，估 00:45、實際 00:28）。
+ * liveMin = 而家實測由總站去到呢個站要幾多分鐘（追蹤巴士用嘅每段行車時間加埋）。
+ * 按比例縮放（最多 0.4–1.5 倍），尾班同前一班一齊移；頭班係朝早，唔郁。
+ */
+export function adjustLastBus(info: LastBus | null, liveMin: number | null | undefined): LastBus | null {
+  if (!info || info.last === null || !info.offsetMin || info.offsetMin < 5 || !liveMin || !(liveMin > 0)) return info;
+  const scale = Math.min(1.5, Math.max(0.4, liveMin / info.offsetMin));
+  const delta = Math.round(info.offsetMin * (scale - 1) * 60_000);
+  return { ...info, last: info.last + delta, prev: info.prev != null ? info.prev + delta : info.prev };
 }
 
 /** 香港時間 HH:MM */
