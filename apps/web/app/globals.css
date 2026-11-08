@@ -628,7 +628,9 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .stop.open .badge { background: var(--card); }
 .source { text-align: center; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); margin: 0; font-size: 0.75rem; }
 .scheduled { font-size: 0.6875rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--surface-2); color: var(--muted); }
-.eta-next .co, .eta-more .co { margin-top: 0; align-self: center; }
+.eta-more .co { margin-top: 0; align-self: center; }
+/* 大字嗰行用 baseline：同「23:42」對齊（center 會對住 40px 大字嘅中間，浮咗上去） */
+.eta-next .co { margin-top: 0; align-self: baseline; }
 .last-tag { font-size: 0.6875rem; font-weight: 800; padding: 1px 6px; border-radius: 6px; background: var(--special-soft); color: var(--special); white-space: nowrap; }
 .last-bus { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 0.8125rem; font-weight: 600; color: var(--muted); }
 .last-bus.urgent { color: var(--special); }

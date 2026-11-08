@@ -176,8 +176,11 @@ export const StopRow = memo(function StopRow(p: Props) {
                     </>
                   )}
                 </Text>
-                <Text style={{ color: t.muted, fontSize: 15, ...tabular }}>{clock && minsOf(next.e) > 0 ? `${minsOf(next.e)} 分鐘` : next.e.eta!.slice(11, 16)}</Text>
-                <EtaTags e={next.e} multiCompany={p.multiCompany} isLast={next.isLast} />
+                {/* 時間同標籤自己一行（置中），整行以時間嘅 baseline 同大字對齊；標籤直接放會黐頂（CompanyTag alignSelf flex-start） */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <Text style={{ color: t.muted, fontSize: 15, ...tabular }}>{clock && minsOf(next.e) > 0 ? `${minsOf(next.e)} 分鐘` : next.e.eta!.slice(11, 16)}</Text>
+                  <EtaTags e={next.e} multiCompany={p.multiCompany} isLast={next.isLast} />
+                </View>
               </View>
             </View>
           )}
