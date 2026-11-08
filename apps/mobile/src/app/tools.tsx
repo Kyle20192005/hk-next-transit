@@ -137,6 +137,8 @@ function DragTile({ id, index, live, dx, lifted, dragging, onRemove }: { id: Too
       {...responder.panHandlers}
       style={{
         flex: 1,
+        // 要橫排：ToolTile 自己係 flex: 1，喺直排（預設）入面 iOS／Android 會將佢高度壓到 0（網頁唔會），圖示同名溢出卡外
+        flexDirection: 'row',
         borderRadius: 18,
         zIndex: lifted ? 2 : 0,
         transform: [{ translateX: dx }, { scale: lifted ? 1.06 : 1 }],

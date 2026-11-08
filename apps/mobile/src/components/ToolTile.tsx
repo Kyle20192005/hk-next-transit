@@ -36,6 +36,8 @@ export function ToolTile({
         accessibilityRole="button"
         accessibilityLabel={label ?? x.label}
         style={({ pressed }) => ({
+          // 同一行嘅卡一樣高（有「即將推出」嗰啲高啲）
+          flexGrow: 1,
           alignItems: 'center',
           gap: 6,
           paddingTop: 16,
