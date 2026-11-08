@@ -261,7 +261,20 @@ def fetch_ctb():
 if __name__ == '__main__':
     os.makedirs(CACHE, exist_ok=True)
     t = time.time()
-    ths = [threading.Thread(target=f) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_osm_mtrb, fetch_osm_places, fetch_journey_times)]
+    failed = []
+
+    def run(f):
+        try:
+            f()
+        except Exception as e:  # 記低，全部做完先一齊報；唔好令 build.py 讀唔到檔先爆
+            failed.append(f'{f.__name__}: {e}')
+
+    ths = [threading.Thread(target=run, args=(f,)) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_osm_mtrb, fetch_osm_places, fetch_journey_times)]
     for th in ths: th.start()
     for th in ths: th.join()
+    if failed:
+        print('下載失敗：', *failed, sep='\n  ')
+        if any('403' in x for x in failed):
+            print('  403 Forbidden：data.gov.hk 擋咗呢個 IP（問得太密），等一陣（例如 30–60 分鐘）再試，或者減細 RT_RPS')
+        sys.exit(1)
     print(f'完成 {time.time() - t:.0f}s')
