@@ -607,6 +607,9 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .source { text-align: center; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); margin: 0; font-size: 0.75rem; }
 .scheduled { font-size: 0.6875rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--surface-2); color: var(--muted); }
 .eta-next .co, .eta-more .co { margin-top: 0; align-self: center; }
+.last-bus { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 0.8125rem; font-weight: 600; color: var(--muted); }
+.last-bus.urgent { color: var(--special); }
+.last-bus.gone { margin-top: 0; font-size: 0.9375rem; color: var(--text); }
 .eta-failed { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 10px; border-radius: var(--radius-s); background: var(--special-soft); color: var(--special); font-size: 0.8125rem; }
 
 /* 站點列表頂：最近嘅站 */

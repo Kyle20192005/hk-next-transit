@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { COMPANIES, formatDistance, shortName, type Company, type Eta } from '@hknt/core';
+import { COMPANIES, formatDistance, lastBusText, shortName, type Company, type Eta, type LastBus } from '@hknt/core';
 import { tabular, useTheme } from '@/lib/theme';
 import { useFavorite, type Favorite } from '@/lib/favorites';
 import { BusGlyph, Icon } from './Icon';
@@ -35,6 +35,8 @@ type Props = {
   now: number;
   selectedVariantId: string | null;
   fare: { adult: string; joyYou: string | null } | null;
+  /** 打開咗先有：呢個站嘅尾班車（時間表估算，同網頁一樣） */
+  lastBus: LastBus | null;
   nearestMetres: number | null;
   travelSeconds: number | null;
   travelMetres: number | null;
@@ -60,6 +62,7 @@ export const StopRow = memo(function StopRow(p: Props) {
   const isMine = (e: Eta) => !p.selectedVariantId || !e.variant?.variantId || e.variant.variantId === p.selectedVariantId;
   const next = list?.find((x) => isMine(x.e)) ?? null;
   const rest = list?.filter((x) => x !== next) ?? [];
+  const last = lastBusText(p.lastBus, p.now);
   const minsOf = (e: Eta) => Math.max(0, Math.round((Date.parse(e.eta!) - p.now) / 60000));
   // 設定「到站時間顯示」：鐘數模式大字係鐘數，旁邊細字先係分鐘
   const clock = usePrefs().etaFormat === 'clock';
@@ -155,7 +158,7 @@ export const StopRow = memo(function StopRow(p: Props) {
         <View style={{ paddingLeft: SEQ_W + TL_W + 6, paddingRight: 16, paddingBottom: 16 }}>
           {p.error && <Text style={{ color: t.muted }}>載入失敗：{p.error}</Text>}
           {!p.error && list === null && <Text style={{ color: t.muted }}>載入中…</Text>}
-          {!p.error && list?.length === 0 && p.failed.length === 0 && <Text style={{ color: t.muted }}>暫時冇班次</Text>}
+          {!p.error && list?.length === 0 && p.failed.length === 0 && !last?.gone && <Text style={{ color: t.muted }}>暫時冇班次</Text>}
           {next && (
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
@@ -198,6 +201,13 @@ export const StopRow = memo(function StopRow(p: Props) {
                   </View>
                 );
               })}
+            </View>
+          )}
+          {/* 尾班車：仲有車就提一提（30 分鐘內強調）；過咗而且真係冇班次就講「今日已經冇車」同下次頭班 */}
+          {last && (!last.gone || (list?.length === 0 && p.failed.length === 0)) && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: last.gone ? 0 : 10 }}>
+              <Icon name="clock" size={15} color={last.urgent ? t.special : last.gone ? t.text : t.muted} />
+              <Text style={{ flex: 1, fontSize: last.gone ? 15 : 13, fontWeight: '600', color: last.urgent ? t.special : last.gone ? t.text : t.muted }}>{last.text}</Text>
             </View>
           )}
           {p.failed.length > 0 && (

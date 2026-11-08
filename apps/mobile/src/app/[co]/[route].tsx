@@ -18,6 +18,7 @@ import {
   joyYouFare,
   labelEtas,
   LIVE_REFRESH,
+  lastBusAt,
   parseLiveBuses,
   pointOnPath,
   secondsFrom,
@@ -195,7 +196,8 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
     return () => clearInterval(id);
   }, []);
 
-  const sorted = useMemo(() => sortVariants(variantsForDir(data, dir), calendar, now), [data, dir, calendar, now]);
+  const dirVariants = useMemo(() => variantsForDir(data, dir), [data, dir]);
+  const sorted = useMemo(() => sortVariants(dirVariants, calendar, now), [dirVariants, calendar, now]);
   // pickVariant 同預先 fetch 共用，要一致，否則預熱嘅 /api/buses 網址對唔上
   const selected = pickVariant(sorted, dir, { variantId, stopId: stopParam });
 
@@ -547,6 +549,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
                 now={etaNow}
                 selectedVariantId={selected?.id ?? null}
                 fare={fares[i] ?? null}
+                lastBus={openIndex === i && i < stops.length - 1 ? lastBusAt(dirVariants, s.stopId, s.dir, calendar, etaNow) : null}
                 nearestMetres={nearest?.index === i ? nearest.metres : null}
                 travelSeconds={after ? tr : null}
                 travelMetres={after ? (cumMetres[i] ?? 0) - (cumMetres[openIndex!] ?? 0) : null}

@@ -284,6 +284,10 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 - 預先 fetch（網頁 `lib/prefetch.ts`、App `src/lib/prefetch.ts`）：撳落路線（未放手）`warmRoute` 預熱
   `/api/buses`（伺服器 cache 10 秒），候選 ≤ 3 條停 0.4 秒 `preloadRoute` 只攞路線資料。預設方向同走法一律用 core
   `defaultDir`／`pickVariant`（路線頁、預熱共用），否則預熱網址同路線頁唔同，cache 唔會命中。
+- **尾班車提示**（打開站之後，到站時間下面）：core `lastBusAt`（呢個方向所有經過呢個站嘅走法、政府時間表 + `offsets` 估算到站；
+  琴日過咗午夜仲未完嘅班次當仲係琴日嘅服務日）、`lastBusText`：「尾班約 23:45」、30 分鐘內「· 仲有 N 分鐘」（紅色）、
+  過咗而且冇班次「今日已經冇車 · 下次頭班約（聽日）06:10」（取代「暫時冇班次」；仲有實時班次就唔講冇車）。冇時間表嘅走法唔計，全部冇就唔顯示。
+  網頁 page.tsx 喺伺服器計好傳落 `StopList`／`StopRow`（`lastBus`）；App 路線頁即場計。終點站唔顯示。
 - 時間線豎線畫喺 `li.stop::before`（成個站嘅高度），唔好畫喺按鈕入面，否則行與行之間同打開咗嘅到站時間部分會斷線。
 - 車費：GTFS `fare_attributes` 分段收費（fare_id = route-方向-上車站序-落車站序），上車車費 = 由嗰個站去任何站嘅最高收費；
   pipeline 存做 `variant.fares[站ID]`（冇分段就用 JSON_BUS 嘅 `fullFare`）。站點列表右邊顯示，終點站唔顯示。

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
+  lastBusAt,
   fmtMinutes,
   serviceWindow,
   activeServiceIds,
@@ -115,6 +116,9 @@ export default async function RoutePage({ params, searchParams }: Props) {
   const segSeconds = selected?.segSeconds ?? null;
   const other = dirs.find((d) => d !== dir);
   const initialOpen = stopParam ? stops.findIndex((s) => s.stopId === stopParam) : -1;
+  // 尾班車：呢個方向所有走法（經過呢個站嘅）一齊計；終點站唔使（唔會喺度上車）
+  const dirVariants = variantsForDir(data, dir);
+  const lastBus = stops.map((s, i) => (i === stops.length - 1 ? null : lastBusAt(dirVariants, s.stopId, s.dir, calendar, now.getTime())));
 
   const mapStops: MapStop[] = stops.flatMap((s, i) => {
     const info = data.stops[s.stopId];
@@ -197,6 +201,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
           selectedVariantId={selected?.id ?? null}
           company={data.company}
           fares={fares}
+          lastBus={lastBus}
           segSeconds={segSeconds}
           cumMetres={cumMetres}
           initialOpen={initialOpen >= 0 ? initialOpen : null}

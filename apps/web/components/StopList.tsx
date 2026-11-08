@@ -2,7 +2,7 @@
 import { getPrefs } from '@/lib/prefs';
 import { busesClient } from '@/lib/buses';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BusStabilizer, LIVE_REFRESH, parseLiveBuses, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
+import { BusStabilizer, LIVE_REFRESH, type LastBus, parseLiveBuses, busDistanceTo, busFraction, formatDistance, labelEtas, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { OPEN_STOP_EVENT, publishBuses, publishFocus } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
 import { companyColor, companyInk } from '@/lib/company';
@@ -28,6 +28,8 @@ type Props = {
   company: string;
   /** 每個站上車嘅車費（同 stops 對應）；joyYou = null 即係唔適用樂悠咭 */
   fares: ({ adult: string; joyYou: string | null } | null)[];
+  /** 每個站嘅尾班車（時間表估算；同 stops 對應） */
+  lastBus: (LastBus | null)[];
   /** 一開頁就打開嘅站（由「附近」撳入嚟） */
   initialOpen: number | null;
   /** 捲動區最底（資料來源） */
@@ -46,7 +48,7 @@ const BUSES_REFRESH_MS = LIVE_REFRESH.busesMs;
  * - 打開站時：攞到站時間、地圖放大過去；每班車標示「距離 N 個站／未開出」
  * - 後面嘅站顯示由打開咗嘅站出發要幾耐，同下一班車大概幾時到
  */
-export default function StopList({ co, multiCompany, companies, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, fares, initialOpen, children }: Props) {
+export default function StopList({ co, multiCompany, companies, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, fares, lastBus, initialOpen, children }: Props) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -298,6 +300,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
             here={s.lat !== undefined && s.lng !== undefined ? { lat: s.lat, lng: s.lng, name: s.name, current: { co, route, dir: s.dir } } : null}
             fav={i < stops.length - 1 ? { co, route, dir: s.dir, dest: stops[stops.length - 1]?.name ?? '', companies, stopId: s.stopId, stopName: s.name } : null}
             fare={fares[i] ?? null}
+            lastBus={openIndex === i ? (lastBus[i] ?? null) : null}
             travelSeconds={openIndex !== null && i > openIndex ? tr : null}
             travelMetres={openIndex !== null && i > openIndex ? (cumMetres[i] ?? 0) - (cumMetres[openIndex] ?? 0) : null}
             nextArrival={openIndex !== null && i > openIndex && tr !== null && nextAtOpen !== null ? nextAtOpen + tr * 1000 : null}

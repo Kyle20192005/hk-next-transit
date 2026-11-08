@@ -121,3 +121,78 @@ export function serviceDaysLabel(days: boolean[]): string {
   if (contiguous && on.length > 2) return `星期${names[on[0]!]}至${names[on[on.length - 1]!]}`;
   return `星期${on.map((i) => names[i]).join('、')}`;
 }
+
+const DAY_MS = 86_400_000;
+const HK_OFFSET_MS = 8 * 3600_000;
+/** 包含 `t` 嗰日嘅香港午夜（毫秒） */
+const hkMidnight = (t: number) => Math.floor((t + HK_OFFSET_MS) / DAY_MS) * DAY_MS - HK_OFFSET_MS;
+
+/** 由總站開出到呢個站要幾多分鐘（時間表估算）；呢個走法唔經呢個站 → null */
+export function minutesToStop(v: Variant, stopId: string, dir: string): number | null {
+  const idx = v.stops.findIndex((s, i) => s === stopId && v.stopDirs[i] === dir);
+  if (idx >= 0) return (v.offsets[idx] ?? 0) / 60;
+  return null;
+}
+
+export interface LastBus {
+  /** 呢個服務日喺呢個站嘅尾班（毫秒）；今日冇班次就 null */
+  last: number | null;
+  /** 尾班過咗之後，下一班（頭班）幾時到（毫秒）；未過尾班就 null */
+  nextFirst: number | null;
+}
+
+/**
+ * 呢個站嘅尾班車（所有經過呢個站、同方向嘅走法一齊計；用政府時間表 + 由總站開出嘅估計時間）。
+ * 服務日：琴日嘅班次過咗午夜仲未完（例如 01:00 仲有 00:45 開出嗰班）就當仲係琴日嘅服務日。
+ * 冇任何走法有時間表 → null（唔好亂講）。
+ */
+export function lastBusAt(variants: Variant[], stopId: string, dir: string, calendar: Calendar, now: number): LastBus | null {
+  const today = hkMidnight(now);
+  const days = [-1, 0, 1].map((d) => today + d * DAY_MS);
+  const perDay: number[][] = [[], [], []];
+  let any = false;
+  for (const v of variants) {
+    const off = minutesToStop(v, stopId, dir);
+    if (off === null || !v.schedules.some((s) => s.departures.length)) continue;
+    any = true;
+    days.forEach((dayStart, k) => {
+      const active = activeServiceIds(calendar, new Date(dayStart + 12 * 3600_000));
+      for (const s of v.schedules) {
+        if (!active.has(s.serviceId)) continue;
+        for (const m of s.departures) perDay[k]!.push(dayStart + (m + off) * 60_000);
+      }
+    });
+  }
+  if (!any) return null;
+  const max = (xs: number[]) => (xs.length ? Math.max(...xs) : null);
+  const lastYesterday = max(perDay[0]!);
+  const last = lastYesterday !== null && lastYesterday > now ? lastYesterday : max(perDay[1]!);
+  if (last !== null && last > now) return { last, nextFirst: null };
+  const upcoming = perDay.flat().filter((t) => t > now);
+  return { last, nextFirst: upcoming.length ? Math.min(...upcoming) : null };
+}
+
+/** 香港時間 HH:MM */
+const clock = (t: number) => {
+  const d = new Date(t + HK_OFFSET_MS);
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+};
+
+/**
+ * 尾班車提示文字：
+ * - 尾班未到：「尾班約 23:45」；30 分鐘內「尾班約 23:45 · 仲有 12 分鐘」（urgent）
+ * - 過咗：「今日已經冇車 · 下次頭班約 06:10」（聽日嘅加「聽日」）
+ * 時間係時間表估算，所以寫「約」。
+ */
+export function lastBusText(info: LastBus | null, now: number): { text: string; urgent: boolean; gone: boolean } | null {
+  if (!info) return null;
+  if (info.last !== null && info.last > now) {
+    const mins = Math.round((info.last - now) / 60_000);
+    return mins <= 30
+      ? { text: `尾班約 ${clock(info.last)} · 仲有 ${mins} 分鐘`, urgent: true, gone: false }
+      : { text: `尾班約 ${clock(info.last)}`, urgent: false, gone: false };
+  }
+  if (info.nextFirst === null) return { text: '今日已經冇車', urgent: false, gone: true };
+  const tomorrow = hkMidnight(info.nextFirst) > hkMidnight(now);
+  return { text: `今日已經冇車 · 下次頭班約 ${tomorrow ? '聽日 ' : ''}${clock(info.nextFirst)}`, urgent: false, gone: true };
+}

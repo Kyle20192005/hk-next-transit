@@ -1,6 +1,6 @@
 'use client';
 import { forwardRef } from 'react';
-import { formatDistance, shortName, type Eta } from '@hknt/core';
+import { formatDistance, lastBusText, shortName, type Eta, type LastBus } from '@hknt/core';
 import BusIcon from './BusIcon';
 import CompanyTag from './CompanyTag';
 import { COMPANIES } from '@/lib/company';
@@ -51,6 +51,8 @@ type Props = {
   selectedVariantId: string | null;
   /** 由打開咗嘅站去呢個站要幾多秒（只有後面嘅站先有） */
   travelSeconds: number | null;
+  /** 打開咗先有：呢個站嘅尾班車（時間表估算） */
+  lastBus: LastBus | null;
   /** 呢個站上車嘅車費；joyYou = null 即係唔適用樂悠咭 */
   fare: { adult: string; joyYou: string | null } | null;
   /** 呢個係用戶最近嘅站：同用戶相距幾多米 */
@@ -72,7 +74,7 @@ const hhmm = (ms: number) =>
 
 /** 一個站（時間線一行）。開定收、到站時間由 StopList 控制。 */
 const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
-  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav, here },
+  { index, multiCompany, name, terminus, open, onToggle, etas, whereLabels, error, failed, now, selectedVariantId, fare, lastBus, nearestMetres, travelSeconds, travelMetres, nextArrival, buses, fav, here },
   ref,
 ) {
   const list = etas?.map((e, i) => ({ e, where: whereLabels?.[i] ?? null })) ?? null;
@@ -80,6 +82,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
   const isMine = (e: Eta) => !selectedVariantId || !e.variant?.variantId || e.variant.variantId === selectedVariantId;
   const next = list?.find((x) => isMine(x.e)) ?? null;
   const rest = list?.filter((x) => x !== next) ?? [];
+  const last = lastBusText(lastBus, now);
   const minsOf = (e: Eta) => Math.max(0, Math.round((Date.parse(e.eta!) - now) / 60000));
   // 設定「到站時間顯示」：鐘數模式大字係鐘數，旁邊細字先係分鐘
   const clock = usePrefs().etaFormat === 'clock';
@@ -124,7 +127,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
         <div className="etas" aria-live="polite">
           {error && <div className="muted">載入失敗：{error}</div>}
           {!error && list === null && <div className="muted">載入中…</div>}
-          {!error && list?.length === 0 && failed.length === 0 && <div className="muted">暫時冇班次</div>}
+          {!error && list?.length === 0 && failed.length === 0 && !last?.gone && <div className="muted">暫時冇班次</div>}
           {next && (
             <div className="eta-next">
               <span className="eta-big">
@@ -166,6 +169,12 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
                 );
               })}
             </ul>
+          )}
+          {/* 尾班車：仲有車就提一提（30 分鐘內強調）；過咗而且真係冇班次就講「今日已經冇車」同下次頭班 */}
+          {last && (!last.gone || (list?.length === 0 && failed.length === 0)) && (
+            <div className={`last-bus${last.urgent ? ' urgent' : ''}${last.gone ? ' gone' : ''}`}>
+              <Icon name="clock" size={15} /> {last.text}
+            </div>
           )}
           {failed.length > 0 && (
             <div className="eta-failed" role="status">
