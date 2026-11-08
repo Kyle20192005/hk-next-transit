@@ -1,7 +1,10 @@
 """港鐵示意圖座標（自己畫）+ 檢查：45° 轉彎、統一彎位、站離轉角、轉車站對齊、站名唔撞。輸出 TS。"""
-# 用法：curl -s https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv -o /tmp/mtr.csv；python3 packages/core/tools/mtr-layout.py [--ts]
-# 改完座標行一次，0 個問題先將 --ts 輸出貼返入 src/mtr-map.ts 嘅 MTR_MAP_LINES／MTR_MAP_LABELS。
-import json, math, sys, csv, collections
+# 用法：curl -s https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv -o /tmp/mtr.csv
+#       python3 packages/core/tools/mtr-layout.py [csv] [--ts | --write]
+# 改完座標行一次，0 個問題先 --write（寫入 src/mtr-map.ts 嘅 MTR_MAP_LINES／LABELS／LABEL_GAP），
+# 之後一定要行 mtr-water.py --write（海岸綫跟站位置變形）。
+# 站位置參考真實地理（OpenStreetMap 站點），但係自己排，唔係照官方路綫圖。
+import json, math, os, re, sys, csv, collections
 
 G = 0.24      # 並排綫距離 = 綫闊（貼埋）
 R = 0.45      # 統一彎位（沿線段由轉角量）
@@ -11,15 +14,16 @@ L = {}
 def line(code, paths, stations):
     L[code] = {'paths': paths, 'stations': stations}
 
+# 座標參考真實地理（OpenStreetMap 站位置，市區放大、新界收細），再拉直做 45°。
 # ---------------- 港島綫 ----------------
 line('ISL', [[(2.5,22),(29.3,22),(30.3,23),(30.3,25.6)]], dict(
     KET=(2.5,22), HKU=(4.4,22), SYP=(6.2,22), SHW=(8.0,22), CEN=(10.2,22), ADM=(12.4,22), WAC=(14.6,22), CAB=(16.6,22),
     TIH=(18.6,22), FOH=(20.6,22), NOP=(22.6,22), QUB=(24.6,22), TAK=(26.6,22), SWH=(28.6,22), SKW=(30.3,23.7), HFC=(30.3,24.65), CHW=(30.3,25.6)))
-# ---------------- 荃灣綫：中環、金鐘緊貼港島綫上面 ----------------
+# ---------------- 荃灣綫：中環、金鐘緊貼港島綫上面；荔景之後向北去荃灣 ----------------
 TW = 22 - G
-line('TWL', [[(10.2,TW),(13.0,TW),(15,TW-2.0),(15,13.1),(14.2,12.3),(1.5,12.3)]], dict(
+line('TWL', [[(10.2,TW),(13.0,TW),(15,TW-2.0),(15,13.1),(14.2,12.3),(8.24,12.3),(7.24,11.3),(7.24,7.25)]], dict(
     CEN=(10.2,TW), ADM=(12.4,TW), TST=(15,17.9), JOR=(15,17.0), YMT=(15,15.8), MOK=(15,14.8), PRE=(15,13.8),
-    SSP=(13.6,12.3), CSW=(12.25,12.3), LCK=(11.0,12.3), MEF=(9.48,12.3), LAK=(7.6,12.3), KWF=(6.0,12.3), KWH=(4.5,12.3), TWH=(3.0,12.3), TSW=(1.5,12.3)))
+    SSP=(13.6,12.3), CSW=(12.0,12.3), LCK=(10.4,12.3), MEF=(8.84,12.3), LAK=(7.74,11.8), KWF=(7.24,9.8), KWH=(7.24,8.95), TWH=(7.24,8.1), TSW=(7.24,7.25)))
 # ---------------- 觀塘綫：油麻地至太子喺荃灣綫右邊貼住 ----------------
 KX = 15 + G
 line('KTL', [[(21.2,17.2),(16.04,17.2),(KX,16.4),(KX,10.6),(16.04,9.8),(24.05,9.8),(24.85,10.6),(24.85,14.6),(25.65,15.4),(28.5,15.4)]], dict(
@@ -30,43 +34,45 @@ TK = 15.4 + G
 line('TKL', [[(22.6,TW),(25.2,TW),(25.9,TW-0.7),(25.9,TK+0.7),(26.6,TK),(30.2,TK),(31.0,TK-0.8),(31.0,12.4)],
              [(30.2,TK),(31.0,TK+0.8),(31.0,17.6)]], dict(
     NOP=(22.6,TW), QUB=(24.6,TW), YAT=(27.2,TK), TIK=(28.5,TK), TKO=(29.6,TK), HAH=(31.0,13.6), POA=(31.0,12.4), LHP=(31.0,17.6)))
-# ---------------- 屯馬綫 ----------------
-ML = 9.48 # 經美孚、南昌嗰段直綫（南昌貼住東涌綫右邊）
-line('TML', [[(1,7.0),(1,2.9),(1.8,2.1),(3.2,2.1),(4,2.9),(4,8.0),(5.5,9.5),(8.68,9.5),(ML,10.3),(ML,15.5),(ML+3.1,18.6),(18.4,18.6),(19.2,17.8),
-              (19.2,16.3),(22.0,13.5),(22.0,9.0),(21.2,8.2),(18.54,8.2),(17.5+G,7.4),(17.5+G,6.2),(19.44,4.5),(28.6,4.5)]], dict(
-    TUM=(1,7.0), SIH=(1,4.6), TIS=(2.5,2.1), LOP=(4,3.7), YUL=(4,5.2), KSR=(4,6.7), TWW=(7.0,9.5), MEF=(ML,12.3-G), NAC=(ML,14.9),
-    AUS=(10.9,16.92), ETS=(16.2,18.6), HUH=(17.5,18.6), HOM=(19.2,17.2-G), TKW=(20.5,15.0), SUW=(22,12.8), KAT=(22,11.4), DIH=(22,9.8+G),
-    HIK=(20.0,8.2), TAW=(17.5+G,6.8), CKT=(18.6,5.34), STW=(20.2,4.5), CIO=(21.6,4.5), SHM=(23.0,4.5), TSH=(24.4,4.5), HEO=(25.8,4.5),
-    MOS=(27.2,4.5), WKS=(28.6,4.5)))
-# ---------------- 東鐵綫：金鐘喺港島綫下面，過咗金鐘先斜上 ----------------
+# ---------------- 屯馬綫：美孚向西北（荔景、葵芳之間穿過荃灣綫）→ 荃灣西 → 錦上路 → 元朗、天水圍 → 屯門；
+#                  東面經大圍向東去馬鞍山（喺東鐵綫東南面） ----------------
+ML = 9.48   # 南昌嗰段直綫（貼住東涌綫右邊）
+line('TML', [[(-0.6,9.6),(-0.6,6.3),(0.1,5.6),(4.8,5.6),(5.6,6.4),(5.6,8.82),(ML,12.7),(ML,15.5),(ML+3.1,18.6),(18.4,18.6),(19.2,17.8),
+              (19.2,16.3),(22.0,13.5),(22.0,9.0),(21.2,8.2),(18.54,8.2),(17.5+G,7.4),(17.5+G,6.2),(18.44,5.5),(23.4,5.5),(25.4,3.5),(27.6,3.5)]], dict(
+    TUM=(-0.6,9.6), SIH=(-0.6,8.0), TIS=(0.7,5.6), LOP=(1.8,5.6), YUL=(2.95,5.6), KSR=(4.2,5.6), TWW=(6.2,9.42),
+    MEF=(8.84,12.06), NAC=(ML,14.9), AUS=(10.9,16.92), ETS=(16.2,18.6), HUH=(17.5,18.6), HOM=(19.2,17.2-G), TKW=(20.5,15.0), SUW=(22,12.8),
+    KAT=(22,11.4), DIH=(22,9.8+G), HIK=(20.0,8.2), TAW=(17.5+G,6.8), CKT=(19.2,5.5), STW=(20.4,5.5), CIO=(21.6,5.5), SHM=(22.8,5.5),
+    TSH=(24.1,4.8), HEO=(24.8,4.1), MOS=(26.2,3.5), WKS=(27.6,3.5)))
+# ---------------- 東鐵綫：金鐘喺港島綫下面，過咗金鐘先斜上；大圍之後向東北去大學，再向西北去上水、羅湖 ----------------
 EA = 22 + G
-line('EAL', [[(12.4,EA),(13.0,EA),(13.94,21.3),(16.3,21.3),(17.5,20.1),(17.5,2.9),(16.7,2.1),(10.2,2.1)],
-             [(12.2,2.1),(11.4,2.9),(10.2,2.9)]], dict(
-    ADM=(12.4,EA), EXC=(15.4,21.3), HUH=(17.5,18.6-G), MKK=(17.5,13.0), KOT=(17.5,9.8+G), TAW=(17.5,6.8), SHT=(17.5,5.8), FOT=(17.5,4.7),
-    UNI=(17.5,3.6), TAP=(16.0,2.1), TWO=(14.75,2.1), FAN=(13.5,2.1), SHS=(12.2,2.1), LOW=(10.2,2.1), LMC=(10.2,2.9)))
+line('EAL', [[(12.4,EA),(13.0,EA),(13.94,21.3),(16.3,21.3),(17.5,20.1),(17.5,5.2),(20.2,2.5),(20.2,1.6),(18.0,-0.6),(15.0,-0.6),(14.3,-1.3)],
+             [(15.8,-0.6),(12.8,-0.6)]], dict(
+    ADM=(12.4,EA), EXC=(15.4,21.3), HUH=(17.5,18.6-G), MKK=(17.5,13.0), KOT=(17.5,9.8+G), TAW=(17.5,6.8), SHT=(18.2,4.5), FOT=(18.9,3.8),
+    UNI=(19.6,3.1), TAP=(19.5,0.9), TWO=(18.6,0.0), FAN=(17.2,-0.6), SHS=(15.8,-0.6), LOW=(14.3,-1.3), LMC=(12.8,-0.6)))
 # ---------------- 南港島綫：金鐘最低一條 ----------------
 SI = 22 + 2*G
 line('SIL', [[(12.4,SI),(13.0,SI),(13.8,SI+0.8),(13.8,24.5),(13.0,25.3),(9.0,25.3)]], dict(
     ADM=(12.4,SI), OCP=(13.8,23.9), WCH=(12.4,25.3), LET=(10.7,25.3), SOH=(9.0,25.3)))
-# ---------------- 東涌綫、機場快綫：香港站至青衣貼住並排；過咗青衣機場快綫交叉去上面 ----------------
+# ---------------- 東涌綫、機場快綫：香港站至青衣貼住並排（荔景同荃灣綫貼住）；過咗青衣東涌綫斜落欣澳、東涌，
+#                  機場快綫喺佢北面另外斜落機場（機場喺東涌北面） ----------------
 TC = 9.0 + G   # 東涌綫（外邊）
-line('TCL', [[(TC,21.3),(TC,13.4),(8.38,12.3+G),(7.0,12.3+G),(5.0,14.54),(5.0,18.3),(4.2,19.1),(2.6,19.1)]], dict(
-    HOK=(TC,21.3), KOW=(TC,17.9), OLY=(TC,16.3), NAC=(TC,14.9), LAK=(7.6,12.3+G), TSY=(5.0,15.4), SUN=(5.0,17.6), TUC=(2.6,19.1)))
-line('AEL', [[(9.0,21.3),(9.0,13.499),(8.281,12.3+2*G),(7.099,12.3+2*G),(5.24,14.639),(5.24,16.2),(4.24,17.2),(1.9,17.2)]], dict(
-    HOK=(9.0,21.3), KOW=(9.0,17.9), TSY=(5.24,15.4), AIR=(3.4,17.2), AWE=(1.9,17.2)))
-# ---------------- 迪士尼綫：由欣澳貼住東涌綫向下 ----------------
-line('DRL', [[(5.0+G,17.6),(5.0+G,19.6)]], dict(SUN=(5.0+G,17.6), DIS=(5.0+G,19.6)))
+line('TCL', [[(TC,21.3),(TC,13.64),(6.6,11.0),(4.8,11.0),(0.0,15.8)]], dict(
+    HOK=(TC,21.3), KOW=(TC,17.9), OLY=(TC,16.3), NAC=(TC,14.9), LAK=(7.4,11.8), TSY=(5.8,11.0), SUN=(2.2,13.6), TUC=(0.0,15.8)))
+line('AEL', [[(9.0,21.3),(9.0,13.74),(6.5,11.24),(2.4,11.24),(-0.76,14.4),(-2.9,14.4)]], dict(
+    HOK=(9.0,21.3), KOW=(9.0,17.9), TSY=(5.8,11.24), AIR=(-1.4,14.4), AWE=(-2.9,14.4)))
+# ---------------- 迪士尼綫：由欣澳向下（東涌綫喺欣澳係斜綫） ----------------
+line('DRL', [[(2.2,13.6+G),(2.2,15.4)]], dict(SUN=(2.2,13.6+G), DIS=(2.2,15.4)))
 
 LABELS = dict(
   CEN='s', ADM='sw', SKW='e', HFC='e', CHW='e',
-  TST='w', JOR='w', YMT='w', MOK='w', PRE='w', SSP='n', CSW='n', LCK='n', MEF='ne', LAK='n', KWF='n', KWH='n', TWH='n', TSW='n',
+  TST='w', JOR='w', YMT='w', MOK='w', PRE='w', SSP='n', CSW='n', LCK='n', MEF='ne', LAK='sw', KWF='e', KWH='e', TWH='e', TSW='n',
   WHA='e', HOM='se', SKM='e', KOT='nw', LOF='n', WTS='n', DIH='se', CHH='n', KOB='e', NTK='e', KWT='e', LAT='e', YAT='n', TIK='n',
   NOP='s', QUB='s', TKO='s', HAH='e', POA='e', LHP='e',
-  TUM='e', SIH='e', TIS='n', LOP='e', YUL='e', KSR='e', TWW='n', NAC='e', AUS='ne', ETS='n', HUH='se', TKW='se', SUW='e', KAT='e',
-  HIK='n', TAW='w', CKT='se', STW='n', CIO='n', SHM='n', TSH='n', HEO='n', MOS='n', WKS='n',
-  EXC='n', MKK='e', SHT='w', FOT='w', UNI='w', TAP='n', TWO='n', FAN='n', SHS='n', LOW='w', LMC='w',
+  TUM='s', SIH='w', TIS='n', LOP='s', YUL='s', KSR='n', TWW='sw', NAC='e', AUS='ne', ETS='n', HUH='se', TKW='se', SUW='e', KAT='e',
+  HIK='n', TAW='w', CKT='s', STW='n', CIO='s', SHM='n', TSH='se', HEO='se', MOS='n', WKS='n',
+  EXC='n', MKK='e', SHT='nw', FOT='nw', UNI='nw', TAP='ne', TWO='ne', FAN='s', SHS='s', LOW='n', LMC='w',
   OCP='e', WCH='s', LET='s', SOH='s',
-  HOK='nw', KOW='w', OLY='w', TSY='w', SUN='w', TUC='s', AIR='n', AWE='n', DIS='s',
+  HOK='nw', KOW='w', OLY='w', TSY='s', SUN='se', TUC='w', AIR='n', AWE='n', DIS='s',
 )
 # 站名同站粒之間額外留位（例如奧運：左邊仲有機場快綫）
 LABEL_GAP = dict(OLY=0.42)
@@ -151,7 +157,7 @@ for s, r in rects.items():
 for e in errs: print('✗', e)
 print(f'{len(errs)} 個問題')
 
-if '--ts' in sys.argv:
+if '--ts' in sys.argv or '--write' in sys.argv:
     def P(p): return f'[{round(p[0],3)}, {round(p[1],3)}]'
     out = []
     for code in ['ISL','TWL','KTL','TKL','TML','EAL','SIL','TCL','AEL','DRL']:
@@ -159,6 +165,19 @@ if '--ts' in sys.argv:
         paths = ', '.join('[' + ', '.join(P(p) for p in path) + ']' for path in l['paths'])
         stas = ', '.join(f'{s}: {P(p)}' for s,p in l['stations'].items())
         out.append(f"  {{ line: '{code}', paths: [{paths}], stations: {{ {stas} }} }},")
-    print('LINES>>>'); print('\n'.join(out))
-    print('LABELS>>>'); print('  ' + ', '.join(f"{s}: '{v}'" for s,v in LABELS.items()) + ',')
-    print('GAP>>>'); print(json.dumps(LABEL_GAP))
+    lines_ts = '\n'.join(out)
+    labels_ts = '  ' + ', '.join(f"{s}: '{v}'" for s,v in LABELS.items()) + ','
+    gap_ts = '{ ' + ', '.join(f'{k}: {v}' for k, v in LABEL_GAP.items()) + ' }'
+    if '--write' in sys.argv:
+        if errs: sys.exit('有問題，唔寫')
+        tp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src/mtr-map.ts')
+        t = open(tp).read()
+        t = re.sub(r'(export const MTR_MAP_LINES: readonly MtrMapLine\[\] = \[\n).*?(\n\];)', lambda m: m.group(1) + lines_ts + m.group(2), t, count=1, flags=re.S)
+        t = re.sub(r'(export const MTR_MAP_LABELS: Readonly<Record<string, LabelSide>> = \{\n).*?(\n\};)', lambda m: m.group(1) + labels_ts + m.group(2), t, count=1, flags=re.S)
+        t = re.sub(r'(export const MTR_MAP_LABEL_GAP: Readonly<Record<string, number>> = )\{.*?\};', lambda m: m.group(1) + gap_ts + ';', t, count=1)
+        open(tp, 'w').write(t)
+        print('已寫入 src/mtr-map.ts；記得再行 mtr-water.py --write')
+    else:
+        print('LINES>>>'); print(lines_ts)
+        print('LABELS>>>'); print(labels_ts)
+        print('GAP>>>'); print(gap_ts)

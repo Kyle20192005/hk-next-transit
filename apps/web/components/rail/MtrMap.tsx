@@ -10,7 +10,7 @@ const MIN_PX = 9;
 const MAX_PX = 90;
 
 /**
- * 港鐵路綫圖（core mtr-map.ts 嘅自畫示意圖）：拖動、兩隻手指或者滑鼠轆縮放、撳站。
+ * 港鐵路綫圖（core mtr-map.ts 嘅自畫示意圖，站位置同海參考真實地理）：拖動、兩隻手指或者滑鼠轆縮放、撳站。
  * 用 viewBox 做平移縮放（SVG 本身唔郁），站名喺任何大細都清楚。
  */
 export default function MtrMap({ selected, onStation }: { selected: string | null; onStation: (sta: string) => void }) {
@@ -18,6 +18,8 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<View | null>(null);
   const stations = useMemo(() => mtrMapStations(), []);
+  // 海：所有環一條 path（evenodd：海入面嘅島係陸地）
+  const waterD = useMemo(() => MTR_MAP_WATER.map((w) => `${mtrRoundPathD(w, [], 0.3)} Z`).join(' '), []);
   // 綫：轉角圓角（似港鐵圖），每條綫只避開自己嘅站
   const linePaths = useMemo(
     () => MTR_MAP_LINES.flatMap((l) => l.paths.map((p, i) => ({ key: `${l.line}-${i}`, color: mtrLine(l.line)?.color, d: mtrRoundPathD(p, Object.values(l.stations)) }))),
@@ -118,9 +120,7 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
     <div className="mtr-map" ref={box} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
       {view && (
         <svg viewBox={`${view.x} ${view.y} ${view.w} ${view.w * aspect}`} role="img" aria-label="港鐵路綫圖">
-          {MTR_MAP_WATER.map((w, i) => (
-            <path key={`w${i}`} d={`${mtrRoundPathD(w, [], 0.5)} Z`} className="mtr-water" />
-          ))}
+          <path d={waterD} fillRule="evenodd" className="mtr-water" />
           {MTR_MAP_REGIONS.map((r) => (
             <g key={r.zh} className="mtr-region">
               <text x={r.at[0]} y={r.at[1]} textAnchor="middle" className="mtr-region-zh">
@@ -157,6 +157,10 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
           })}
         </svg>
       )}
+      {/* 站位置同海岸綫參考 OpenStreetMap（ODbL） */}
+      <a className="mtr-attr" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()}>
+        © OpenStreetMap 貢獻者
+      </a>
       <div className="mtr-zoom" onPointerDown={(e) => e.stopPropagation()}>
         <button onClick={() => zoomBtn(1.4)} aria-label="放大">
           <Icon name="plus" size={18} />

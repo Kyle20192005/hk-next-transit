@@ -809,6 +809,7 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .mtr-region-zh { font-size: 0.62px; font-weight: 700; letter-spacing: 0.15px; fill: var(--muted); opacity: 0.32; }
 .mtr-region-en { font-size: 0.26px; fill: var(--muted); opacity: 0.4; }
 .mtr-sta.on .mtr-zh { fill: var(--accent); }
+.mtr-attr { position: absolute; left: 10px; bottom: 8px; padding: 2px 6px; border-radius: 6px; font-size: 0.68rem; color: var(--muted); background: color-mix(in srgb, var(--card) 80%, transparent); text-decoration: none; }
 .mtr-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
 .mtr-zoom button { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 12px; background: var(--card); color: var(--text); box-shadow: var(--shadow); cursor: pointer; }
 .mtr-zoom .mtr-fit { font-size: 0.75rem; font-weight: 700; }

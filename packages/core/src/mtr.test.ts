@@ -35,7 +35,7 @@ describe('mtr', () => {
   });
 });
 
-import { MTR_MAP_BEND, MTR_MAP_LINES, mtrMapStations } from './mtr-map';
+import { MTR_MAP_BEND, MTR_MAP_LINES, MTR_MAP_VIEW, MTR_MAP_WATER, mtrMapStations } from './mtr-map';
 import { MTR_LINE_STATIONS } from './mtr-data';
 
 describe('mtr map', () => {
@@ -96,6 +96,32 @@ describe('mtr map geometry', () => {
       const sameX = s.pts.every((p) => Math.abs(p[0] - s.pts[0]![0]) < 1e-9);
       const sameY = s.pts.every((p) => Math.abs(p[1] - s.pts[0]![1]) < 1e-9);
       expect(sameX || sameY, `${s.code} ${JSON.stringify(s.pts)}`).toBe(true);
+    }
+  });
+
+  it('water: first ring frames the whole map, and every station is on land (evenodd)', () => {
+    const [frame, ...rest] = MTR_MAP_WATER;
+    const xs = frame!.map((p) => p[0]);
+    const ys = frame!.map((p) => p[1]);
+    expect(Math.min(...xs)).toBeLessThan(MTR_MAP_VIEW.minX);
+    expect(Math.max(...xs)).toBeGreaterThan(MTR_MAP_VIEW.minX + MTR_MAP_VIEW.width);
+    expect(Math.min(...ys)).toBeLessThan(MTR_MAP_VIEW.minY);
+    expect(Math.max(...ys)).toBeGreaterThan(MTR_MAP_VIEW.minY + MTR_MAP_VIEW.height);
+    expect(rest.length).toBeGreaterThan(5);
+    const inside = (ring: readonly (readonly [number, number])[], x: number, y: number) => {
+      let c = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i]!;
+        const [xj, yj] = ring[j]!;
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+      }
+      return c;
+    };
+    for (const s of mtrMapStations()) {
+      const x = s.box.x + s.box.w / 2;
+      const y = s.box.y + s.box.h / 2;
+      const water = MTR_MAP_WATER.filter((r) => inside(r, x, y)).length % 2 === 1;
+      expect(water, `${s.code} 喺海度`).toBe(false);
     }
   });
 });
