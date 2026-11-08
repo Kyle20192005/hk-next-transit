@@ -96,6 +96,8 @@ export function createLiveClient(opts: {
     stopEtas: (co: string, stopId: string) => area(`/api/stop-etas?co=${co}&stop=${encodeURIComponent(stopId)}`),
     /** 呢個位置可以搭嘅所有路線（喺度搭得、首頁下班車） */
     here: (lat: number, lng: number) => area(`/api/here?lat=${lat}&lng=${lng}`),
+    /** 港鐵站所有綫嘅到站時間 */
+    mtr: (sta: string) => get(`/api/mtr?sta=${encodeURIComponent(sta)}`),
     /** 而家係咪用緊 tracker（除錯用） */
     usingTracker: () => Boolean(tracker) && now() >= downUntil,
   };

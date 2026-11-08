@@ -5,6 +5,7 @@ import CompanyTag from '@/components/CompanyTag';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { TRANSPORT_MODES, orderedModes, placeMatches, radiusLabel, type PlaceMatch, type RouteIndex, type StopRouteHit, type TransportMode } from '@hknt/core';
 import ComingSoon from './ComingSoon';
+import RailView from '../rail/RailView';
 import Keypad from './Keypad';
 import Logo from '@/components/Logo';
 import Icon from '@/components/Icon';
@@ -145,7 +146,7 @@ export default function RouteBrowser({
             </button>
           ))}
         </div>
-        {!modeInfo.ready ? null : place === null ? (
+        {!modeInfo.ready || mode === 'rail' ? null : place === null ? (
           <button className="search-field" onClick={usePlace} aria-label="搜尋路線">
             <Icon name="search" size={20} className="search-icon" />
             <span className={code ? 'search-code' : 'search-placeholder'}>{code || '輸入路線號碼'}</span>
@@ -183,6 +184,8 @@ export default function RouteBrowser({
 
       {!modeInfo.ready ? (
         <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
+      ) : mode === 'rail' ? (
+        <RailView />
       ) : (
       <>
       <ul className="route-list" ref={listRef}>

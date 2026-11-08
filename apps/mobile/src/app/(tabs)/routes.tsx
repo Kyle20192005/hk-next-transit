@@ -39,7 +39,9 @@ export default function RoutesTab() {
     setSeenPriority(priority);
     setMode(priority === 'rail' ? 'rail' : 'bus');
   }
-  const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
+  // 港鐵路綫圖網頁版做咗，App 版未做：App 暫時當未 ready（顯示「功能即將推出」）
+  const baseMode = TRANSPORT_MODES.find((m) => m.id === mode)!;
+  const modeInfo = mode === 'rail' ? { ...baseMode, ready: false } : baseMode;
   const list = useRef<FlatList<PlaceMatch<Route>>>(null);
 
   const fetchRoutes = () => api.routes().then((r) => setRoutes(r.routes)).catch((e: Error) => setError(e.message));

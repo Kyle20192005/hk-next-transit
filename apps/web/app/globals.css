@@ -5,6 +5,7 @@
  */
 :root {
   --bg: #f2f3f5;
+  --water: #d9edf9;
   --card: #ffffff;
   --surface-2: #f6f7f9;
   --text: #111318;
@@ -35,6 +36,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0b0d11;
+  --water: #10283a;
     --card: #161920;
     --surface-2: #1d2128;
     --text: #edeef1;
@@ -57,6 +59,7 @@
 }
 :root[data-theme="dark"] {
   --bg: #0b0d11;
+  --water: #10283a;
   --card: #161920;
   --surface-2: #1d2128;
   --text: #edeef1;
@@ -787,3 +790,43 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
   .home.tab-home .tab-bar { position: relative; z-index: 30; }
   .home.tab-home .tab-bar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 18px; background: var(--brand); border-radius: 0 0 18px 18px; pointer-events: none; }
 }
+
+/* ---------- 港鐵路綫圖（components/rail） ---------- */
+.mtr-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.mtr-map { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background: var(--card); cursor: grab; }
+.mtr-map:active { cursor: grabbing; }
+.mtr-map svg { display: block; width: 100%; height: 100%; }
+.mtr-line { fill: none; stroke-width: 0.24; stroke-linecap: round; stroke-linejoin: round; }
+.mtr-hit { fill: transparent; }
+.mtr-sta { cursor: pointer; }
+.mtr-dot { fill: #fff; stroke-width: 0.075; }
+.mtr-dot.inter { stroke: #23262b; stroke-width: 0.065; }
+.mtr-sta.on .mtr-dot { fill: var(--brand); }
+.mtr-zh, .mtr-en { paint-order: stroke; stroke: var(--card); stroke-width: 0.09px; stroke-linejoin: round; }
+.mtr-zh { font-size: 0.3px; font-weight: 700; fill: var(--text); }
+.mtr-en { font-size: 0.18px; font-weight: 500; fill: var(--muted); }
+.mtr-water { fill: var(--water); }
+.mtr-region-zh { font-size: 0.62px; font-weight: 700; letter-spacing: 0.15px; fill: var(--muted); opacity: 0.32; }
+.mtr-region-en { font-size: 0.26px; fill: var(--muted); opacity: 0.4; }
+.mtr-sta.on .mtr-zh { fill: var(--accent); }
+.mtr-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.mtr-zoom button { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 12px; background: var(--card); color: var(--text); box-shadow: var(--shadow); cursor: pointer; }
+.mtr-zoom .mtr-fit { font-size: 0.75rem; font-weight: 700; }
+.mtr-backdrop { background: rgb(0 0 0 / 0.2); }
+.mtr-sheet { max-height: 62dvh; gap: 12px; }
+.mtr-sheet-head { display: flex; align-items: flex-start; gap: 10px; }
+.mtr-sheet-head > div:first-child { flex: none; }
+.mtr-sheet-head h2 { margin: 0; font-size: 1.375rem; }
+.mtr-chips { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+.mtr-chip { padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; }
+.mtr-line-block { border-radius: 14px; padding: 10px 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; }
+.mtr-line-block h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+.mtr-line-bar { width: 6px; height: 18px; border-radius: 3px; background: var(--line); }
+.mtr-dir { display: flex; flex-direction: column; gap: 2px; }
+.mtr-dir-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.mtr-plat { flex: none; padding: 1px 7px; border-radius: 6px; background: var(--card); font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.mtr-etas b { font-size: 1.25rem; color: var(--accent); }
+.mtr-trains { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.mtr-trains li { display: flex; align-items: baseline; gap: 10px; }
+.mtr-trains .mtr-etas { min-width: 64px; }
+.mtr-source { font-size: 0.75rem; margin: 0; }

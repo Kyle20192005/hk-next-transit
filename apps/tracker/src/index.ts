@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { APP_VERSION, etasAtStopDetailed, hereRoutes, inHongKong, stopEtas, type StopLiveDeps } from '@hknt/core';
+import { APP_VERSION, etasAtStopDetailed, hereRoutes, inHongKong, isMtrStation, mtrStationEtas, stopEtas, type StopLiveDeps } from '@hknt/core';
 import { config } from './config';
 import { dataVersion, getAllStops, getCalendar, getIndex, getRoute, isCo, SAFE_ROUTE, SAFE_STOP } from './data';
 import { createLines, NotFound } from './lines';
@@ -12,6 +12,7 @@ import { BusyError, createUpstream } from './upstream';
  *   GET /api/eta?co=ctb&route=101&stop=001152  某站到站時間（同網站 /api/eta 一樣格式；追蹤緊嘅線直接用 cache，唔使再問巴士公司）
  *   GET /api/stop-etas?co=ctb&stop=001106      一個站所有路線嘅下一兩班（附近）
  *   GET /api/here?lat=22.28&lng=114.15          呢個位置可以搭嘅路線（喺度搭得、首頁下班車）
+ *   GET /api/mtr?sta=TST                         港鐵站所有綫嘅到站時間（同網站 /api/mtr 一樣格式）
  *   GET /health
  */
 const upstream = createUpstream({ ttlMs: config.upstreamTtlMs, rps: config.upstreamRps, rpsByHost: config.upstreamRpsByHost });
@@ -90,6 +91,13 @@ const server = createServer(async (req, res) => {
       // 經 upstream（10 秒 cache）：呢條線追蹤緊嘅話，呢個站啱啱先問過，唔會再問巴士公司
       const { etas, failed } = await etasAtStopDetailed(data, stop, calendar, upstream.fetch);
       return send(req, res, 200, { route: data.route, stop, fetchedAt: new Date().toISOString(), etas, failed }, { 'Cache-Control': 'no-store' });
+    }
+
+    if (url.pathname === '/api/mtr') {
+      const sta = (url.searchParams.get('sta') ?? '').toUpperCase();
+      if (!isMtrStation(sta)) return send(req, res, 400, { error: '冇呢個港鐵站' });
+      const { lines: l, failed } = await mtrStationEtas(sta, upstream.fetch);
+      return send(req, res, 200, { sta, fetchedAt: new Date().toISOString(), lines: l, failed }, { 'Cache-Control': 'no-store' });
     }
 
     // 附近、喺度搭得：一次問好多個站，用低優先；tracker 忙就回 503，前端改問 Vercel（唔好俾用戶見到唔完整嘅「冇班次」）
