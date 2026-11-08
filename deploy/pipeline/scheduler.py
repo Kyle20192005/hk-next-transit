@@ -45,7 +45,10 @@ def run_once() -> None:
             json.dump(result, f, ensure_ascii=False)
     except OSError:
         pass
-    print(f"[scheduler] 完成：{result}", flush=True)
+    if code == 0:
+        print(f"[scheduler] ✅ 更新成功：{result}", flush=True)
+    else:
+        print(f"[scheduler] ❌ 更新失敗（exit {code}），data 分支冇改，網站繼續用舊數據；睇上面 [pipeline] 最後幾行搵原因：{result}", flush=True)
     ping(code == 0)
 
 
