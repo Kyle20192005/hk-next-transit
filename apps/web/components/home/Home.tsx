@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import type { RouteIndex, TransportMode } from '@hknt/core';
+import { TRANSPORT_MODES, type RouteIndex, type TransportMode } from '@hknt/core';
 import Icon, { type IconName } from '@/components/Icon';
 import Logo from '@/components/Logo';
 import { useFavorites } from '@/lib/favorites';
@@ -14,7 +14,7 @@ import Settings from './Settings';
 import News from './News';
 import { toolById, type ToolId } from '@hknt/core';
 import ToolEditor from './ToolEditor';
-import { usePrefs } from '@/lib/prefs';
+import { getPrefs, usePrefs } from '@/lib/prefs';
 
 type Tab = 'home' | 'routes' | 'nav' | 'favs' | 'settings';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -26,6 +26,8 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 ];
 /** 由路線頁返嚟時返返上次嘅分頁 */
 const TAB_KEY = 'hknt.tab';
+/** 「路線」分頁揀咗邊款交通工具（同 TAB_KEY 一樣，由路線頁返嚟用） */
+const MODE_KEY = 'hknt.mode';
 
 /**
  * 首頁：底部分頁列（首頁／路線／導航／收藏／設定；導航未做，顯示「即將推出」），每個分頁有自己嘅黃色標題區。
@@ -35,10 +37,32 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   const [tab, setTab] = useState<Tab>('home');
   // 唔係分頁嘅頁：附近車站、交通消息（有返回掣）
   const [view, setView] = useState<null | { kind: 'nearby' } | { kind: 'tools' } | { kind: 'news'; pos: { lat: number; lng: number } | null }>(null);
-  const [mode, setMode] = useState<TransportMode>('bus');
+  const [mode, setModeState] = useState<TransportMode>('bus');
   // 設定「交通工具優先」：路線分頁預設揀邊款
   const { priority } = usePrefs();
-  useEffect(() => setMode(priority === 'rail' ? 'rail' : 'bus'), [priority]);
+  // 揀咗邊款記低（連同當時嘅優先設定）：由巴士路線頁返嚟仲係巴士，唔好變返港鐵優先嘅預設；
+  // 設定改咗優先就清走記錄，用返新預設
+  const setMode = (m: TransportMode) => {
+    setModeState(m);
+    try {
+      sessionStorage.setItem(MODE_KEY, JSON.stringify({ mode: m, priority: getPrefs().priority }));
+    } catch {
+      /* 唔記得都冇所謂 */
+    }
+  };
+  useEffect(() => {
+    // hydration 時 usePrefs 先俾預設值：同真設定唔夾就等真值，唔好當係改咗設定
+    if (priority !== getPrefs().priority) return;
+    let saved: TransportMode | null = null;
+    try {
+      const s = JSON.parse(sessionStorage.getItem(MODE_KEY) ?? 'null') as { mode?: string; priority?: string } | null;
+      if (s?.priority === priority && TRANSPORT_MODES.some((m) => m.id === s.mode)) saved = s.mode as TransportMode;
+      else sessionStorage.removeItem(MODE_KEY);
+    } catch {
+      /* 用預設 */
+    }
+    setModeState(saved ?? (priority === 'rail' ? 'rail' : 'bus'));
+  }, [priority]);
   const favCount = useFavorites().length;
   // 港鐵站（首頁大卡、收藏、路綫圖搜尋）：入「路線」分頁揀港鐵，飛去嗰個站並打開到站時間
   const [railPick, setRailPick] = useState<RailPick | null>(null);

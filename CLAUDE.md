@@ -382,7 +382,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   `usePrefs()` 即時更新，effect／callback 入面用 `getPrefs()`（網頁 hydration 時 usePrefs 先俾預設值）。
   - 深色模式（跟系統／淺色／深色）：網頁寫 `<html data-theme>`（layout 嘅 `THEME_SCRIPT` 載入前先寫，唔閃；CSS 深色變數同時跟
     `prefers-color-scheme` + `:root:not([data-theme="light"])` 同 `:root[data-theme="dark"]`，地圖用 `useDark()`）；App 用 `Appearance.setColorScheme`。
-  - 交通工具優先（巴士／港鐵）：「路線」分頁預設同分類次序（`orderedModes`）；首頁大字兩行（最近港鐵站／巴士站）同大卡「下班車」嘅卡次序（core `orderNearCards`：
+  - 交通工具優先（巴士／港鐵）：「路線」分頁預設同分類次序（`orderedModes`；只係預設：用戶揀咗另一款，由路線頁返嚟要用返佢揀嗰款，網頁 sessionStorage `hknt.mode` 連同當時嘅優先設定記低，改咗設定先用新預設；App 路線頁 `router.back()`，分頁狀態本身保留）；首頁大字兩行（最近港鐵站／巴士站）同大卡「下班車」嘅卡次序（core `orderNearCards`：
     港鐵 → 港鐵站卡排先；巴士 → 巴士站卡排先，港鐵站卡跟後，但一定會出）。
   - 到站時間顯示（分鐘／鐘數）：core `etaParts`、`etaRest`、`minutesLabel(at, now, fmt)`；一行內嘅用 `EtaInline`（兩邊都有），站點列表 `StopRow` 大細字對調。
   - 輕鐵到站顯示（按月台／按路線，`lrtGroup`，輕鐵站面板頂都切換得）。

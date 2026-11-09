@@ -1,6 +1,6 @@
 {
   "name": "hk-next-transit",
-  "version": "0.25.2",
+  "version": "0.25.3",
   "private": true,
   "packageManager": "pnpm@10.28.0",
   "scripts": {
