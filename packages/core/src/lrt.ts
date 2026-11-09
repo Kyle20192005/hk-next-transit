@@ -12,19 +12,19 @@ export interface LrtRoute {
   ink: string;
 }
 
-/** 路線色：參考車站同車廂路線圖慣用嘅顏色（路線識別用） */
+/** 路線色：港鐵官方輕鐵路線色（Wikipedia Module:Adjacent stations/MTR Light Rail 記錄嘅色碼，路線識別用） */
 export const LRT_ROUTES: readonly LrtRoute[] = [
   { route: '505', color: '#DA2128', ink: '#fff' },
-  { route: '507', color: '#00A650', ink: '#fff' },
-  { route: '610', color: '#5B2C1B', ink: '#fff' },
-  { route: '614', color: '#00B8E6', ink: '#06303d' },
-  { route: '614P', color: '#F08C93', ink: '#3d1013' },
-  { route: '615', color: '#F5C400', ink: '#3a2e00' },
-  { route: '615P', color: '#0B4F8C', ink: '#fff' },
-  { route: '705', color: '#8CC63F', ink: '#1f3108' },
-  { route: '706', color: '#B07CC6', ink: '#fff' },
-  { route: '751', color: '#F28C1E', ink: '#3a1f05' },
-  { route: '761P', color: '#6A2C91', ink: '#fff' },
+  { route: '507', color: '#00A54F', ink: '#fff' },
+  { route: '610', color: '#541912', ink: '#fff' },
+  { route: '614', color: '#15C0F2', ink: '#05313f' },
+  { route: '614P', color: '#F6A4AA', ink: '#4a1418' },
+  { route: '615', color: '#FFDC01', ink: '#3a3000' },
+  { route: '615P', color: '#016584', ink: '#fff' },
+  { route: '705', color: '#7BC351', ink: '#1f3a0b' },
+  { route: '706', color: '#B279B4', ink: '#fff' },
+  { route: '751', color: '#F58220', ink: '#3a1c05' },
+  { route: '761P', color: '#6E2C91', ink: '#fff' },
 ];
 
 export const lrtRoute = (r: string): LrtRoute | undefined => LRT_ROUTES.find((x) => x.route === r);
