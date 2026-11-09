@@ -85,6 +85,7 @@ export function companyOf(url: string): string {
   if (url.includes('kmb')) return 'KMB';
   if (url.includes('nlb')) return 'NLB';
   if (url.includes('getSchedule.php')) return 'MTR'; // 港鐵（重鐵）到站
+  if (url.includes('/lrt/')) return 'LRT'; // 輕鐵到站
   if (url.includes('mtr')) return 'MTRB';
   if (url.includes('hkbuseta')) return 'times';
   return 'other';
