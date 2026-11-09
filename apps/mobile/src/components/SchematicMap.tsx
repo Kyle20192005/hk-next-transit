@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Linking, PanResponder, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import { Canvas, Group, Picture, type SkPicture } from '@shopify/react-native-skia';
-import { useDerivedValue, useSharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useDerivedValue, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { radius, shadow, useTheme, type Theme } from '@/lib/theme';
 import { Icon } from './Icon';
 
@@ -11,12 +11,15 @@ export type MapFocus = { sta: string; zoom: boolean };
 /** 面板遮住咗嘅位（px） */
 export type MapInset = { right: number; bottom: number };
 export type MapBounds = { readonly minX: number; readonly minY: number; readonly width: number; readonly height: number };
+/** 浮喺站上面嘅 RN 元件（車費起點／終點標記、揀起點終點嘅彈出選單）：x、y = 站頂中間（地圖座標）；interactive = 撳得（否則手勢照落地圖） */
+export type MapPinAt = { key: string; x: number; y: number; node: ReactNode; interactive?: boolean };
 type Size = { w: number; h: number };
 /** 一格幾多 px 先睇得清（開頁用）；縮放範圍（一格 px）。同網頁 useMapView 一樣 */
 const START_PX = 34;
 const MAX_PX = 90;
 const NO_INSET: MapInset = { right: 0, bottom: 0 };
 const NO_NEAR: string[] = [];
+const NO_PINS: MapPinAt[] = [];
 
 type Cfg = { bounds: MapBounds; minPx: number; inset: MapInset };
 /** 唔准拖到成幅圖離開畫面（留返一半；面板遮住咗嘅位唔計）；縮放有上下限 */
@@ -74,6 +77,7 @@ export function SchematicMap({
   focus = null,
   inset = NO_INSET,
   near = NO_NEAR,
+  pins = NO_PINS,
 }: {
   bounds: MapBounds;
   /** 開頁中心（地圖座標） */
@@ -90,6 +94,7 @@ export function SchematicMap({
   focus?: MapFocus | null;
   inset?: MapInset;
   near?: string[];
+  pins?: MapPinAt[];
 }) {
   const t = useTheme();
   const [size, setSize] = useState<Size>({ w: 0, h: 0 });
@@ -206,6 +211,12 @@ export function SchematicMap({
           </Canvas>
         )}
       </GestureSurface>
+      {ready &&
+        pins.map((p) => (
+          <MapPin key={p.key} x={p.x} y={p.y} sc={sc} ox={ox} oy={oy} interactive={!!p.interactive}>
+            {p.node}
+          </MapPin>
+        ))}
       {attribution && (
         <Pressable onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')} style={{ position: 'absolute', left: 10, bottom: 8 + inset.bottom, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: t.card + 'cc' }}>
           <Text style={{ fontSize: 11, color: t.muted }}>© OpenStreetMap 貢獻者</Text>
@@ -224,6 +235,23 @@ export function SchematicMap({
         </ZoomButton>
       </View>
     </View>
+  );
+}
+
+/** 浮喺站上面（站頂中間、向上擺）：位置跟地圖變形（UI thread 計，拖、縮放都唔使 React 重畫） */
+function MapPin({ x, y, sc, ox, oy, interactive, children }: { x: number; y: number; sc: SharedValue<number>; ox: SharedValue<number>; oy: SharedValue<number>; interactive: boolean; children: ReactNode }) {
+  const [sz, setSz] = useState({ w: 0, h: 0 });
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateX: x * sc.get() + ox.get() - sz.w / 2 }, { translateY: y * sc.get() + oy.get() - sz.h - 6 }],
+  }));
+  return (
+    <Animated.View
+      pointerEvents={interactive ? 'box-none' : 'none'}
+      onLayout={(e) => setSz({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
+      style={[{ position: 'absolute', left: 0, top: 0, opacity: sz.w ? 1 : 0, zIndex: interactive ? 5 : 3 }, style]}
+    >
+      {children}
+    </Animated.View>
   );
 }
 

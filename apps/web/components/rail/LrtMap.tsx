@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { LRT_MAP_ARROWS, LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_LEGEND, LRT_MAP_SIZE as S, LRT_MAP_STATIONS, LRT_MAP_VIEW, lrtRoute, lrtRouteStopIds, lrtStopEn, lrtStopName, mtrLine, type LrtMapStation } from '@hknt/core';
 import Icon from '../Icon';
-import { useMapView, type MapFocus, type MapInset } from './useMapView';
+import { useMapView, type MapFocus, type MapInset, type MapPin } from './useMapView';
 
 const START_PX = 34;
 const MIN_PX = 8;
@@ -21,6 +21,7 @@ export default function LrtMap({
   inset = { right: 0, bottom: 0 },
   near = [],
   route = null,
+  pins = [],
 }: {
   selected: string | null;
   onStation: (sta: string) => void;
@@ -30,6 +31,8 @@ export default function LrtMap({
   near?: string[];
   /** 標出呢條路線（其他淡咗）：站面板撳路線號碼 */
   route?: string | null;
+  /** 浮喺站上面嘅 HTML（車費起點／終點），跟住地圖郁 */
+  pins?: MapPin[];
 }) {
   const byId = useMemo(() => new Map(LRT_MAP_STATIONS.map((s) => [s.id, s])), []);
   const under = useMemo(() => LRT_MAP_LANES.filter((l) => !l.o), []);
@@ -43,7 +46,13 @@ export default function LrtMap({
     const s = LRT_MAP_STATIONS.find((x) => lrtStopName(x.id) === '兆康');
     return s ? { x: s.x, y: s.y } : { x: LRT_MAP_VIEW.minX + LRT_MAP_VIEW.width / 2, y: LRT_MAP_VIEW.minY + LRT_MAP_VIEW.height / 2 };
   }, []);
-  const { box, size, view, aspect, handlers, zoomBtn, fitAll } = useMapView({ bounds: LRT_MAP_VIEW, start, startPx: START_PX, minPx: MIN_PX, maxPx: MAX_PX, focus, inset, locate, onStation });
+  const { box, size, view, aspect, handlers, zoomBtn, fitAll, toScreen } = useMapView({ bounds: LRT_MAP_VIEW, start, startPx: START_PX, minPx: MIN_PX, maxPx: MAX_PX, focus, inset, locate, onStation });
+
+  /** 站頂中間（標記、彈出選單指住呢點） */
+  const top = (sta: string) => {
+    const s = byId.get(sta);
+    return s ? { x: s.hit[0] + s.hit[2] / 2, y: s.hit[1] } : null;
+  };
 
   return (
     <div className="mtr-map lrt-map" ref={box} {...handlers}>
@@ -98,6 +107,15 @@ export default function LrtMap({
           {route && selected && byId.get(selected) && <Ring s={byId.get(selected)!} className="mtr-focus lrt-hl" />}
         </svg>
       )}
+      {pins.map((p) => {
+        const a = top(p.sta);
+        const s = a && toScreen(a.x, a.y);
+        return s ? (
+          <div key={p.key} className="map-pin" style={{ left: s.left, top: s.top }}>
+            {p.node}
+          </div>
+        ) : null;
+      })}
       <div className={size.h - inset.bottom < 110 ? 'mtr-zoom row hidden' : size.h - inset.bottom < 200 ? 'mtr-zoom row' : 'mtr-zoom'} style={{ bottom: 12 + inset.bottom, right: 12 + inset.right }} onPointerDown={(e) => e.stopPropagation()}>
         <button onClick={() => zoomBtn(1.4)} aria-label="放大">
           <Icon name="plus" size={18} />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatDistance, lrtRecent, lrtRoute, lrtRouteName, lrtStopEn, lrtStopName, lrtStopRoutes, mtrCardStations, mtrLine, mtrRecent, mtrStationEn, mtrStationLines, mtrStationName, nearestLrtStops, searchLrtStops, searchMtrStations } from '@hknt/core';
+import { formatDistance, lrtRecent, lrtRoute, lrtRouteName, lrtStopEn, lrtStopName, lrtStopRoutes, mtrCardStations, mtrLine, mtrRecent, mtrStationEn, mtrStationLines, mtrStationName, nearestLrtStops, NO_FARE_ENDS, searchLrtStops, searchMtrStations, setFareEnd, swapFareEnds, type FareEnds, type FareRole } from '@hknt/core';
 import { Icon } from './Icon';
 import { useNearbyStops } from './Nearby';
 import { addRecent } from '@/lib/recent';
@@ -11,6 +11,8 @@ import { LrtMap } from './LrtMap';
 import { MtrStationSheet } from './MtrStationSheet';
 import { LrtStationSheet, RouteChip } from './LrtStationSheet';
 import type { MapFocus, MapInset } from './SchematicMap';
+import { FarePin, FarePopover, FareSheet, type RailPin } from './Fare';
+import { haptic } from '@/lib/haptics';
 
 type Kind = 'mtr' | 'lrt';
 type Hit = { sta: string; lrt: boolean };
@@ -25,6 +27,7 @@ const FULL_GAP = 56;
  * 「路線」分頁 → 港鐵・輕鐵（同網頁 components/rail/RailView.tsx 一樣）：左上角切換港鐵／輕鐵路綫圖（記住上次揀邊個），
  * 路綫圖 + 到站面板 + 搜尋結果（港鐵站、輕鐵站一齊搵）。搜尋欄喺標題列（routes.tsx），呢度出結果（浮喺地圖頂）；
  * 揀咗就清空、收鍵盤、轉去嗰幅圖、飛去嗰個站並打開面板。面板唔遮成幅圖：量佢遮咗幾多（inset）俾地圖。
+ * 右上角「車費」：入選擇模式，撳站喺站上面彈出「起點｜終點」，揀齊就喺面板顯示車費（港鐵、輕鐵分開計）。
  */
 export function RailView({ query, onPicked, open }: { query: string; onPicked: () => void; open?: { sta: string; n: string; lrt?: boolean } | null }) {
   const t = useTheme();
@@ -48,9 +51,15 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
   const [movedNear, setMovedNear] = useState<Kind | null>(null);
   /** 輕鐵：喺圖上標出嘅路線（站面板撳路線號碼；轉圖就取消） */
   const [route, setRoute] = useState<string | null>(null);
+  /** 車費計算模式：起點、終點，同埋彈出緊「起點｜終點」嘅站（港鐵、輕鐵分開，轉圖就清走） */
+  const [fare, setFare] = useState(false);
+  const [ends, setEnds] = useState<FareEnds>(NO_FARE_ENDS);
+  const [pending, setPending] = useState<string | null>(null);
   const setKind = (k: Kind) => {
     setKindState(k);
     setRoute(null);
+    setEnds(NO_FARE_ENDS);
+    setPending(null);
     setSta(null);
     setFocus(null);
     setMovedNear(null);
@@ -77,6 +86,10 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
   if (openKey !== seenOpen) {
     setSeenOpen(openKey);
     if (open) {
+      // 由首頁、收藏撳入嚟：結束車費計算
+      setFare(false);
+      setEnds(NO_FARE_ENDS);
+      setPending(null);
       setKindState(open.lrt ? 'lrt' : 'mtr');
       setRoute(null);
       setMovedNear(open.lrt ? 'lrt' : 'mtr');
@@ -89,21 +102,44 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
   // 手機每次揀新站都由半開開始（方便繼續撳地圖）
   const onStation = useCallback(
     (c: string) => {
-      setSta(c);
       setFocus({ sta: c, zoom: false });
+      // 車費模式：撳站唔開到站面板，喺站上面彈出「起點｜終點」（再撳一次收埋）
+      if (fare) {
+        haptic.pick();
+        return setPending((p) => (p === c ? null : c));
+      }
+      setSta(c);
       if (!wide) setAll(false);
     },
-    [wide],
+    [wide, fare],
   );
-  /** 轉去某幅圖嘅站（搜尋、面板「轉乘」）：飛去（放大置中）再打開 */
+  /** 轉去某幅圖嘅站（搜尋、面板「轉乘」）：飛去（放大置中）再打開；車費模式就彈出「起點｜終點」 */
   const jump = (k: Kind, s: string) => {
-    setKindState(k);
-    setRoute(null);
+    if (k !== kind) {
+      setKindState(k);
+      setRoute(null);
+      setEnds(NO_FARE_ENDS);
+      setPending(null);
+      AsyncStorage.setItem(KIND_KEY, k).catch(() => {});
+    }
     setMovedNear(k);
-    AsyncStorage.setItem(KIND_KEY, k).catch(() => {});
-    setSta(s);
     setFocus({ sta: s, zoom: true });
+    if (fare) return setPending(s);
+    setSta(s);
     if (!wide) setAll(false);
+  };
+  const toggleFare = () => {
+    haptic.tap();
+    setFare((f) => !f);
+    setEnds(NO_FARE_ENDS);
+    setPending(null);
+    setSta(null);
+  };
+  const pickRole = (role: FareRole) => {
+    if (!pending) return;
+    haptic.tap();
+    setEnds((e) => setFareEnd(e, pending, role));
+    setPending(null);
   };
   const pick = (h: Hit) => {
     Keyboard.dismiss();
@@ -123,17 +159,37 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
   };
   const name = (s: string) => (kind === 'lrt' ? lrtStopName(s) : mtrStationName(s));
   const nearIds = near.map((n) => n.sta);
+  // 車費：起點、終點標記；撳咗嘅站彈出選單（同一個站就只出選單；同網頁一樣）
+  const pins: RailPin[] = !fare
+    ? []
+    : [
+        ...(['from', 'to'] as const).filter((r) => ends[r] && ends[r] !== pending).map((r) => ({ key: r, sta: ends[r]!, node: <FarePin role={r} /> })),
+        ...(pending ? [{ key: `pop-${pending}`, sta: pending, node: <FarePopover onPick={pickRole} />, interactive: true }] : []),
+      ];
+  const shownSel = fare ? pending : sta;
+  const panelOpen = fare || !!sta;
   const sheetSize = wide ? null : { full: Math.max(200, box.h - FULL_GAP), peekMax: panelMax(box.h) };
   const panelStyle = wide ? ({ position: 'absolute', top: 12, right: 12, bottom: 12, width: 380 } as const) : ({ position: 'absolute', left: 0, right: 0, bottom: 0 } as const);
 
   return (
     <View style={{ flex: 1 }} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
       {kind === 'mtr' ? (
-        <MtrMap key="mtr" selected={sta} onStation={onStation} focus={focus} inset={sta ? inset : NO_INSET} near={nearIds} />
+        <MtrMap key="mtr" selected={shownSel} onStation={onStation} focus={focus} inset={panelOpen ? inset : NO_INSET} near={nearIds} pins={pins} />
       ) : (
-        <LrtMap key="lrt" selected={sta} onStation={onStation} focus={focus} inset={sta ? inset : NO_INSET} near={nearIds} route={route} />
+        <LrtMap key="lrt" selected={shownSel} onStation={onStation} focus={focus} inset={panelOpen ? inset : NO_INSET} near={nearIds} route={route} pins={pins} />
       )}
-      <View pointerEvents="box-none" style={{ position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+      {/* 車費計算（右上角；港鐵、輕鐵分開）：面板喺右邊時移開，唔好俾面板遮住 */}
+      <Pressable
+        onPress={toggleFare}
+        accessibilityRole="button"
+        accessibilityState={{ selected: fare }}
+        accessibilityLabel={fare ? '結束車費計算' : '車費計算'}
+        style={{ position: 'absolute', top: 10, right: 10 + (panelOpen ? inset.right : 0), zIndex: 4, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingLeft: 12, paddingRight: 16, borderRadius: 999, borderWidth: 1, borderColor: fare ? 'transparent' : t.line, backgroundColor: fare ? t.brand : t.card, ...shadow, shadowOpacity: 0.16, shadowRadius: 7, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}
+      >
+        <Icon name="ticket" size={18} color={fare ? t.onBrand : t.text} />
+        <Text style={{ fontSize: 16, fontWeight: '800', color: fare ? t.onBrand : t.text }}>車費</Text>
+      </Pressable>
+      <View pointerEvents="box-none" style={{ position: 'absolute', top: 10, left: 10, right: 120, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         {/* 港鐵／輕鐵切換：大過其他浮動掣，有圖示，揀咗嘅用黃色（同網頁 .rail-switch 一樣） */}
         <View
           accessibilityRole="tablist"
@@ -180,8 +236,9 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
           </Pressable>
         )}
       </View>
-      {sta && kind === 'mtr' && <MtrStationSheet sta={sta} onClose={close} tab={tab} onTab={setTab} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} onXfer={(s) => jump('lrt', s)} />}
-      {sta && kind === 'lrt' && <LrtStationSheet sta={sta} onClose={close} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} onXfer={(s) => jump('mtr', s)} route={route} onRoute={setRoute} />}
+      {fare && <FareSheet lrt={kind === 'lrt'} ends={ends} onSwap={() => setEnds(swapFareEnds)} onClear={() => (setEnds(NO_FARE_ENDS), setPending(null))} onClose={toggleFare} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} />}
+      {!fare && sta && kind === 'mtr' && <MtrStationSheet sta={sta} onClose={close} tab={tab} onTab={setTab} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} onXfer={(s) => jump('lrt', s)} />}
+      {!fare && sta && kind === 'lrt' && <LrtStationSheet sta={sta} onClose={close} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} onXfer={(s) => jump('mtr', s)} route={route} onRoute={setRoute} />}
       {query.trim() !== '' && (
         <View style={{ position: 'absolute', top: 8, left: 12, right: 12, maxHeight: '70%', borderRadius: radius.m, backgroundColor: t.card, ...shadowLg }}>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 6 }}>

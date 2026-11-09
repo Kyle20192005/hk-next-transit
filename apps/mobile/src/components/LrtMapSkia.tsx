@@ -3,7 +3,8 @@ import { DashPathEffect, Group, Picture, RoundedRect, Skia, StrokeCap, StrokeJoi
 import { LRT_MAP_ARROWS, LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_LEGEND, LRT_MAP_SIZE as S, LRT_MAP_STATIONS, LRT_MAP_VIEW, lrtRoute, lrtRouteStopIds, lrtStopEn, lrtStopName, mtrLine, type LrtMapStation } from '@hknt/core';
 import { useTheme, type Theme } from '@/lib/theme';
 import { alpha, drawText, makePaint } from '@/lib/skia-draw';
-import { SchematicMap, type MapFocus, type MapInset } from './SchematicMap';
+import { SchematicMap, type MapFocus, type MapInset, type MapPinAt } from './SchematicMap';
+import type { RailPin } from './Fare';
 
 export { setMapFontProvider } from '@/lib/skia-draw';
 
@@ -193,6 +194,12 @@ function ringRect(s: LrtMapStation) {
   return { x: x - p, y: y - p, width: w + 2 * p, height: h + 2 * p, r: Math.min(w, h) / 2 + p };
 }
 
+/** 站頂中間（車費標記、彈出選單指住呢點） */
+const top = (sta: string) => {
+  const s = BY_ID.get(sta);
+  return s ? { x: s.hit[0] + s.hit[2] / 2, y: s.hit[1] } : null;
+};
+
 /**
  * 輕鐵路綫圖（同網頁 components/rail/LrtMap.tsx 一樣嘅 core 資料同畫法）：一隻手指拖、兩隻手指縮放、撳站。
  * 成幅圖錄一次（mapPicture），拖拉縮放同港鐵路綫圖共用 SchematicMap。
@@ -204,6 +211,7 @@ export function LrtMap({
   inset,
   near,
   route = null,
+  pins,
 }: {
   selected: string | null;
   onStation: (sta: string) => void;
@@ -212,6 +220,8 @@ export function LrtMap({
   near?: string[];
   /** 標出呢條路線（其他淡咗）：站面板撳路線號碼 */
   route?: string | null;
+  /** 浮喺站上面嘅元件（車費起點／終點、彈出選單） */
+  pins?: RailPin[];
 }) {
   const t = useTheme();
   const picture = useMemo(() => mapPicture(t), [t]);
@@ -245,5 +255,14 @@ export function LrtMap({
       })()}
     </>
   );
-  return <SchematicMap bounds={LRT_MAP_VIEW} start={START} minPx={MIN_PX} picture={picture} hit={hit} locate={locate} overlay={overlay} selected={selected} onStation={onStation} focus={focus} inset={inset} near={near} />;
+  return <SchematicMap pins={toPins(pins)} bounds={LRT_MAP_VIEW} start={START} minPx={MIN_PX} picture={picture} hit={hit} locate={locate} overlay={overlay} selected={selected} onStation={onStation} focus={focus} inset={inset} near={near} />;
 }
+
+/** 站代號 → 站頂座標（搵唔到嘅站唔出） */
+function toPins(pins: RailPin[] | undefined): MapPinAt[] {
+  return (pins ?? []).flatMap((p) => {
+    const a = top(p.sta);
+    return a ? [{ key: p.key, x: a.x, y: a.y, node: p.node, interactive: p.interactive }] : [];
+  });
+}
+

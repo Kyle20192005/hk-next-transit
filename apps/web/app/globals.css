@@ -1037,3 +1037,35 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .rail-xfer:hover { background: var(--bg); }
 .rail-xfer-tag { padding: 1px 6px; border-radius: 5px; font-size: 0.75rem; font-weight: 700; line-height: 1.35; }
 .rail-xfer svg { color: var(--muted); margin-left: -2px; }
+
+/* 路綫圖車費計算（components/rail/Fare.tsx）：右上角掣、站上面嘅「起點｜終點」選單同標記、車費面板 */
+.rail-overlay { max-width: calc(100% - 120px); }
+.rail-fare-btn { position: absolute; top: 10px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px 10px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-size: 1rem; font-weight: 800; box-shadow: 0 4px 14px rgb(0 0 0 / 0.16), var(--shadow); cursor: pointer; }
+.rail-fare-btn.on { background: var(--brand); color: var(--on-brand); border-color: transparent; }
+.map-pin { position: absolute; z-index: 3; transform: translate(-50%, calc(-100% - 6px)); pointer-events: none; }
+.map-pin:has(.fare-pop) { z-index: 5; pointer-events: auto; }
+.fare-ico { display: inline-grid; place-items: center; flex: none; border-radius: 6px; color: #fff; }
+.fare-pop { position: relative; display: flex; align-items: center; padding: 6px; border-radius: 14px; background: rgb(28 28 30 / 0.94); color: #fff; box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); white-space: nowrap; }
+.fare-pop::after { content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); border: 8px solid transparent; border-bottom: 0; border-top-color: rgb(28 28 30 / 0.94); }
+.fare-pop-item { display: flex; align-items: center; }
+.fare-pop button { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border: 0; border-radius: 10px; background: none; color: #fff; font: inherit; font-size: 1.125rem; font-weight: 800; cursor: pointer; }
+.fare-pop button:hover { background: rgb(255 255 255 / 0.12); }
+.fare-pop-sep { width: 1px; height: 30px; margin: 0 4px; background: rgb(255 255 255 / 0.3); }
+.fare-pin { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 3px; border: 2px solid var(--fc); border-radius: 999px; background: var(--card); color: var(--fc); font-size: 0.875rem; font-weight: 800; box-shadow: var(--shadow); white-space: nowrap; }
+.fare-pin::after { content: ''; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 6px solid transparent; border-bottom: 0; border-top-color: var(--fc); }
+.fare-ends { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px 16px; }
+.fare-ends-list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.fare-end { display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 800; }
+.fare-end.empty span:last-child { color: var(--muted); font-weight: 600; font-size: 0.9375rem; }
+.fare-swap { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 12px; background: var(--surface-2); color: var(--text); cursor: pointer; }
+.fare-swap:disabled { opacity: 0.4; cursor: default; }
+.fare-main { display: flex; align-items: baseline; justify-content: space-between; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); }
+.fare-main strong { font-size: 1.75rem; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
+.fare-group h3 { margin: 2px 2px 6px; font-size: 0.8125rem; font-weight: 700; color: var(--muted); }
+.fare-group dl { margin: 0; padding: 2px 14px; border-radius: 14px; background: var(--surface-2); }
+.fare-group dl > div { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.fare-group dl > div:first-child { border-top: 0; }
+.fare-group dt { font-weight: 600; }
+.fare-group dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; }
+.fare-note { margin: 0; font-size: 0.8125rem; }
+

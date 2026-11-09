@@ -31,7 +31,10 @@ export type IconName =
   | 'minibus'
   | 'ferry'
   | 'tram'
-  | 'lrt';
+  | 'lrt'
+  | 'ticket'
+  | 'arrow-ne'
+  | 'arrow-se';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home: <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1Z" />,
@@ -63,6 +66,17 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M6 12.5h12M12 6.5V3.5M9 3.5h6M9 21l1-2.5M15 21l-1-2.5" />
     </>
   ),
+  /** 車費：車飛（中間虛綫撕位） */
+  ticket: (
+    <>
+      <path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5V10a2 2 0 0 0 0 4v2.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5V14a2 2 0 0 0 0-4Z" />
+      <path d="M14.5 6.5v1.5M14.5 11v2M14.5 16v1.5" />
+    </>
+  ),
+  /** 起點（車費計算） */
+  'arrow-ne': <path d="M7 17 17 7M9 7h8v8" />,
+  /** 終點（車費計算） */
+  'arrow-se': <path d="M7 7l10 10M17 9v8H9" />,
   /** 輕鐵：港鐵列車正面 + 人字形集電弓（同電車嘅 T 形桿分開） */
   lrt: (
     <>

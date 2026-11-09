@@ -85,6 +85,8 @@ export const api = {
   mtr: (sta: string) => liveJson<{ sta: string; lines: MtrLineEtas[]; failed: string[] }>(live.mtr(sta)),
   /** 輕鐵站到站時間（tracker 優先）：每個月台嘅班次；failed = 攞唔到 */
   lrt: (sta: string) => liveJson<{ sta: string; platforms: LrtPlatform[]; failed: boolean }>(live.lrt(sta)),
+  /** 路綫圖車費：由呢個站去其他每個站（[八達通成人, 小童, 長者, 殘疾, 學生, 樂悠咭, 單程成人, 單程小童, 單程長者]；機場快綫冇嘅係 null） */
+  fare: (lrt: boolean, from: string) => get<{ from: string; fares: Record<string, (number | null)[]> }>(`/api/${lrt ? 'lrt' : 'mtr'}/fare?from=${q(from)}`),
   stopEtas: (co: Co, stop: string) =>
     liveJson<{ routes: { route: string; dir: 'O' | 'I'; etas: { eta: string; company: Company; scheduled: boolean }[] }[] }>(live.stopEtas(co, stop)),
 };

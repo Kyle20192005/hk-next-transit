@@ -37,3 +37,4 @@ export * from './lrt-geo';
 export * from './lrt-map';
 export * from './mtr-map';
 export * from './rail-xfer';
+export * from './rail-fare';

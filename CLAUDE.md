@@ -148,6 +148,15 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
   色綫尾寫「輕鐵」／「屯馬綫」（打橫喺旁邊、打直喺上／下面；兆康上面係麒麟，字擺喺色綫右邊），圖例有說明。
   港鐵圖方向同尺寸 `MTR_MAP_XFER_DIR`、`MTR_MAP_XFER`（`mtrXferLink`），輕鐵圖 `LRT_MAP_STATIONS[].xl`、`xt`，都由排版工具寫入並檢查唔撞綫、唔撞字。
   站面板頂有「轉乘 [輕鐵] ›」／「轉乘 [屯馬綫] ›」（網頁 `components/rail/XferButton.tsx`、App `components/XferButton.tsx`），撳咗轉去另一幅圖嘅同一個站。
+- **車費計算**（2026-11，用戶要求；參考圖：深色浮動選單「↗ 起點｜↘ 終點」）：地圖右上角「車費」掣（面板喺右邊時跟住移開）→ 選擇模式：
+  撳站（或者搜尋）唔開到站面板，喺站頂彈出「起點｜終點」（core `setFareEnd`：**一定係一個起點、一個終點**，揀咗另一邊個站就清走另一邊）；
+  起點紅（↗ `arrow-ne`）、終點藍（↘ `arrow-se`）標記喺站頂；面板（同站面板一樣嘅拉板／右邊）顯示起點 → 終點（可以對調、清除）同車費：
+  八達通（成人、學生、小童、長者、殘疾人士、樂悠咭 60–64）、單程票（成人、小童、長者），core `RAIL_FARE_TYPES`、`fareMoney`（null →「—」）。
+  **港鐵、輕鐵分開計**：轉圖就清走起點終點。網頁 `components/rail/Fare.tsx`（站頂 HTML 用 `useMapView` 嘅 `toScreen` + 地圖 `pins` prop）、
+  App `src/components/Fare.tsx`（`SchematicMap` 嘅 `pins`：Reanimated `useAnimatedStyle` 跟住地圖變形擺位）。
+  數據：港鐵開放數據（data.gov.hk「港鐵 — 路綫、車費及無障礙設施」）`mtr_lines_fares.csv` + `airport_express_fares.csv` →
+  `packages/core/tools/mtr-fares.py` → `apps/web/lib/mtr-fares.json`（`/api/mtr/fare?from=`；數字站 ID 用站 CSV 轉站代號，馬場 70 人手 = RAC；
+  機場快綫只有香港／九龍／青衣／機場／博覽館之間、只有成人小童，其他 null）；輕鐵 `lrt-fares.json`（`/api/lrt/fare?from=`）。每年加價後重跑兩個工具。
 - 用戶定落嘅排法（2026-11，改之前問清楚）：荃灣綫荔景之後向北；屯馬綫南昌、美孚直上、喺荃灣綫上面轉西去荃灣西；東涌綫、機場快綫南昌北面
   90° 轉西貼住荃灣綫底經荔景，青衣喺西南斜綫上（轉車站打斜），之後扭一扭交換位置、貼住經欣澳，過咗小蠔灣先分開（機場喺東涌北面）；
   迪士尼綫先貼住東涌綫向東北再屈落；香港站喺中環正上方、上下排；紅磡東鐵、屯馬一齊向東北斜（屯馬東南邊），何文田屯馬喺觀塘綫上面水平並排。
@@ -200,7 +209,7 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
   - 附近車站頁：巴士站、範圍內嘅港鐵站同輕鐵站按距離混埋排，鐵路站卡每條綫／路線每個方向下一班，撳入路綫圖。
   - 站面板路線號碼撳得：路綫圖標出成條路線（其他淡咗，core `lrtRouteStopIds`），左上角標籤「[610] 屯門碼頭 ↔ 元朗 ✕」（`lrtRouteName`）；
     網頁 SVG 喺所有站之後（站同站名都要淡咗）蓋一層半透明再畫返嗰條路線，揀咗嘅站框補畫喺最上面；App 每個主題 + 路線錄一張 SkPicture 疊喺 overlay。轉圖、搜尋、轉乘就取消。
-- 未做：收費區、車費（數據有，介面收埋）。
+- 車費：用路綫圖右上角「車費」計（見港鐵一節「車費計算」）；站面板嘅車費（`SHOW_FARES`）仍然收埋。收費區唔畫。
 
 ## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）
 

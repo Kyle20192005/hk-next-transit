@@ -28,7 +28,8 @@ import {
 } from '@hknt/core';
 import { useTheme, type Theme } from '@/lib/theme';
 import { alpha, drawText, makePaint } from '@/lib/skia-draw';
-import { SchematicMap, type MapFocus, type MapInset } from './SchematicMap';
+import { SchematicMap, type MapFocus, type MapInset, type MapPinAt } from './SchematicMap';
+import type { RailPin } from './Fare';
 
 export { setMapFontProvider } from '@/lib/skia-draw';
 /** 要飛去嘅站、面板遮住咗嘅位（同輕鐵共用 SchematicMap） */
@@ -190,6 +191,12 @@ const locate = (sta: string) => {
   return s ? { x: s.box.x + s.box.w / 2, y: s.box.y + s.box.h / 2 } : null;
 };
 
+/** 站頂中間（車費標記、彈出選單指住呢點） */
+const top = (sta: string) => {
+  const s = STATIONS.find((x) => x.code === sta);
+  return s ? { x: s.box.x + s.box.w / 2, y: s.box.y } : null;
+};
+
 /**
  * 港鐵路綫圖（同網頁 components/rail/MtrMap.tsx 一樣嘅 core 資料同畫法）：一隻手指拖、兩隻手指放大縮細、撳站。
  * 成幅圖錄一次（mapPicture），拖拉縮放同輕鐵路綫圖共用 SchematicMap。
@@ -200,6 +207,7 @@ export function MtrMap({
   focus = null,
   inset,
   near,
+  pins,
 }: {
   selected: string | null;
   onStation: (sta: string) => void;
@@ -207,6 +215,8 @@ export function MtrMap({
   inset?: MtrInset;
   /** 附近嘅站（藍色虛線光圈，同揀咗嘅站嘅橙色分開；同網頁一樣） */
   near?: string[];
+  /** 浮喺站上面嘅元件（車費起點／終點、彈出選單） */
+  pins?: RailPin[];
 }) {
   const t = useTheme();
   const picture = useMemo(() => mapPicture(t), [t]);
@@ -248,6 +258,7 @@ export function MtrMap({
   );
   return (
     <SchematicMap
+      pins={toPins(pins)}
       bounds={MTR_MAP_VIEW}
       start={{ x: 16.5, y: 13 }}
       minPx={MIN_PX}
@@ -264,3 +275,12 @@ export function MtrMap({
     />
   );
 }
+
+/** 站代號 → 站頂座標（搵唔到嘅站唔出） */
+function toPins(pins: RailPin[] | undefined): MapPinAt[] {
+  return (pins ?? []).flatMap((p) => {
+    const a = top(p.sta);
+    return a ? [{ key: p.key, x: a.x, y: a.y, node: p.node, interactive: p.interactive }] : [];
+  });
+}
+

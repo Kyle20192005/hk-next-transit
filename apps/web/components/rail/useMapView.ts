@@ -5,6 +5,8 @@ export type MapView = { x: number; y: number; w: number };
 export type MapFocus = { sta: string; zoom: boolean };
 export type MapInset = { right: number; bottom: number };
 export type MapBounds = { readonly minX: number; readonly minY: number; readonly width: number; readonly height: number };
+/** 浮喺站上面嘅 HTML（站頂中間，向上擺） */
+export type MapPin = { key: string; sta: string; node: React.ReactNode };
 
 /**
  * 示意圖（港鐵、輕鐵路綫圖）共用：viewBox 平移縮放（拖、兩隻手指、滑鼠轆）、撳站、飛去某個站、縮放掣、全圖。
@@ -190,5 +192,8 @@ export function useMapView({
     setView(clamp({ x: bounds.minX + bounds.width / 2 - w / 2, y: bounds.minY + bounds.height / 2 - (w * aspect) / 2, w }));
   };
 
-  return { box, size, view, aspect, handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp }, zoomBtn, fitAll };
+  /** 地圖座標 → 地圖框入面嘅 px（浮喺站上面嘅 HTML，例如車費起點／終點） */
+  const toScreen = (x: number, y: number) => (view && size.w ? { left: ((x - view.x) / view.w) * size.w, top: ((y - view.y) / view.w) * size.w } : null);
+
+  return { box, size, view, aspect, handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp }, zoomBtn, fitAll, toScreen };
 }

@@ -4,8 +4,9 @@ import MtrMap from './MtrMap';
 import MtrStationSheet from './MtrStationSheet';
 import LrtMap from './LrtMap';
 import LrtStationSheet from './LrtStationSheet';
-import type { MapFocus, MapInset } from './useMapView';
-import { formatDistance, lrtRecent, lrtRouteName, lrtStopName, mtrCardStations, mtrRecent, mtrStationName, nearestLrtStops } from '@hknt/core';
+import type { MapFocus, MapInset, MapPin } from './useMapView';
+import FareSheet, { FarePin, FarePopover } from './Fare';
+import { formatDistance, lrtRecent, lrtRouteName, lrtStopName, mtrCardStations, mtrRecent, mtrStationName, nearestLrtStops, NO_FARE_ENDS, setFareEnd, swapFareEnds, type FareEnds, type FareRole } from '@hknt/core';
 import Icon from '../Icon';
 import { useNearbyStops } from '../home/Nearby';
 import { addRecent } from '@/lib/recent';
@@ -40,6 +41,7 @@ const readKind = (): Kind => {
 /**
  * 「路線」分頁 → 港鐵・輕鐵：左上角切換港鐵／輕鐵路綫圖（記住上次揀邊個），撳站（或者喺標題列搜尋）睇到站時間。
  * 面板唔遮成幅圖：量佢遮咗幾多（inset）俾地圖，地圖將個站移去淨低嘅地方。
+ * 右上角「車費」：入選擇模式，撳站喺站上面彈出「起點｜終點」，揀齊就喺面板顯示車費（港鐵、輕鐵分開計）。
  */
 export default function RailView({ pick }: { pick: RailPick | null }) {
   const [kind, setKindState] = useState<Kind>(readKind);
@@ -55,10 +57,17 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
   const [inset, setInset] = useState<MapInset>({ right: 0, bottom: 0 });
   /** 輕鐵：喺圖上標出嘅路線（站面板撳路線號碼） */
   const [route, setRoute] = useState<string | null>(null);
+  /** 車費計算模式：起點、終點，同埋彈出緊「起點｜終點」嘅站 */
+  const [fare, setFare] = useState(false);
+  const [ends, setEnds] = useState<FareEnds>(NO_FARE_ENDS);
+  const [pending, setPending] = useState<string | null>(null);
 
   const saveKind = (k: Kind) => {
     setKindState(k);
     setRoute(null);
+    // 港鐵、輕鐵分開計：轉圖就清走起點終點
+    setEnds(NO_FARE_ENDS);
+    setPending(null);
     try {
       sessionStorage.setItem(KIND_KEY, k);
     } catch {
@@ -73,10 +82,23 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
   };
   /** 轉去另一幅圖嘅站（搜尋、首頁、面板「轉乘」）：飛去（放大置中）再打開 */
   const jump = (k: Kind, s: string) => {
-    saveKind(k);
-    setSta(s);
+    if (k !== kind) saveKind(k);
     setFocus({ sta: s, zoom: true });
+    // 車費模式：搜尋到嘅站彈出「起點｜終點」揀
+    if (fare) return setPending(s);
+    setSta(s);
     if (isNarrow()) setAll(false);
+  };
+  const toggleFare = () => {
+    setFare((f) => !f);
+    setEnds(NO_FARE_ENDS);
+    setPending(null);
+    setSta(null);
+  };
+  const pickRole = (role: FareRole) => {
+    if (!pending) return;
+    setEnds((e) => setFareEnd(e, pending, role));
+    setPending(null);
   };
 
   // 附近嘅站（用首頁嗰份定位，有快取）：800 米內嘅都標，冇就標 2 公里內最近一個
@@ -109,11 +131,16 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pick]);
 
-  const onStation = useCallback((c: string) => {
-    setSta(c);
-    setFocus({ sta: c, zoom: false });
-    if (isNarrow()) setAll(false);
-  }, []);
+  const onStation = useCallback(
+    (c: string) => {
+      setFocus({ sta: c, zoom: false });
+      // 車費模式：撳站唔開到站面板，喺站上面彈出「起點｜終點」（再撳一次收埋）
+      if (fare) return setPending((p) => (p === c ? null : c));
+      setSta(c);
+      if (isNarrow()) setAll(false);
+    },
+    [fare],
+  );
   const onClose = useCallback(() => setSta(null), []);
 
   // 打開咗嘅港鐵站、輕鐵站記入首頁「最近睇過」
@@ -140,18 +167,31 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
     ro.observe(el);
     ro.observe(w);
     return () => ro.disconnect();
-  }, [sta, kind]);
+  }, [sta, kind, fare]);
 
   const name = (s: string) => (kind === 'lrt' ? lrtStopName(s) : mtrStationName(s));
   const nearIds = near.map((n) => n.sta);
+  // 車費：起點、終點標記；撳咗嘅站彈出選單（同一個站就只出選單）
+  const pins: MapPin[] = !fare
+    ? []
+    : [
+        ...(['from', 'to'] as const).filter((r) => ends[r] && ends[r] !== pending).map((r) => ({ key: r, sta: ends[r]!, node: <FarePin role={r} /> })),
+        ...(pending ? [{ key: `pop-${pending}`, sta: pending, node: <FarePopover onPick={pickRole} /> }] : []),
+      ];
+  const shownSel = fare ? pending : sta;
 
   return (
     <div className="mtr-wrap" ref={wrap}>
       {kind === 'mtr' ? (
-        <MtrMap key="mtr" selected={sta} onStation={onStation} focus={focus} inset={inset} near={nearIds} />
+        <MtrMap key="mtr" selected={shownSel} onStation={onStation} focus={focus} inset={inset} near={nearIds} pins={pins} />
       ) : (
-        <LrtMap key="lrt" selected={sta} onStation={onStation} focus={focus} inset={inset} near={nearIds} route={route} />
+        <LrtMap key="lrt" selected={shownSel} onStation={onStation} focus={focus} inset={inset} near={nearIds} route={route} pins={pins} />
       )}
+      {/* 車費計算：港鐵、輕鐵分開（面板喺右邊時移開，唔好俾面板遮住） */}
+      <button className={fare ? 'rail-fare-btn on' : 'rail-fare-btn'} style={{ right: 10 + inset.right }} onClick={toggleFare} aria-pressed={fare} aria-label={fare ? '結束車費計算' : '車費計算'}>
+        <Icon name="ticket" size={18} />
+        車費
+      </button>
       <div className="rail-overlay">
         <div className="rail-switch" role="tablist" aria-label="港鐵或者輕鐵">
           <button role="tab" aria-selected={kind === 'mtr'} onClick={() => kind !== 'mtr' && setKind('mtr')}>
@@ -187,8 +227,9 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
           </button>
         )}
       </div>
-      {sta && kind === 'mtr' && <MtrStationSheet ref={panel} sta={sta} onClose={onClose} tab={tab} onTab={setTab} all={all} onAll={setAll} sheet={sheet} onXfer={(s) => jump('lrt', s)} />}
-      {sta && kind === 'lrt' && <LrtStationSheet ref={panel} sta={sta} onClose={onClose} all={all} onAll={setAll} sheet={sheet} onXfer={(s) => jump('mtr', s)} route={route} onRoute={setRoute} />}
+      {fare && <FareSheet ref={panel} lrt={kind === 'lrt'} ends={ends} onSwap={() => setEnds(swapFareEnds)} onClear={() => (setEnds(NO_FARE_ENDS), setPending(null))} onClose={toggleFare} sheet={sheet} />}
+      {!fare && sta && kind === 'mtr' && <MtrStationSheet ref={panel} sta={sta} onClose={onClose} tab={tab} onTab={setTab} all={all} onAll={setAll} sheet={sheet} onXfer={(s) => jump('lrt', s)} />}
+      {!fare && sta && kind === 'lrt' && <LrtStationSheet ref={panel} sta={sta} onClose={onClose} all={all} onAll={setAll} sheet={sheet} onXfer={(s) => jump('mtr', s)} route={route} onRoute={setRoute} />}
     </div>
   );
 }

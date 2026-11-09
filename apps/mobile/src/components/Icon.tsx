@@ -30,7 +30,10 @@ export type IconName =
   | 'minibus'
   | 'ferry'
   | 'tram'
-  | 'lrt';
+  | 'lrt'
+  | 'ticket'
+  | 'arrow-ne'
+  | 'arrow-se';
 
 /** duo：雙色（線條實色 + 同色淺填色），常用工具等大圖示用 */
 export function Icon({ name, size = 22, color, duo = false }: { name: IconName; size?: number; color: string; duo?: boolean }) {
@@ -93,6 +96,18 @@ export function Icon({ name, size = 22, color, duo = false }: { name: IconName; 
             <Path {...p} d="M6 12.5h12M12 6.5V3.5M9 3.5h6M9 21l1-2.5M15 21l-1-2.5" />
           </>
         );
+      case 'ticket':
+        // 車費：車飛（同網頁一樣）
+        return (
+          <>
+            <Path {...p} d="M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5V10a2 2 0 0 0 0 4v2.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5V14a2 2 0 0 0 0-4Z" />
+            <Path {...p} d="M14.5 6.5v1.5M14.5 11v2M14.5 16v1.5" />
+          </>
+        );
+      case 'arrow-ne':
+        return <Path {...p} d="M7 17 17 7M9 7h8v8" />;
+      case 'arrow-se':
+        return <Path {...p} d="M7 7l10 10M17 9v8H9" />;
       case 'lrt':
         // 輕鐵：港鐵列車正面 + 人字形集電弓（同網頁一樣）
         return (

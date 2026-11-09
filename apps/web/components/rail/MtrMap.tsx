@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { LRT_BRAND, MTR_LINES, MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LEGEND, MTR_MAP_LEGEND_SYMBOLS, MTR_MAP_LINES, MTR_MAP_LINKS, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, MTR_MAP_XFER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName, mtrXferLink, type Pt } from '@hknt/core';
 import Icon from '../Icon';
-import { useMapView, type MapFocus, type MapInset } from './useMapView';
+import { useMapView, type MapFocus, type MapInset, type MapPin } from './useMapView';
 
 export type MtrFocus = MapFocus;
 export type MtrInset = MapInset;
@@ -21,6 +21,7 @@ export default function MtrMap({
   focus = null,
   inset = { right: 0, bottom: 0 },
   near = [],
+  pins = [],
 }: {
   selected: string | null;
   onStation: (sta: string) => void;
@@ -30,6 +31,8 @@ export default function MtrMap({
   inset?: MtrInset;
   /** 附近嘅站（藍色光圈，同揀咗嘅站嘅橙色分開） */
   near?: string[];
+  /** 浮喺站上面嘅 HTML（車費起點／終點標記、揀起點終點嘅彈出選單），跟住地圖郁 */
+  pins?: MapPin[];
 }) {
   const stations = useMemo(() => mtrMapStations(), []);
   // 海：所有環一條 path（evenodd：海入面嘅島係陸地）
@@ -58,7 +61,13 @@ export default function MtrMap({
     const s = stations.find((x) => x.code === sta);
     return s ? { x: s.box.x + s.box.w / 2, y: s.box.y + s.box.h / 2 } : null;
   };
-  const { box, size, view, aspect, handlers, zoomBtn, fitAll } = useMapView({ bounds: MTR_MAP_VIEW, start: { x: 16.5, y: 13 }, startPx: START_PX, minPx: MIN_PX, maxPx: MAX_PX, focus, inset, locate, onStation });
+  const { box, size, view, aspect, handlers, zoomBtn, fitAll, toScreen } = useMapView({ bounds: MTR_MAP_VIEW, start: { x: 16.5, y: 13 }, startPx: START_PX, minPx: MIN_PX, maxPx: MAX_PX, focus, inset, locate, onStation });
+
+  /** 站頂中間（標記、彈出選單指住呢點） */
+  const top = (sta: string) => {
+    const s = stations.find((x) => x.code === sta);
+    return s ? { x: s.box.x + s.box.w / 2, y: s.box.y } : null;
+  };
 
   return (
     <div className="mtr-map" ref={box} {...handlers}>
@@ -151,6 +160,15 @@ export default function MtrMap({
         © OpenStreetMap 貢獻者
       </a>
       {/* 面板遮到地圖剩好矮：縮放掣打橫排，唔好頂穿上面；拉板全開（剩一條）就收埋 */}
+      {pins.map((p) => {
+        const a = top(p.sta);
+        const s = a && toScreen(a.x, a.y);
+        return s ? (
+          <div key={p.key} className="map-pin" style={{ left: s.left, top: s.top }}>
+            {p.node}
+          </div>
+        ) : null;
+      })}
       <div className={size.h - inset.bottom < 110 ? 'mtr-zoom row hidden' : size.h - inset.bottom < 200 ? 'mtr-zoom row' : 'mtr-zoom'} style={{ bottom: 12 + inset.bottom, right: 12 + inset.right }} onPointerDown={(e) => e.stopPropagation()}>
         <button onClick={() => zoomBtn(1.4)} aria-label="放大">
           <Icon name="plus" size={18} />
