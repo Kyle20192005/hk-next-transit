@@ -87,13 +87,13 @@ put('河田', ZX, 26.5, 'v')
 # 505 經山景／經鳴琴：山景兩個站喺石排—鳴琴旁邊行一條平行綫，兩邊喺建安會合（似港鐵地圖嘅細圈）
 XS = XW + 0.75
 put('石排', XW, 24.2, 'v')
-put_join('J505N', XW, 24.5, 'v')  # 山景嗰邊喺石排南面併返入主綫
-put('鳴琴', XW, 25.85, 'v')
-put('山景(北)', XS, 26.05, 'v')
-put('山景(南)', XS, 26.7, 'v')
-put_join('J505S', XS, 27.7, 'v')   # 兩邊喺度併返一條紅綫
-put('建安', XS, 28.15, 'v')
-YK = 28.95                     # 建安 → 屯門
+put_join('J505N', XW, 24.75, 'v')  # 山景嗰邊喺石排南面併返入主綫
+put('鳴琴', XW, 26.0, 'v')
+put('山景(北)', XS, 26.25, 'v')
+put('山景(南)', XS, 26.85, 'v')
+put_join('J505S', XS, 27.85, 'v')  # 兩邊喺度併返一條紅綫
+put('建安', XS, 28.3, 'v')
+YK = 29.1                      # 建安 → 屯門
 YT = YK + 0.8                  # 屯門
 put('屯門', ZX, YT, 'v')
 YP = YT + 0.8                  # 杯渡一行
@@ -132,8 +132,8 @@ BENDS = {
     ('澤豐', '銀圍'): [(ZX, RY)],
     ('澤豐', '蔡意橋'): [(ZX, RY)],
     ('銀圍', '蔡意橋'): [(ZX, RY)],
-    ('J505N', '山景(北)'): [(XW, 24.72), (XS, 25.47)],
-    ('鳴琴', 'J505S'): [(XW, 26.4), (XS, 27.15)],
+    ('J505N', '山景(北)'): [(XW, 24.97), (XS, 25.72)],
+    ('鳴琴', 'J505S'): [(XW, 26.55), (XS, 27.3)],
     ('建安', '屯門'): [(XS, YK), (ZX, YK)],
     ('市中心', '杯渡'): [(ZX, YP)],
     ('杯渡', '何福堂'): [(KX, YP)],
@@ -159,7 +159,7 @@ CHAIN_ORDER = [
     (['安定', '兆麟'], ['614P', '614', '507', '505']),
     (['田景', '良景', '新圍'], ['507', '615', '615P', '505']),
     (['新圍', '石排'], ['615', '615P', '505']),
-    (['石排', 'J505N', '鳴琴'], ['505', '610', '615', '615P']),
+    (['石排', 'J505N', '鳴琴'], ['610', '615', '615P', '505']),
     (['鳴琴', '青雲', '青山村', '龍門', '輕鐵車廠', '蝴蝶', '美樂', '屯門碼頭'], ['610', '615', '615P']),
 ]
 # 終點站路線號碼：extend = 色綫穿過個站再散開；split = 穿過個站之後左右分兩邊打直排；n／s／e／w = 放喺站嗰邊（^ = 由站向上排）
@@ -314,49 +314,84 @@ def side_seq(s, side):
         o = lane_order(s, other(e, s))
         seq += [(r, e) for r in (o if side == 1 else o[::-1])]
     return seq
-def placements(sizes, M):
-    res = []
-    def rec(i, start, acc):
-        if i == len(sizes): res.append(list(acc)); return
-        for st in range(start, M - sum(sizes[i:]) + 1):
-            acc.append(st); rec(i + 1, st + sizes[i], acc); acc.pop()
-    rec(0, 0, [])
-    return res
 def blocks_of(seq):
     out = []
     for r, e in seq:
         if not out or out[-1][0] != e: out.append((e, []))
         out[-1][1].append(r)
     return out
-jumps = []
-for s in P:
-    if s in VIRTUAL: continue
+def side_layouts(blocks, M, req=None):
+    """每段路軌（成束）放喺邊個位：可以調次序（出站後彎出去跨過其他綫）、同一條路線可以共用一個位（分岔）、
+    一束入面可以留一個空位俾另一條綫插入（之後喺彎位收埋）"""
+    res = []
+    for perm in itertools.permutations(range(len(blocks))):
+        def rec(i, prev, occ, slots, holes):
+            if i == len(perm):
+                res.append((perm, dict(slots), dict(occ), holes))
+                return
+            e, rs = blocks[perm[i]]
+            hs = [req[perm[i]]] if req and perm[i] in req else [None] + list(range(1, len(rs)))
+            for h in hs:
+                w = len(rs) + (h is not None)
+                for st in range(prev, M - w + 1):
+                    ks = [st + k + (1 if h is not None and k >= h else 0) for k in range(len(rs))]
+                    if any(occ.get(k, r) != r for k, r in zip(ks, rs)): continue
+                    o2 = dict(occ)
+                    for k, r in zip(ks, rs): o2[k] = r
+                    slots[perm[i]] = ks
+                    rec(i + 1, st, o2, slots, holes + (h is not None))
+                    del slots[perm[i]]
+        rec(0, 0, {}, {}, 0)
+    return res
+def inversions(perm): return [(perm[j], perm[i]) for i in range(len(perm)) for j in range(i + 1, len(perm)) if perm[j] < perm[i]]
+lane_port = {}      # (站, 路軌, 路線) → 出站方向左邊偏移（未計站嘅橫移）
+holes = {}          # (站, 路軌) → 空位喺第幾條綫前面（按站嘅法綫方向排）
+def solve(s, required):
+    global jumps
     A, B = blocks_of(side_seq(s, 1)), blocks_of(side_seq(s, -1))
     na, nb = sum(len(x[1]) for x in A), sum(len(x[1]) for x in B)
-    M = max(na, nb) + 2
+    M = max(na, nb) + 3
+    LA = side_layouts(A, M, {i: required[(s, e)] for i, (e, _) in enumerate(A) if (s, e) in required})
+    LB = side_layouts(B, M, {i: required[(s, e)] for i, (e, _) in enumerate(B) if (s, e) in required})
     best = None
-    for pa in placements([len(x[1]) for x in A], M):
-        sa = {st + i: r for (e, rs), st in zip(A, pa) for i, r in enumerate(rs)}
-        for pb in placements([len(x[1]) for x in B], M):
-            sb = {st + i: r for (e, rs), st in zip(B, pb) for i, r in enumerate(rs)}
-            match = sum(1 for k, r in sa.items() if sb.get(k) == r)
-            used = set(sa) | set(sb)
+    for pa, sla, oa, ha in LA:
+        for pb, slb, ob, hb in LB:
+            match = sum(1 for k, r in oa.items() if ob.get(k) == r)
+            used = set(oa) | set(ob)
             span = max(used) - min(used)
-            ca = (min(sa) + max(sa)) / 2 if sa else 0
-            cb = (min(sb) + max(sb)) / 2 if sb else ca
-            key = (-match, span, abs(ca - cb) if sa and sb else 0)
-            if best is None or key < best[0]: best = (key, pa, pb, sa, sb)
-    _, pa, pb, sa, sb = best
-    used = set(sa) | set(sb)
+            ca = (min(oa) + max(oa)) / 2 if oa else 0
+            cb = (min(ob) + max(ob)) / 2 if ob else ca
+            shared = (na - len(oa)) + (nb - len(ob))
+            key = (-match, ha + hb, -shared, len(inversions(pa)) + len(inversions(pb)), span, abs(ca - cb) if oa and ob else 0)
+            if best is None or key < best[0]: best = (key, pa, pb, sla, slb, oa, ob)
+    _, pa, pb, sla, slb, oa, ob = best
+    used = set(oa) | set(ob)
     mid = (min(used) + max(used)) / 2
-    for side, blocks, pl in ((1, A, pa), (-1, B, pb)):
-        for (e, rs), st in zip(blocks, pl):
-            c = (mid - (st + (len(rs) - 1) / 2)) * G
+    for side, blocks, sl in ((1, A, sla), (-1, B, slb)):
+        for bi, (e, rs) in enumerate(blocks):
+            ks = sl[bi]
+            holes[(s, e)] = next((k for k in range(1, len(ks)) if ks[k] - ks[k - 1] == 2), None)
+            ws = [(mid - k) * G for k in ks]
+            for r, w in zip(rs, ws): lane_port[(s, e, r)] = w if side == 1 else -w
+            c = sum(ws) / len(ws)
             port_base[(s, e)] = c if side == 1 else -c
-    both = set(sa.values()) & set(sb.values())
-    for r in sorted(both):
-        if not any(sb.get(k) == r for k, x in sa.items() if x == r): jumps.append(f'{nm_(s)} {r}')
-
+    for r in sorted(set(oa.values()) & set(ob.values())):
+        if not any(ob.get(k) == r for k, x in oa.items() if x == r): jumps.append(f'{nm_(s)} {r}')
+# 直路軌兩頭嘅空位要一致（否則中間要打斜移位）：一頭有空位，另一頭都留返
+required = {}
+for _ in range(6):
+    jumps = []
+    for s in P:
+        if s not in VIRTUAL: solve(s, required)
+    new = {}
+    for e in edges:
+        u, v = sorted(e)
+        if len(geom(u, v)) != 2 or u in VIRTUAL or v in VIRTUAL: continue
+        hu, hv = holes.get((u, e)), holes.get((v, e))
+        if hu is not None and hv is None: new[(v, e)] = hu
+        if hv is not None and hu is None: new[(u, e)] = hv
+    if all(required.get(k) == h for k, h in new.items()): break
+    required.update(new)
 # 站嘅橫移：令每段路軌兩頭嘅出站位一致（色綫一路平行，轉彎同心）。
 # 由最大嘅站開始，先跟直路軌、再跟同其他路軌共用彎位嘅、最後其他，咁樣對唔齊嘅只會喺普通彎位處理。
 shift = {}
@@ -415,35 +450,59 @@ def lane_poly(g, offs):
 lanes = []          # (路線, 點, (u, v), 單向 (由, 去) 或者 None)
 lane_end = {}       # (站, 路線) → (點, 由站入路軌嘅方向)
 jogs = []
+def lane_off(s, e, r, l_uv, at_u):
+    """呢條色綫喺站 s 嘅偏移（u → v 方向嘅左邊）"""
+    if (s, e, r) in lane_port: p = lane_port[(s, e, r)] + shift[s] * side_of[(s, e)]
+    else: p = port_eff(s, e) + (l_uv if at_u else -l_uv)
+    return p if at_u else -p
 for e in edges:
     u, v = oriented(*e)
     g = geom(u, v)
     rs = lane_order(u, v)
     n = len(rs)
-    pu, pv = port_eff(u, e), -port_eff(v, e)
-    if len(g) == 2 and abs(pu - pv) > 1e-6: jogs.append(f'{nm_(u)}–{nm_(v)}（{abs(pu - pv):.2f}）')
     for i, r in enumerate(rs):
         l = ((n - 1) / 2 - i) * G
+        pu, pv = lane_off(u, e, r, l, True), lane_off(v, e, r, l, False)
         if len(g) == 2 and abs(pu - pv) > 1e-6:
+            jogs.append(f'{nm_(u)}–{nm_(v)} {r}（{abs(pu - pv):.2f}）')
             (dx, dy), L = unit(g[0], g[1])
             nx, ny = left((dx, dy))
             dl = abs(pv - pu)
             m = (L - dl) / 2
             a, b = g
-            pts = [(a[0] + nx * (pu + l), a[1] + ny * (pu + l)),
-                   (a[0] + dx * m + nx * (pu + l), a[1] + dy * m + ny * (pu + l), 0.3),
-                   (a[0] + dx * (m + dl) + nx * (pv + l), a[1] + dy * (m + dl) + ny * (pv + l), 0.3),
-                   (b[0] + nx * (pv + l), b[1] + ny * (pv + l))]
+            pts = [(a[0] + nx * pu, a[1] + ny * pu),
+                   (a[0] + dx * m + nx * pu, a[1] + dy * m + ny * pu, 0.3),
+                   (a[0] + dx * (m + dl) + nx * pv, a[1] + dy * (m + dl) + ny * pv, 0.3),
+                   (b[0] + nx * pv, b[1] + ny * pv)]
         else:
             k = len(g) - 1
             half = max(1, k // 2)
-            offs = [pu + l if j < half else pv + l for j in range(k)]
-            if abs(pu - pv) < 1e-6: offs = [pu + l] * k
+            offs = [pu if j < half else pv for j in range(k)]
+            if abs(pu - pv) < 1e-6: offs = [pu] * k
             pts = lane_poly(g, offs)
         dirs = used_dirs[(e, r)]
         lanes.append((r, pts, (u, v), next(iter(dirs)) if len(dirs) == 1 else None))
         lane_end.setdefault((u, r), (pts[0], unit(g[0], g[1])[0]))
         lane_end.setdefault((v, r), (pts[-1], unit(g[-1], g[-2])[0]))
+
+# 交叉：兩條唔同路軌嘅色綫相交，綫少嗰束（分出去、彎出去嗰條）畫喺上面，有自己嘅黑邊
+def seg_cross(p1, p2, q1, q2):
+    d1, d2 = (p2[0] - p1[0], p2[1] - p1[1]), (q2[0] - q1[0], q2[1] - q1[1])
+    den = cross(d1, d2)
+    if abs(den) < 1e-9: return False
+    w = (q1[0] - p1[0], q1[1] - p1[1])
+    t, u = cross(w, d2) / den, cross(w, d1) / den
+    return 0.02 < t < 0.98 and 0.02 < u < 0.98
+over_edges = set()
+for i in range(len(lanes)):
+    ri, pi, ei, _ = lanes[i]
+    for j in range(i + 1, len(lanes)):
+        rj, pj, ej, _ = lanes[j]
+        if frozenset(ei) == frozenset(ej): continue
+        if any(seg_cross(a, b, c, d) for a, b in zip(pi, pi[1:]) for c, d in zip(pj, pj[1:])):
+            ni, nj = len(edges[frozenset(ei)]), len(edges[frozenset(ej)])
+            top = ei if (ni, ORDER.index(ri)) < (nj, ORDER.index(rj)) else ej
+            over_edges.add(frozenset(top))
 
 # ---------------------------------------------------------------------------
 # 站：膠囊或者圓點（中心跟色綫實際位置）
@@ -454,9 +513,9 @@ for s in STATIONS:
     N = left(ax)
     offs = []
     for e in adj[s]:
-        p, n, sd = port_eff(s, e), len(edges[e]), side_of[(s, e)]
-        for i in range(n):
-            offs.append(sd * (p + ((n - 1) / 2 - i) * G))
+        sd = side_of[(s, e)]
+        for r in edges[e]:
+            offs.append(sd * (lane_port[(s, e, r)] + shift[s] * sd))
     lo, hi = min(offs), max(offs)
     c = (lo + hi) / 2
     cx, cy = P[s][0] + N[0] * c, P[s][1] + N[1] * c
@@ -658,9 +717,14 @@ if '--svg' in sys.argv:
     sc = 60
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{vw * sc:.0f}" height="{vh * sc:.0f}" viewBox="{vx} {vy} {vw} {vh}" font-family="PingFang HK, Noto Sans CJK TC, sans-serif">',
          f'<rect x="{vx}" y="{vy}" width="{vw}" height="{vh}" fill="#fff"/>']
-    for r, pts in all_lanes:
+    under = [(r, pts) for r, pts, uv, _ in lanes if frozenset(uv) not in over_edges] + cap_lanes
+    over = [(r, pts) for r, pts, uv, _ in lanes if frozenset(uv) in over_edges]
+    for r, pts in under:
         o.append(f'<path d="{path_d(pts)}" fill="none" stroke="{INK}" stroke-width="{G + 2 * CASE}"/>')
-    for r, pts in all_lanes:
+    for r, pts in under:
+        o.append(f'<path d="{path_d(pts)}" fill="none" stroke="{COLORS[r]}" stroke-width="{G - SEP}"/>')
+    for r, pts in over:       # 跨過其他綫嘅（出站後彎出去）：自己一條黑邊畫喺上面
+        o.append(f'<path d="{path_d(pts)}" fill="none" stroke="{INK}" stroke-width="{G - SEP + 2 * CASE}"/>')
         o.append(f'<path d="{path_d(pts)}" fill="none" stroke="{COLORS[r]}" stroke-width="{G - SEP}"/>')
     for a in arrows:
         o.append(f'<path d="M-0.035 -0.042 L0.025 0 L-0.035 0.042" fill="none" stroke="#fff" stroke-width="0.026" stroke-linecap="round" stroke-linejoin="round" transform="translate({a["x"]} {a["y"]}) rotate({a["angle"]})"/>')
