@@ -7,6 +7,8 @@ import { TRANSPORT_MODES, orderedModes, placeMatches, radiusLabel, type PlaceMat
 import ComingSoon from './ComingSoon';
 import RailView, { type RailPick } from '../rail/RailView';
 import RailSearch from '../rail/RailSearch';
+import TramView from '../rail/TramView';
+import TramSearch from '../rail/TramSearch';
 import Keypad from './Keypad';
 import Logo from '@/components/Logo';
 import Icon from '@/components/Icon';
@@ -29,6 +31,8 @@ export default function RouteBrowser({
   onNearby,
   railPick,
   onRailPick,
+  tramPick,
+  onTramPick,
 }: {
   routes: Routes;
   updated: string | null;
@@ -40,6 +44,8 @@ export default function RouteBrowser({
   /** 港鐵：要打開嘅站（搜尋、首頁大卡、收藏）；每次新 object 就飛去一次 */
   railPick: RailPick | null;
   onRailPick: (sta: string, lrt: boolean) => void;
+  tramPick: { sta: string; n: number } | null;
+  onTramPick: (sta: string) => void;
 }) {
   const [code, setCode] = useState(''); // 路線號碼（鍵盤）
   const [place, setPlace] = useState<string | null>(null); // 地點搜尋（null = 用緊號碼鍵盤）
@@ -109,7 +115,7 @@ export default function RouteBrowser({
 
   // 實體鍵盤（電腦、iPad 鍵盤）：直接打路線號碼；打緊地點時唔理
   useEffect(() => {
-    if (place !== null || mode === 'rail') return;
+    if (place !== null || mode === 'rail' || mode === 'tram') return;
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
@@ -154,6 +160,8 @@ export default function RouteBrowser({
         </div>
         {!modeInfo.ready ? null : mode === 'rail' ? (
           <RailSearch onPick={onRailPick} />
+        ) : mode === 'tram' ? (
+          <TramSearch onPick={onTramPick} />
         ) : place === null ? (
           <button className="search-field" onClick={usePlace} aria-label="搜尋路線">
             <Icon name="search" size={20} className="search-icon" />
@@ -194,6 +202,8 @@ export default function RouteBrowser({
         <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
       ) : mode === 'rail' ? (
         <RailView pick={railPick} />
+      ) : mode === 'tram' ? (
+        <TramView pick={tramPick} />
       ) : (
       <>
       <ul className="route-list" ref={listRef}>

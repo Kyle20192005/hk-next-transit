@@ -66,6 +66,8 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   const favCount = useFavorites().length;
   // 港鐵站（首頁大卡、收藏、路綫圖搜尋）：入「路線」分頁揀港鐵，飛去嗰個站並打開到站時間
   const [railPick, setRailPick] = useState<RailPick | null>(null);
+  // 電車站（首頁、收藏、附近、搜尋）：入「路線」分頁揀電車，飛去嗰個站並打開班次（n 每次唔同，同一個站都會再飛）
+  const [tramPick, setTramPick] = useState<{ sta: string; n: number } | null>(null);
 
   useEffect(() => {
     // 主畫面圖示長撳嘅捷徑（app/manifest.ts）：/?tab=favs、/?view=nearby；用完清走，重新整理唔會再跳
@@ -89,6 +91,11 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
     } catch {
       /* 唔記得都冇所謂 */
     }
+  };
+  const openTram = (sta: string) => {
+    setMode('tram');
+    setTramPick({ sta, n: Date.now() });
+    pick('routes');
   };
   const openMtr = (sta: string, lrt = false) => {
     setMode('rail');
@@ -123,7 +130,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
                 }}
               />
             )}
-            {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} mode={mode} onMode={setMode} onNearby={() => setView({ kind: 'nearby' })} railPick={railPick} onRailPick={(sta, lrt) => setRailPick({ sta, lrt })} />}
+            {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} mode={mode} onMode={setMode} onNearby={() => setView({ kind: 'nearby' })} railPick={railPick} onRailPick={(sta, lrt) => setRailPick({ sta, lrt })} tramPick={tramPick} onTramPick={(sta) => setTramPick({ sta, n: Date.now() })} />}
             {tab === 'nav' && <Navigation />}
             {tab === 'favs' && <Favorites onBrowse={() => pick('routes')} onMtr={openMtr} />}
             {tab === 'settings' && <Settings updated={updated} />}

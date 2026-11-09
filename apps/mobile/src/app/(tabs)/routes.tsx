@@ -6,6 +6,7 @@ import { api, type Co } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { AppBar, Brand, BRAND_ROW, ComingSoon, CompanyTag } from '@/components/ui';
 import { RailView } from '@/components/RailView';
+import { TramView } from '@/components/TramView';
 import { Icon } from '@/components/Icon';
 import { Keypad } from '@/components/Keypad';
 import { preloadRoute, warmRoute } from '@/lib/prefetch';
@@ -47,6 +48,9 @@ export default function RoutesTab() {
   // 港鐵：路綫圖 + 車站搜尋（唔使號碼鍵盤）
   const rail = mode === 'rail';
   const [railQ, setRailQ] = useState('');
+  // 電車：路綫圖 + 電車站搜尋（同港鐵一樣，唔使號碼鍵盤）
+  const tram = mode === 'tram';
+  const [tramQ, setTramQ] = useState('');
   const list = useRef<FlatList<PlaceMatch<Route>>>(null);
 
   const fetchRoutes = () => api.routes().then((r) => setRoutes(r.routes)).catch((e: Error) => setError(e.message));
@@ -139,7 +143,28 @@ export default function RoutesTab() {
             )}
           </View>
         )}
-        {modeInfo.ready && !rail && (
+        {tram && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingLeft: 14, paddingRight: 8, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
+            <Icon name="search" size={20} color={t.muted} />
+            <TextInput
+              value={tramQ}
+              onChangeText={setTramQ}
+              placeholder="搜尋電車站，例如 銀行街、跑馬地"
+              placeholderTextColor={t.muted}
+              returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="none"
+              accessibilityLabel="搜尋電車站"
+              style={{ flex: 1, fontSize: 17, color: t.text, paddingVertical: 12 }}
+            />
+            {tramQ !== '' && (
+              <Pressable onPress={() => setTramQ('')} accessibilityLabel="清除" style={{ width: 34, height: 34, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
+                <Icon name="close" size={18} color={t.muted} />
+              </Pressable>
+            )}
+          </View>
+        )}
+        {modeInfo.ready && !rail && !tram && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingLeft: 14, paddingRight: 8, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
           <Icon name="search" size={20} color={t.muted} />
           {place === null ? (
@@ -171,7 +196,9 @@ export default function RoutesTab() {
       </AppBar>
 
       {rail ? (
-        <RailView query={railQ} onPicked={() => setRailQ('')} open={params.sta ? { sta: params.sta, n: params.n ?? '', lrt: params.lrt === '1' } : null} />
+        <RailView query={railQ} onPicked={() => setRailQ('')} open={params.sta && params.mode !== 'tram' ? { sta: params.sta, n: params.n ?? '', lrt: params.lrt === '1' } : null} />
+      ) : tram ? (
+        <TramView query={tramQ} onPicked={() => setTramQ('')} open={params.sta && params.mode === 'tram' ? { sta: params.sta, n: params.n ?? '' } : null} />
       ) : !modeInfo.ready ? (
         <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
       ) : error ? (
@@ -197,7 +224,7 @@ export default function RoutesTab() {
         />
       )}
 
-      {modeInfo.ready && !rail && place === null && routes && (
+      {modeInfo.ready && !rail && !tram && place === null && routes && (
         <Keypad nextChars={nextChars} onKey={(k) => setCode((c) => c + k)} onBack={() => setCode((c) => c.slice(0, -1))} onPlace={() => setPlace('')} canBack={code.length > 0} />
       )}
     </View>

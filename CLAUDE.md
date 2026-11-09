@@ -211,6 +211,33 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
     網頁 SVG 喺所有站之後（站同站名都要淡咗）蓋一層半透明再畫返嗰條路線，揀咗嘅站框補畫喺最上面；App 每個主題 + 路線錄一張 SkPicture 疊喺 overlay。轉圖、搜尋、轉乘就取消。
 - 車費：用路綫圖右上角「車費」計（見港鐵一節「車費計算」）；站面板嘅車費（`SHOW_FARES`）仍然收埋。收費區唔畫。
 
+## 電車：路綫圖同班次
+
+「路線」分頁 →「電車」（2026-11，用戶要求）：自己畫嘅電車路綫圖 + 站面板 + 搜尋。網頁 `components/rail/{TramView,TramMap,TramStationSheet,TramSearch}.tsx`，
+App `src/components/{TramView,TramMap,TramMapSkia,TramStationSheet}.tsx`（`(tabs)/routes.tsx` 揀電車，搜尋欄喺標題列；`?mode=tram&sta=&n=` 打開某個站）。
+網頁 Home 有 `openTram(sta)`（將來首頁卡、收藏用）。
+
+- **數據**：站 = data.gov.hk「電車站」開放數據（`fetch.py` 嘅 `fetch_tram_stops`，行駛方向、站代號、站名中英）；路線、站序、班次 = 運輸署 GTFS（agency `TRAM`，6 條路線）。
+  `pipeline/tram.py` 兩邊共用：GTFS 站名「英皇道(健康東街)(西行方向)」同方向內先用括號入面嘅街名、再用路名對站；跑馬地環綫冇方向，按喺跑馬地總站前（南行 S）後（北行 N）分；
+  總站開放數據寫「T」，用名對返官網到站代號（`TERMINI`：上環 `WMT` 有 WM、WMT 兩個代號，跑馬地 `HVT` 有 HVT_K（西行）、HVT_B（東行））；
+  GTFS 冇嘅電車廠站（屈地街 94W 只落客、西灣河 97E）插返入經過嘅路線，時間取中間。估計到站秒數按距離比例分 GTFS 全程時間。
+  - 靜態（core `tram-data.ts`，`packages/core/tools/tram-data.py --write`）：`TRAM_STATIONS`（站 ID = 站代號，總站用主要代號）、`TRAM_ORDER`、`TRAM_ROUTES`。
+  - 每日（`build.py` → `out/tram.json`，`calendar.json` 包埋電車 serviceId）：每條路線每個方向嘅站、秒數、開車時間；成人車費（GTFS，$3.3 全程同價）。
+    電車出錯唔會拖累成個數據更新（跳過，冇 tram.json）。
+- **班次**：電車**冇官方實時到站開放數據**（2026-11 查過 data.gov.hk）。`/api/tram?sta=`：
+  - `schedule`：core `tramStopSchedule`，每個目的地下 3 班（約）、而家約幾多分鐘一班（前後一個鐘中位數）、頭尾班；
+  - `realtime`：用戶揀咗試電車公司網站「下一班電車」（`hktramways.com/nextTram/geteat.php?stop_code=`，XML，core `parseTramEta`）——
+    唔係開放數據、可能隨時停用；**普通請求、唔好偽裝瀏覽器**（試過加 Referer／Cookie 俾安全檢查擋，係啱嘅）；2 秒超時，失敗停問 2 分鐘；回應空（`<root/>`）都當冇。
+    冇實時就用時間表，介面寫明「按運輸署時間表推算」。
+- **路綫圖**（core `tram-map.ts`，`packages/core/tools/tram-layout.py --write`，`--svg 預覽.svg` 出打橫同打直預覽；唔好人手改；唔好照抄電車公司官方路綫圖）：
+  用戶要求**打直**：堅尼地城喺頂、筲箕灣喺底；雙軌，右邊東行站、左邊西行站（站名打橫寫喺外面）；站上下位置跟真實里數（投影落主綫），同一條軌太近就成段推開（東西行唔錯開）；
+  總站膠囊橫跨雙軌、粗體；跑馬地環綫喺左邊（單向，白色箭咀；兩條直綫喺西行站名之間穿過），環綫站名直排。排版喺「打橫」設計再轉 90°。
+  網頁 SVG（`useMapView`，橫向範圍最少 20 單位，闊螢幕唔會放太大）、App Skia（`SchematicMap` 新 `startPx` 46）。
+  撳站範圍：東行站向右、西行站向左（兩條軌只隔 0.2，唔好重疊）。附近 600 米內嘅站藍色虛綫圈（core `nearestTramStations`）。
+- **站面板**：站名、方向（西行往上環、堅尼地城方向等）、「對面（東行）」轉去對面方向最近嘅站（core `oppositeTramStation`，400 米內）、
+  實時或者時間表、車費「成人 $3.3（全程同價，落車付款）· 樂悠咭（60–64 歲）$2」。core `searchTramStations`（同名東西行站都出、寫方向）。
+- 首頁卡、收藏、最近睇過、附近車站頁：未做（core `tramDepartureRows` 預備咗）。
+
 ## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）
 
 `pipeline/others.py`（由 `build.py` 呼叫），路線檔 `out/nlb/<路線>.json`、`out/mtrb/<路線>.json`，網址 `/nlb/11`、`/mtrb/K76`。
@@ -512,7 +539,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   `unknown`（「冇時間表資料」，灰色），唔好寫「今日沒有班次」；「班次」掣只計有時間表嘅走法。
 - 賽馬日改路等按事件嘅走法：政府數據冇。
 - ETA `seq` 規律只喺 38 號驗證過。
-- 小巴、電車、渡輪、導航（點到點）未做（港鐵、輕鐵做咗，見上面「港鐵」「輕鐵」）。介面已經預留（2026-11，用戶要求）：底部分頁「首頁／路線／導航／收藏／設定」，
+- 小巴、渡輪、導航（點到點）未做（港鐵、輕鐵、電車做咗，見上面「港鐵」「輕鐵」「電車」）。介面已經預留（2026-11，用戶要求）：底部分頁「首頁／路線／導航／收藏／設定」，
   導航顯示「功能即將推出」（將來做好，首頁「你想去邊？」直接用）；「路線」標題下面、搜尋欄上面一行交通工具分類（core `TRANSPORT_MODES`，`ready: false` 嘅揀咗就收埋搜尋欄同鍵盤，
   只顯示「功能即將推出」）。網頁 `components/home/{ComingSoon,Navigation,Settings}.tsx`，App `src/app/(tabs)/{navigation,settings}.tsx` + `ui.tsx` 嘅 `ComingSoon`。
   加新交通工具：喺 `TRANSPORT_MODES` 改 `ready: true` 再接返列表。附近同收藏將來包埋所有交通工具；首頁標題「下一程」。

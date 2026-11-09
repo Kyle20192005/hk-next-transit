@@ -18,9 +18,9 @@ type Kind = 'mtr' | 'lrt';
 const KIND_KEY = 'hknt.rail';
 
 const NARROW = '(max-width: 767.98px)';
-const isNarrow = () => typeof window !== 'undefined' && window.matchMedia(NARROW).matches;
+export const isNarrow = () => typeof window !== 'undefined' && window.matchMedia(NARROW).matches;
 /** 手機（窄過 768px）：面板做貼底拉板 */
-function useNarrow() {
+export function useNarrow() {
   const [n, setN] = useState(isNarrow);
   useEffect(() => {
     const m = window.matchMedia(NARROW);

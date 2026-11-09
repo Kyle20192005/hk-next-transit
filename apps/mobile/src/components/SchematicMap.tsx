@@ -78,6 +78,7 @@ export function SchematicMap({
   inset = NO_INSET,
   near = NO_NEAR,
   pins = NO_PINS,
+  startPx = START_PX,
 }: {
   bounds: MapBounds;
   /** 開頁中心（地圖座標） */
@@ -95,6 +96,8 @@ export function SchematicMap({
   inset?: MapInset;
   near?: string[];
   pins?: MapPinAt[];
+  /** 開頁一格（地圖單位）幾多 px（預設 34；電車圖窄長，字要大啲） */
+  startPx?: number;
 }) {
   const t = useTheme();
   const [size, setSize] = useState<Size>({ w: 0, h: 0 });
@@ -178,7 +181,7 @@ export function SchematicMap({
     if (!width) return;
     if (cam.current) setCam(clamp(cam.current, s, cfg), s);
     else {
-      const w = Math.min(bounds.width, width / START_PX);
+      const w = Math.min(bounds.width, width / startPx);
       const h = (w * height) / width;
       setCam({ x: start.x - w / 2, y: start.y - h / 2, w }, s);
       setReady(true);

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createLiveClient, isCo, type Co, type Calendar, type Company, type Eta, type LrtPlatform, type MtrLineEtas, type NearMtr, type NewsItem, type RouteData, type RouteIndex, type StopRouteHit } from '@hknt/core';
+import { createLiveClient, isCo, type Co, type Calendar, type Company, type Eta, type LrtPlatform, type MtrLineEtas, type NearMtr, type NewsItem, type RouteData, type RouteIndex, type StopRouteHit, type TramEta, type TramStopDest } from '@hknt/core';
 
 /**
  * 後端 = apps/web 嘅 API。預設用線上網站（手機連唔到電腦嘅 localhost）；
@@ -85,6 +85,8 @@ export const api = {
   mtr: (sta: string) => liveJson<{ sta: string; lines: MtrLineEtas[]; failed: string[] }>(live.mtr(sta)),
   /** 輕鐵站到站時間（tracker 優先）：每個月台嘅班次；failed = 攞唔到 */
   lrt: (sta: string) => liveJson<{ sta: string; platforms: LrtPlatform[]; failed: boolean }>(live.lrt(sta)),
+  /** 電車站班次（Vercel）：realtime = 電車公司網站實時（冇就 null），schedule = 按時間表推算 */
+  tram: (sta: string) => get<{ sta: string; realtime: TramEta[] | null; schedule: TramStopDest[]; fare: number | null }>(`/api/tram?sta=${q(sta)}`),
   /** 路綫圖車費：由呢個站去其他每個站（[八達通成人, 小童, 長者, 殘疾, 學生, 樂悠咭, 單程成人, 單程小童, 單程長者]；機場快綫冇嘅係 null） */
   fare: (lrt: boolean, from: string) => get<{ from: string; fares: Record<string, (number | null)[]> }>(`/api/${lrt ? 'lrt' : 'mtr'}/fare?from=${q(from)}`),
   stopEtas: (co: Co, stop: string) =>

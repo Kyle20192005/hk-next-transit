@@ -1078,3 +1078,26 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .fare-group dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; }
 .fare-note { margin: 0; font-size: 0.8125rem; }
 
+
+/* ---------- 電車路綫圖（components/rail/TramMap、TramStationSheet） ---------- */
+.tram-line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.tram-stop, .tram-term { fill: #fff; stroke: #1d1d1f; }
+.tram-sta.on .tram-stop, .tram-sta.on .tram-term { fill: var(--brand); }
+.tram-label { fill: var(--text); font-weight: 700; paint-order: stroke; stroke: var(--card); stroke-width: 0.08px; stroke-linejoin: round; }
+.tram-label.bold { font-weight: 800; }
+.tram-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 10px 16px; }
+.tram-dir { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.8125rem; font-weight: 700; color: var(--muted); }
+.tram-dir svg { flex: none; color: #007a4d; }
+.tram-opp { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--text); font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
+.tram-dest .mtr-next-head h3 { color: var(--text); font-size: 0.9375rem; }
+.tram-headway { margin-right: 8px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, #007a4d 14%, transparent); color: #007a4d; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.tram-row { min-height: 40px; }
+.tram-times { margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tram-firstlast { margin: 2px 0 0; font-size: 0.75rem; }
+.tram-note { margin: 6px 2px 0; font-size: 0.75rem; }
+.tram-fare { display: flex; align-items: center; gap: 6px; margin: 6px 2px 0; font-size: 0.8125rem; color: var(--muted); }
+.tram-fare svg { flex: none; }
+:root[data-theme="dark"] .tram-headway, :root[data-theme="dark"] .tram-dir svg { color: #3ec48a; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tram-headway, :root:not([data-theme="light"]) .tram-dir svg { color: #3ec48a; }
+}

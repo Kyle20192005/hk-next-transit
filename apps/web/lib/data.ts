@@ -1,7 +1,7 @@
 import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { CO_LIST, dataFileRequest, type AnyStopEntry, isCo, SAFE_ROUTE, type Calendar, type Co, type Place, type RouteData, type RouteIndex } from '@hknt/core';
+import { CO_LIST, dataFileRequest, type AnyStopEntry, isCo, SAFE_ROUTE, type Calendar, type Co, type Place, type RouteData, type RouteIndex, type TramTimetable } from '@hknt/core';
 
 /**
  * 讀 pipeline 輸出嘅數據。
@@ -136,6 +136,11 @@ export async function getPlaces(): Promise<Place[]> {
 
 export async function getCalendar(): Promise<Calendar> {
   return (await load<Calendar>('calendar.json')) ?? {};
+}
+
+/** 電車時間表（pipeline/tram.py）；舊數據冇就係 null */
+export async function getTramTimetable(): Promise<TramTimetable | null> {
+  return load<TramTimetable>('tram.json');
 }
 
 /** 診斷用：數據來源設定同讀取結果（唔會顯示 token） */

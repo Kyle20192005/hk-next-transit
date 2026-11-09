@@ -3,6 +3,7 @@
 
 輸出
   out/calendar.json        GTFS 服務日曆（邊個 serviceId 喺邊日行）
+  out/tram.json            香港電車路線、站序、估計到站秒數、開車時間（pipeline/tram.py）
   out/ctb/index.json       城巴路線列表
   out/ctb/<路線>.json      每條路線：站點、走法、時間表、走線、ETA seq 對照、站到站行車時間
   out/report/ctb_stop_map.csv  站點配對結果（A/B/C/X 分級，用嚟人手覆核）
@@ -543,6 +544,13 @@ def main():
               open(f'{OUT}/index.json', 'w', encoding='utf-8'), ensure_ascii=False)
     json.dump({'generatedAt': generated, 'routes': index},
               open(f'{OUT}/ctb/index.json', 'w', encoding='utf-8'), ensure_ascii=False)
+    # 香港電車（pipeline/tram.py）：out/tram.json；佢嘅 serviceId 都要入 calendar.json
+    # 電車出錯（例如電車站檔下載失敗、GTFS 改咗站名配唔到）唔好拖累成個數據更新：跳過電車，寫低原因
+    import tram
+    try:
+        used_services |= tram.build(CACHE, OUT)
+    except Exception as e:  # noqa: BLE001
+        print('⚠️ 電車數據生成失敗，今次冇 tram.json：', e)
     json.dump(load_calendar(used_services), open(f'{OUT}/calendar.json', 'w'), separators=(',', ':'))
 
     fill_lines_from_csdi(lines_by_no)

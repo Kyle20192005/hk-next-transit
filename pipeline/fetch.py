@@ -64,6 +64,8 @@ OSM_MTRB_EXTRA_MASTERS = [8024265, 8024263]
 # 站到站平均行車時間（秒），由 HK-Bus-ETA/hk-bus-time-between-stops 計算，每小時更新
 # 格式：{ 起點站ID: { 下一站ID: 秒 } }，城巴用城巴站 ID。只用數據，冇用佢嘅（GPL）程式碼。
 JOURNEY_TIMES_URL = 'https://timeinterval.hkbuseta.com/times/all.json'
+# 香港電車站（data.gov.hk 開放數據）：行駛方向、站代號、站名（中、英各一個檔）；路線同時間表喺 GTFS（agency TRAM）
+TRAM_STOPS_URL = 'https://static.data.gov.hk/tramways/datasets/tram_stops/summary_tram_stops_{}.csv'
 
 
 def http(url, timeout=120, tries=6):
@@ -94,6 +96,15 @@ def fetch_gtfs():
         return
     zipfile.ZipFile(io.BytesIO(http(GTFS_URL, 600))).extractall(out)
     print('GTFS ok')
+
+
+def fetch_tram_stops():
+    for lang in ('tc', 'en'):
+        path = os.path.join(CACHE, f'tram_stops_{lang}.csv')
+        if done(path):
+            continue
+        open(path, 'wb').write(http(TRAM_STOPS_URL.format(lang)))
+    print('電車站 ok')
 
 
 def fetch_td_bus():
@@ -269,7 +280,7 @@ if __name__ == '__main__':
         except Exception as e:  # 記低，全部做完先一齊報；唔好令 build.py 讀唔到檔先爆
             failed.append(f'{f.__name__}: {e}')
 
-    ths = [threading.Thread(target=run, args=(f,)) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_osm_mtrb, fetch_osm_places, fetch_journey_times)]
+    ths = [threading.Thread(target=run, args=(f,)) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_osm_mtrb, fetch_osm_places, fetch_journey_times, fetch_tram_stops)]
     for th in ths: th.start()
     for th in ths: th.join()
     if failed:

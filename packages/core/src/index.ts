@@ -38,3 +38,6 @@ export * from './lrt-map';
 export * from './mtr-map';
 export * from './rail-xfer';
 export * from './rail-fare';
+export * from './tram';
+export * from './tram-data';
+export * from './tram-map';
