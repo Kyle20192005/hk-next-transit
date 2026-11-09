@@ -585,11 +585,13 @@ for name, mode in CAPS.items():
                 cx, cy = at(ci, tc)
                 caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4), 'sta': s})
                 boxes.append((cx, cy))
-        # 白色站膠囊包住所有號碼
-        w = (max(b[0] for b in boxes) - min(b[0] for b in boxes)) + CAP_W + 0.14
-        h = (max(b[1] for b in boxes) - min(b[1] for b in boxes)) + CAP_H + 0.14
+        # 白色站膠囊喺號碼後面：沿號碼排列方向拉長（兩頭圓角露出嚟），闊度窄過號碼
         cx = (max(b[0] for b in boxes) + min(b[0] for b in boxes)) / 2
         cy = (max(b[1] for b in boxes) + min(b[1] for b in boxes)) / 2
+        spanN = max(abs((b[0] - cx) * N[0] + (b[1] - cy) * N[1]) for b in boxes) * 2
+        long_ = spanN + capN + 0.34
+        short = 0.55 * capA if vertN else capA + 0.1
+        w, h = (short, long_) if vertN else (long_, short)
         markers[s] = {'kind': 'box', 'x': round(cx, 4), 'y': round(cy, 4), 'w': round(w, 4), 'h': round(h, 4)}
     else:
         m = markers[s]
