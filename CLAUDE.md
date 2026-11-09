@@ -230,6 +230,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
 大.中.細（由 0.0.1 開始）：細更新（修正、細改動）、中更新（新功能）、大更新（大改版）。用 `pnpm release:patch|minor|major "內容"`
 （`scripts/version.mjs`）：自動計下一個版本號，更新 core `version.ts`（`APP_VERSION`，設定頁顯示）、各 package.json、
 `apps/mobile/app.json`（version；iOS buildNumber、Android versionCode 每次 +1），同埋 `CHANGELOG.md`。每次推上 main 嘅改動都要揀一個。
+改完（測試、typecheck、睇過介面）直接出版本推上 main，**唔使先開分支俾用戶睇預覽**（2026-11-09 用戶要求）。
 
 ## 陷阱
 
