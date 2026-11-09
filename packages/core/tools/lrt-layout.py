@@ -150,14 +150,20 @@ VIA = {('青松', '兆康'): ['麒麟'], ('鳴琴', '建安'): ['J505S'], ('山�
 CHAIN_ORDER = [
     (['濕地公園', '天秀', '天悅', '天榮', '銀座', '天湖', '天慈', '天水圍'], ['751', '705', '706']),
     (['天耀', '天水圍'], ['706', '705']),
+    (['洪水橋', '鍾屋村', '泥圍', '藍地', '兆康'], ['614', '751', '610', '615']),
+    (['兆康', '麒麟', '青松', '建生', '田景'], ['615', '615P', '505']),
     (['兆康', '屯門醫院', '澤豐'], ['751', '610']),
     (['蔡意橋', '河田', '屯門'], ['751', '507']),
     (['屯門', '市中心'], ['751', '507', '505']),
-    (['安定', '兆麟'], ['505', '614P', '614', '507']),
-    (['石排', 'J505N', '鳴琴'], ['505', '610', '615P', '615']),
+    (['市中心', '安定'], ['614P', '614', '751', '507', '505']),
+    (['安定', '兆麟'], ['614P', '614', '507', '505']),
+    (['田景', '良景', '新圍'], ['507', '615', '615P', '505']),
+    (['新圍', '石排'], ['615', '615P', '505']),
+    (['石排', 'J505N', '鳴琴'], ['505', '610', '615', '615P']),
+    (['鳴琴', '青雲', '青山村', '龍門', '輕鐵車廠', '蝴蝶', '美樂', '屯門碼頭'], ['610', '615', '615P']),
 ]
-# 終點站路線號碼：extend = 色綫穿過個站再散開；split = 穿過個站之後左右分兩邊打直排；n／s／e／w = 放喺站嗰邊
-CAPS = {'元朗': 'extend', '三聖': 'extend', '屯門碼頭': 'split', '友愛': 'e', '田景': 's', '兆康': 'e', '天逸': 'e', '天水圍': 'w'}
+# 終點站路線號碼：extend = 色綫穿過個站再散開；split = 穿過個站之後左右分兩邊打直排；n／s／e／w = 放喺站嗰邊（^ = 由站向上排）
+CAPS = {'元朗': 'extend', '三聖': 'extend', '屯門碼頭': 'split', '友愛': 'e', '田景': 's', '兆康': 'e', '天逸': 'e', '天水圍': 'w^'}
 # 站名位置
 LABELS = {}
 for n in ['天逸', '天富', '頌富', '天瑞', '樂湖', '天耀']: LABELS[n] = 'w'
@@ -169,7 +175,7 @@ LABELS.update({'兆康': 'w', '麒麟': 'n', '青松': 'n', '建生': 'n', '田�
                '銀圍': 'n', '屯門醫院': 'se', '澤豐': 'se', '蔡意橋': 'e', '河田': 'e', '屯門': 'e', '石排': 'w', '鳴琴': 'w',
                '山景(北)': 'e', '山景(南)': 'e', '建安': 'e', '市中心': 'w', '杯渡': 's', '友愛': 'w', '安定': 'e', '兆麟': 'e',
                '三聖': 'n', '屯門碼頭': 'w'})
-LABELS.update({'元朗': 'nw', '屯門醫院': 'nw', '兆麟': 'w'})
+LABELS.update({'元朗': 'nw', '屯門醫院': 'nw', '兆麟': 'w', '坑尾村': 'w'})
 for n in ['青雲', '青山村', '龍門', '輕鐵車廠', '蝴蝶', '美樂']: LABELS[n] = 'w'
 for n in ['鳳地', '景峰', '新墟', '何福堂']: LABELS[n] = 'e'
 for n in ['豐景園', '海皇路', '兆禧']: LABELS[n] = 'se'
@@ -298,6 +304,58 @@ for (s, side), lst in side_edges.items():
             own = lane_order(s, other(e, s))
             r = next((r for r in own if r in mo), None)
             if r: port_base[(s, e)] = ((len(mo) - 1) / 2 - mo.index(r)) * G - ((len(own) - 1) / 2 - own.index(r)) * G
+
+# 站兩邊對齊：同一條路線入站出站用同一個位（唔會過咗站就走去第二行）。
+# 兩邊每段路軌（成束色綫）試晒放喺邊個位，揀兩邊同一條路線喺同一個位最多嘅排法；完咗、分出去嘅綫喺旁邊。
+def side_seq(s, side):
+    lst = [e for _, e in side_edges.get((s, side), [])]
+    seq = []
+    for e in (lst if side == 1 else lst[::-1]):
+        o = lane_order(s, other(e, s))
+        seq += [(r, e) for r in (o if side == 1 else o[::-1])]
+    return seq
+def placements(sizes, M):
+    res = []
+    def rec(i, start, acc):
+        if i == len(sizes): res.append(list(acc)); return
+        for st in range(start, M - sum(sizes[i:]) + 1):
+            acc.append(st); rec(i + 1, st + sizes[i], acc); acc.pop()
+    rec(0, 0, [])
+    return res
+def blocks_of(seq):
+    out = []
+    for r, e in seq:
+        if not out or out[-1][0] != e: out.append((e, []))
+        out[-1][1].append(r)
+    return out
+jumps = []
+for s in P:
+    if s in VIRTUAL: continue
+    A, B = blocks_of(side_seq(s, 1)), blocks_of(side_seq(s, -1))
+    na, nb = sum(len(x[1]) for x in A), sum(len(x[1]) for x in B)
+    M = max(na, nb) + 2
+    best = None
+    for pa in placements([len(x[1]) for x in A], M):
+        sa = {st + i: r for (e, rs), st in zip(A, pa) for i, r in enumerate(rs)}
+        for pb in placements([len(x[1]) for x in B], M):
+            sb = {st + i: r for (e, rs), st in zip(B, pb) for i, r in enumerate(rs)}
+            match = sum(1 for k, r in sa.items() if sb.get(k) == r)
+            used = set(sa) | set(sb)
+            span = max(used) - min(used)
+            ca = (min(sa) + max(sa)) / 2 if sa else 0
+            cb = (min(sb) + max(sb)) / 2 if sb else ca
+            key = (-match, span, abs(ca - cb) if sa and sb else 0)
+            if best is None or key < best[0]: best = (key, pa, pb, sa, sb)
+    _, pa, pb, sa, sb = best
+    used = set(sa) | set(sb)
+    mid = (min(used) + max(used)) / 2
+    for side, blocks, pl in ((1, A, pa), (-1, B, pb)):
+        for (e, rs), st in zip(blocks, pl):
+            c = (mid - (st + (len(rs) - 1) / 2)) * G
+            port_base[(s, e)] = c if side == 1 else -c
+    both = set(sa.values()) & set(sb.values())
+    for r in sorted(both):
+        if not any(sb.get(k) == r for k, x in sa.items() if x == r): jumps.append(f'{nm_(s)} {r}')
 
 # 站嘅橫移：令每段路軌兩頭嘅出站位一致（色綫一路平行，轉彎同心）。
 # 由最大嘅站開始，先跟直路軌、再跟同其他路軌共用彎位嘅、最後其他，咁樣對唔齊嘅只會喺普通彎位處理。
@@ -480,8 +538,8 @@ for name, mode in CAPS.items():
                 cy = (by + bh + 0.12 + CAP_H / 2) if mode == 's' else (by - 0.12 - CAP_H / 2)
                 cx = bx + bw / 2 + (i - (k - 1) / 2) * (CAP_W + 0.08)
             else:
-                cx = (bx + bw + 0.12 + CAP_W / 2) if mode == 'e' else (bx - 0.12 - CAP_W / 2)
-                cy = by + bh / 2 + (i - (k - 1) / 2) * (CAP_H + 0.08)
+                cx = (bx + bw + 0.12 + CAP_W / 2) if mode[0] == 'e' else (bx - 0.12 - CAP_W / 2)
+                cy = by + bh / 2 + ((i - (k - 1) / 2) if mode[-1] != '^' else (i - (k - 1))) * (CAP_H + 0.08)
             caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4)})
 def cap_box(c): return (c['x'] - CAP_W / 2, c['y'] - CAP_H / 2, CAP_W, CAP_H)
 
@@ -564,6 +622,7 @@ VIEW = (round(min(xs) - 0.6, 2), round(min(ys) - 0.6, 2), round(max(xs) - min(xs
 
 print(f'{len(P)} 個站、{len(edges)} 段路軌、{len(lanes)} 條色綫、{len(caps)} 個號碼、{len(arrows)} 個箭咀；範圍 {VIEW}', file=sys.stderr)
 for j in jogs: print('· 直路軌兩頭出站位唔同，中間打斜移位：', j, file=sys.stderr)
+if jumps: print('· 過站換位（同其他綫交叉）：', '、'.join(jumps), file=sys.stderr)
 for x in errors: print('✗', x, file=sys.stderr)
 
 # ---------------------------------------------------------------------------
