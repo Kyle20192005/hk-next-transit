@@ -179,8 +179,8 @@ export function MtrMap({
       <Pressable onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')} style={{ position: 'absolute', left: 10, bottom: 8 + inset.bottom, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: t.card + 'cc' }}>
         <Text style={{ fontSize: 11, color: t.muted }}>© OpenStreetMap 貢獻者</Text>
       </Pressable>
-      {/* 面板遮到地圖剩好矮：縮放掣打橫排，唔好頂穿上面 */}
-      <View style={{ position: 'absolute', right: 12 + inset.right, bottom: 12 + inset.bottom, gap: 6, flexDirection: size.h - inset.bottom < 200 ? 'row' : 'column' }}>
+      {/* 面板遮到地圖剩好矮：縮放掣打橫排，唔好頂穿上面；拉板全開（剩一條）就收埋 */}
+      <View style={{ position: 'absolute', right: 12 + inset.right, bottom: 12 + inset.bottom, gap: 6, flexDirection: size.h - inset.bottom < 200 ? 'row' : 'column', display: size.h && size.h - inset.bottom < 110 ? 'none' : 'flex' }}>
         <ZoomButton t={t} onPress={() => zoomBtn(1.4)} label="放大">
           <Icon name="plus" size={18} color={t.text} />
         </ZoomButton>

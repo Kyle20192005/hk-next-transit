@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { ActivityIndicator, Animated, Easing, PanResponder, Pressable, ScrollView, Text, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import { LIVE_REFRESH, hkClockSec, mtrLine, mtrStationEn, mtrStationLines, mtrStationName, mtrTrainEta, type MtrDirection, type MtrLineEtas, type MtrTrain, type Prefs } from '@hknt/core';
 import { api } from '@/lib/api';
 import { usePrefs } from '@/lib/prefs';
@@ -8,9 +8,13 @@ import { Icon } from './Icon';
 
 type Data = { sta: string; lines: MtrLineEtas[]; failed: string[]; at: number };
 type Fmt = Prefs['etaFormat'];
+type Snap = 'peek' | 'full' | 'close';
+/** 手機拉板：全開幾高、半開最高幾高（px） */
+export type SheetSize = { full: number; peekMax: number };
 
 /**
- * 港鐵站到站時間面板（同網頁 components/rail/MtrStationSheet.tsx 一樣）：唔遮成幅圖（手機浮喺下面、闊螢幕喺右邊），
+ * 港鐵站到站時間面板（同網頁 components/rail/MtrStationSheet.tsx 一樣）：唔遮成幅圖。
+ * 手機（sheet）：貼住底邊，有拉柄；半開顯示下班車，向上拉全開見所有班次，向下拉關閉。闊螢幕：右邊面板。
  * 頂部按綫分頁（分頁頂有綫色）；每個方向先顯示下班車（目的地、月台、正在離開／N 分鐘），
  * 「所有班次」展開成個表（目的地｜月台｜下班車，按方向分組）。30 秒更新一次，底部顯示最後更新時間。
  */
@@ -23,6 +27,7 @@ export function MtrStationSheet({
   onAll,
   style,
   onLayout,
+  sheet,
 }: {
   sta: string;
   onClose: () => void;
@@ -32,6 +37,8 @@ export function MtrStationSheet({
   onAll: (all: boolean) => void;
   style?: StyleProp<ViewStyle>;
   onLayout?: (e: LayoutChangeEvent) => void;
+  /** 手機拉板（null = 闊螢幕右邊面板） */
+  sheet: SheetSize | null;
 }) {
   const t = useTheme();
   const { etaFormat } = usePrefs();
@@ -39,6 +46,40 @@ export function MtrStationSheet({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [nonce, setNonce] = useState(0);
+
+  // ---------- 手機：拉上拉落（同網頁一樣嘅規則） ----------
+  const [height] = useState(() => new Animated.Value(0));
+  /** 高度由動畫控制（拖緊、彈緊）；否則半開自動高度、全開 sheet.full */
+  const [anim, setAnim] = useState(false);
+  const peekH = useRef(300);
+  const curH = useRef(0);
+  const snap = useCallback(
+    (target: Snap, from: number) => {
+      if (target === 'close' || !sheet) return onClose();
+      const to = target === 'full' ? sheet.full : peekH.current;
+      height.setValue(from);
+      setAnim(true);
+      Animated.timing(height, { toValue: to, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(() => {
+        onAll(target === 'full');
+        setAnim(false);
+      });
+    },
+    [sheet, onClose, onAll, height],
+  );
+  // 手勢 callback 用嘅最新值（PanResponder 只建一次，喺 SheetGrab 入面）
+  const live = useRef<GrabLive | null>(null);
+  useLayoutEffect(() => {
+    live.current = { sheet, snap, curH: () => curH.current, peekH: () => peekH.current, height, setAnim };
+  }, [sheet, snap, height]);
+  const toggleAll = () => (sheet ? snap(all ? 'peek' : 'full', curH.current) : onAll(!all));
+  const showTable = all || anim;
+  const sizeStyle = !sheet ? null : anim ? { height } : all ? { height: sheet.full } : { maxHeight: sheet.peekMax };
+  const layout = (e: LayoutChangeEvent) => {
+    curH.current = e.nativeEvent.layout.height;
+    // 半開時量返自己幾高（之後拉落嚟彈返去呢個高度）
+    if (sheet && !all && !anim) peekH.current = e.nativeEvent.layout.height;
+    onLayout?.(e);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -74,7 +115,18 @@ export function MtrStationSheet({
   const hasTrains = !!etas?.dirs.some((d) => d.trains.length);
 
   return (
-    <View onLayout={onLayout} style={[{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadowLg }, style]}>
+    <Animated.View
+      onLayout={layout}
+      style={[
+        { backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadowLg },
+        sheet && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.14 },
+        style,
+        sizeStyle,
+      ]}
+    >
+      {/* 拉柄 + 站名 + 分頁：手機可以拉上拉落 */}
+      <SheetGrab live={live}>
+      {sheet && <View style={{ alignSelf: 'center', width: 38, height: 5, borderRadius: 3, marginTop: 7, marginBottom: -3, backgroundColor: t.muted, opacity: 0.45 }} />}
       {/* 站名 */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 10, paddingBottom: 8, paddingLeft: 16, paddingRight: 10 }}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 8 }}>
@@ -106,6 +158,7 @@ export function MtrStationSheet({
           );
         })}
       </View>
+      </SheetGrab>
 
       <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}>
         {etas?.delayed && (
@@ -127,7 +180,7 @@ export function MtrStationSheet({
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 30, marginRight: -6 }}>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: t.muted }}>下班車</Text>
                 {etas.dirs.some((d) => d.trains.length > 1) && (
-                  <Pressable onPress={() => onAll(!all)} accessibilityRole="button" accessibilityState={{ expanded: all }} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingHorizontal: 6 }}>
+                  <Pressable onPress={toggleAll} accessibilityRole="button" accessibilityState={{ expanded: all }} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingHorizontal: 6 }}>
                     <Text style={{ color: t.accent, fontWeight: '700', fontSize: 14 }}>{all ? '收埋班次表' : '所有班次'}</Text>
                     <View style={{ transform: [{ rotate: all ? '180deg' : '0deg' }] }}>
                       <Icon name="chevron-down" size={16} color={t.accent} />
@@ -142,7 +195,7 @@ export function MtrStationSheet({
 
 
             {/* 所有班次表 */}
-            {all && hasTrains && (
+            {showTable && hasTrains && (
               <View>
                 <View style={{ flexDirection: 'row', paddingHorizontal: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: t.line }}>
                   <Text style={[th(t), { flex: 1 }]}>目的地</Text>
@@ -191,8 +244,58 @@ export function MtrStationSheet({
           <Text style={{ fontSize: 12, fontWeight: '700', color: t.text }}>重新整理</Text>
         </Pressable>
       </View>
-    </View>
+    </Animated.View>
   );
+}
+
+type GrabLive = {
+  sheet: SheetSize | null;
+  snap: (target: Snap, from: number) => void;
+  curH: () => number;
+  peekH: () => number;
+  height: Animated.Value;
+  setAnim: (on: boolean) => void;
+};
+
+/**
+ * 拉柄、站名、分頁嗰部分：手機可以拉上拉落（同網頁一樣嘅規則）。郁咗 6px 而且係直向先當拖，輕撳分頁、關閉掣照用得；
+ * 放手時：全開向下掃 → 半開；半開向下掃 → 關閉；向上掃 → 全開；慢慢放 → 近邊個用邊個；拉低過半開 70（由全開拉就要低過半開一半）→ 關閉。
+ */
+function SheetGrab({ live, children }: { live: RefObject<GrabLive | null>; children: React.ReactNode }) {
+  const [responder] = useState(() => {
+    let h0 = 0;
+    const clampH = (h: number) => Math.max(60, Math.min(live.current?.sheet?.full ?? h, h));
+    const end = (dy: number, vy: number) => {
+      const L = live.current;
+      if (!L?.sheet) return;
+      const h = clampH(h0 - dy);
+      const peek = L.peekH();
+      const fromFull = h0 > peek + 20;
+      let target: Snap;
+      if (h < (fromFull ? peek * 0.5 : peek - 70)) target = 'close';
+      else if (vy > 0.4) target = fromFull ? 'peek' : 'close';
+      else if (vy < -0.4) target = 'full';
+      else target = h > (peek + L.sheet.full) / 2 ? 'full' : 'peek';
+      L.snap(target, h);
+    };
+    const want = (dx: number, dy: number) => !!live.current?.sheet && Math.abs(dy) > 6 && Math.abs(dy) > Math.abs(dx);
+    return PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, g) => want(g.dx, g.dy),
+      onMoveShouldSetPanResponder: (_, g) => want(g.dx, g.dy),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        const L = live.current!;
+        L.height.stopAnimation();
+        h0 = L.curH();
+        L.height.setValue(h0);
+        L.setAnim(true);
+      },
+      onPanResponderMove: (_, g) => live.current?.height.setValue(clampH(h0 - g.dy)),
+      onPanResponderRelease: (_, g) => end(g.dy, g.vy),
+      onPanResponderTerminate: (_, g) => end(g.dy, g.vy),
+    });
+  });
+  return <View {...responder.panHandlers}>{children}</View>;
 }
 
 const th = (t: Theme) => ({ fontSize: 12, fontWeight: '700' as const, color: t.muted });

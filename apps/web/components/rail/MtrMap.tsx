@@ -282,8 +282,8 @@ export default function MtrMap({
       <a className="mtr-attr" style={{ bottom: 8 + inset.bottom }} href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()}>
         © OpenStreetMap 貢獻者
       </a>
-      {/* 面板遮到地圖剩好矮：縮放掣打橫排，唔好頂穿上面 */}
-      <div className={size.h - inset.bottom < 200 ? 'mtr-zoom row' : 'mtr-zoom'} style={{ bottom: 12 + inset.bottom, right: 12 + inset.right }} onPointerDown={(e) => e.stopPropagation()}>
+      {/* 面板遮到地圖剩好矮：縮放掣打橫排，唔好頂穿上面；拉板全開（剩一條）就收埋 */}
+      <div className={size.h - inset.bottom < 110 ? 'mtr-zoom row hidden' : size.h - inset.bottom < 200 ? 'mtr-zoom row' : 'mtr-zoom'} style={{ bottom: 12 + inset.bottom, right: 12 + inset.right }} onPointerDown={(e) => e.stopPropagation()}>
         <button onClick={() => zoomBtn(1.4)} aria-label="放大">
           <Icon name="plus" size={18} />
         </button>

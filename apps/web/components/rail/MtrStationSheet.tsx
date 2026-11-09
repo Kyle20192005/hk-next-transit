@@ -1,5 +1,5 @@
 'use client';
-import { forwardRef, useEffect, useState } from 'react';
+import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { LIVE_REFRESH, hkClockSec, mtrLine, mtrStationEn, mtrStationLines, mtrStationName, mtrTrainEta, type MtrDirection, type MtrLineEtas, type MtrTrain } from '@hknt/core';
 import { liveClient } from '@/lib/buses';
 import { usePrefs } from '@/lib/prefs';
@@ -7,61 +7,144 @@ import Icon from '../Icon';
 
 type Data = { sta: string; lines: MtrLineEtas[]; failed: string[]; at: number };
 
+type Snap = 'peek' | 'full' | 'close';
+/** 全開時頂部留幾多地圖（px） */
+const FULL_GAP = 56;
+
 /**
- * 港鐵站到站時間面板（撳路綫圖個站或者搜尋）：唔遮成幅圖（手機喺下面、闊螢幕喺右邊），地圖會移去嗰個站。
+ * 港鐵站到站時間面板（撳路綫圖個站或者搜尋）：唔遮成幅圖，地圖會移去嗰個站。
+ * 手機（sheet）：貼住底邊，有拉柄；半開顯示下班車，向上拉全開見所有班次，向下拉關閉。闊螢幕：右邊面板。
  * 頂部按綫分頁（分頁頂有綫色）；每個方向先顯示下班車（目的地、月台、正在離開／N 分鐘），
  * 「所有班次」展開成個表（目的地｜月台｜下班車，按方向分組）。30 秒更新一次，底部顯示最後更新時間。
  */
-const MtrStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => void; tab: string | null; onTab: (line: string) => void; all: boolean; onAll: (all: boolean) => void }>(
-  function MtrStationSheet({ sta, onClose, tab, onTab, all, onAll }, ref) {
-    const { etaFormat } = usePrefs();
-    const [data, setData] = useState<Data | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [nonce, setNonce] = useState(0);
+const MtrStationSheet = forwardRef<
+  HTMLElement,
+  { sta: string; onClose: () => void; tab: string | null; onTab: (line: string) => void; all: boolean; onAll: (all: boolean) => void; sheet: boolean }
+>(function MtrStationSheet({ sta, onClose, tab, onTab, all, onAll, sheet }, ref) {
+  const { etaFormat } = usePrefs();
+  const [data, setData] = useState<Data | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [nonce, setNonce] = useState(0);
 
-    useEffect(() => {
-      let cancelled = false;
-      const load = async () => {
-        try {
-          const res = await liveClient.mtr(sta);
-          const body = await res.json();
-          if (!res.ok) throw new Error(body.error ?? res.statusText);
-          if (!cancelled) {
-            setData({ ...body, sta, at: Date.now() });
-            setError(null);
-          }
-        } catch (e) {
-          if (!cancelled) setError((e as Error).message);
+  // ---------- 手機：拉上拉落 ----------
+  const el = useRef<HTMLElement | null>(null);
+  const setRefs = (n: HTMLElement | null) => {
+    el.current = n;
+    if (typeof ref === 'function') ref(n);
+    else if (ref) ref.current = n;
+  };
+  /** 拖緊或者彈緊時嘅高度（px）；null = 跟狀態（半開自動高度、全開 CSS 高度） */
+  const [dragH, setDragH] = useState<number | null>(null);
+  const peekH = useRef(300);
+  const full = sheet && all;
+  // 半開時量返自己幾高（之後拉落嚟彈返去呢個高度）
+  useLayoutEffect(() => {
+    if (sheet && !all && dragH === null && el.current) peekH.current = el.current.offsetHeight;
+  });
+  const fullH = () => (el.current?.parentElement?.clientHeight ?? 600) - FULL_GAP;
+  const snap = (target: Snap, from: number) => {
+    if (target === 'close') return onClose();
+    const to = target === 'full' ? fullH() : peekH.current;
+    setDragH(to);
+    const done = () => {
+      setDragH(null);
+      onAll(target === 'full');
+    };
+    const a = el.current?.animate?.([{ height: `${from}px` }, { height: `${to}px` }], { duration: 240, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    if (a) a.onfinish = done;
+    else done();
+  };
+  const drag = useRef<{ id: number; y0: number; h0: number; on: boolean; y: number; t: number; v: number } | null>(null);
+  const onGrabDown = (e: React.PointerEvent) => {
+    if (!sheet || !el.current) return;
+    drag.current = { id: e.pointerId, y0: e.clientY, h0: el.current.offsetHeight, on: false, y: e.clientY, t: e.timeStamp, v: 0 };
+  };
+  const onGrabMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    const dy = e.clientY - d.y0;
+    if (!d.on) {
+      // 郁咗 6px 先當拖（輕撳分頁、關閉掣照用得）
+      if (Math.abs(dy) < 6) return;
+      d.on = true;
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    }
+    const dt = e.timeStamp - d.t;
+    if (dt > 0) d.v = (e.clientY - d.y) / dt;
+    d.y = e.clientY;
+    d.t = e.timeStamp;
+    setDragH(Math.max(60, Math.min(fullH(), d.h0 - dy)));
+  };
+  const onGrabUp = (e: React.PointerEvent) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.on || !el.current) return;
+    const h = el.current.offsetHeight;
+    const peek = peekH.current;
+    const v = e.timeStamp - d.t > 120 ? 0 : d.v; // 停咗先放手唔當掃
+    // 全開向下掃 → 半開；半開向下掃 → 關閉；向上掃 → 全開；慢慢放 → 近邊個用邊個；拉低過半開 70（由全開拉就要低過半開一半）→ 關閉
+    const fromFull = d.h0 > peek + 20;
+    let target: Snap;
+    if (h < (fromFull ? peek * 0.5 : peek - 70)) target = 'close';
+    else if (v > 0.4) target = fromFull ? 'peek' : 'close';
+    else if (v < -0.4) target = 'full';
+    else target = h > (peek + fullH()) / 2 ? 'full' : 'peek';
+    snap(target, h);
+  };
+  const toggleAll = () => (sheet && el.current ? snap(all ? 'peek' : 'full', el.current.offsetHeight) : onAll(!all));
+  const showTable = all || dragH !== null;
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await liveClient.mtr(sta);
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error ?? res.statusText);
+        if (!cancelled) {
+          setData({ ...body, sta, at: Date.now() });
+          setError(null);
         }
-        if (!cancelled) setLoading(false);
-      };
-      void load();
-      const id = setInterval(load, LIVE_REFRESH.etaMs);
-      return () => {
-        cancelled = true;
-        clearInterval(id);
-      };
-      // nonce：撳「重新整理」即刻再攞
-    }, [sta, nonce]);
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      }
+      if (!cancelled) setLoading(false);
+    };
+    void load();
+    const id = setInterval(load, LIVE_REFRESH.etaMs);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+    // nonce：撳「重新整理」即刻再攞
+  }, [sta, nonce]);
 
-    useEffect(() => {
-      const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-      document.addEventListener('keydown', onKey);
-      return () => document.removeEventListener('keydown', onKey);
-    }, [onClose]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
-    const codes = mtrStationLines(sta);
-    // 記住上次揀嘅綫（沿住一條綫睇落去）；呢個站冇就揀第一條
-    const line = tab && codes.includes(tab) ? tab : codes[0]!;
-    const fresh = data?.sta === sta ? data : null;
-    const etas = fresh?.lines.find((l) => l.line === line);
-    const failed = fresh?.failed.includes(line);
-    const info = mtrLine(line)!;
-    const empty = sta === 'RAC' ? '暫時冇班次（只喺賽馬日開放）' : '暫時冇班次';
+  const codes = mtrStationLines(sta);
+  // 記住上次揀嘅綫（沿住一條綫睇落去）；呢個站冇就揀第一條
+  const line = tab && codes.includes(tab) ? tab : codes[0]!;
+  const fresh = data?.sta === sta ? data : null;
+  const etas = fresh?.lines.find((l) => l.line === line);
+  const failed = fresh?.failed.includes(line);
+  const info = mtrLine(line)!;
+  const empty = sta === 'RAC' ? '暫時冇班次（只喺賽馬日開放）' : '暫時冇班次';
 
-    return (
-      <aside ref={ref} className="mtr-panel card" aria-label={`${mtrStationName(sta)}站到站時間`} style={{ ['--mline' as string]: info.color, ['--mline-ink' as string]: info.ink }}>
+  return (
+    <aside
+      ref={setRefs}
+      className={`mtr-panel card${full ? ' full' : ''}${dragH !== null ? ' dragging' : ''}`}
+      aria-label={`${mtrStationName(sta)}站到站時間`}
+      style={{ ['--mline' as string]: info.color, ['--mline-ink' as string]: info.ink, height: dragH ?? undefined }}
+    >
+      {/* 拉柄 + 站名 + 分頁：手機可以拉上拉落 */}
+      <div className="mtr-grab" onPointerDown={onGrabDown} onPointerMove={onGrabMove} onPointerUp={onGrabUp} onPointerCancel={onGrabUp}>
+        <span className="mtr-grab-handle" aria-hidden="true" />
         <header className="mtr-panel-head">
           <div className="mtr-panel-title">
             <h2>{mtrStationName(sta)}</h2>
@@ -82,89 +165,89 @@ const MtrStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => vo
             );
           })}
         </div>
+      </div>
 
-        <div className="mtr-panel-body" role="tabpanel">
-          {etas?.delayed && (
-            <p className="mtr-delay">
-              <Icon name="warning" size={16} />
-              {info.zh}而家有延誤
-            </p>
-          )}
-          {!fresh && !error && <p className="muted mtr-loading">載入中…</p>}
-          {!fresh && error && <p className="eta-failed">載入失敗：{error}</p>}
-          {fresh && (failed || !etas) && <p className="eta-failed">{info.zh}資料暫時攞唔到，稍後會自動再試</p>}
+      <div className="mtr-panel-body" role="tabpanel">
+        {etas?.delayed && (
+          <p className="mtr-delay">
+            <Icon name="warning" size={16} />
+            {info.zh}而家有延誤
+          </p>
+        )}
+        {!fresh && !error && <p className="muted mtr-loading">載入中…</p>}
+        {!fresh && error && <p className="eta-failed">載入失敗：{error}</p>}
+        {fresh && (failed || !etas) && <p className="eta-failed">{info.zh}資料暫時攞唔到，稍後會自動再試</p>}
 
-          {etas?.noData && <p className="muted mtr-nodata">港鐵暫時冇提供{info.zh}嘅到站時間，列車可能照常行駛。</p>}
-          {etas && !etas.noData && (
-            <>
-              <section className="mtr-next" aria-label="下班車">
-                {/* 「所有班次」放喺同一行右邊，慳一行位（矮螢幕都見到晒兩個方向） */}
-                <div className="mtr-next-head">
-                  <h3>下班車</h3>
-                  {etas.dirs.some((d) => d.trains.length > 1) && (
-                    <button className="mtr-more" aria-expanded={all} onClick={() => onAll(!all)}>
-                      {all ? '收埋班次表' : '所有班次'}
-                      <Icon name="chevron-down" size={16} />
-                    </button>
-                  )}
-                </div>
-                {etas.dirs.map((d) => (
-                  <NextRow key={d.dir} d={d} empty={empty} fmt={etaFormat} />
-                ))}
-              </section>
+        {etas?.noData && <p className="muted mtr-nodata">港鐵暫時冇提供{info.zh}嘅到站時間，列車可能照常行駛。</p>}
+        {etas && !etas.noData && (
+          <>
+            <section className="mtr-next" aria-label="下班車">
+              {/* 「所有班次」放喺同一行右邊，慳一行位（矮螢幕都見到晒兩個方向） */}
+              <div className="mtr-next-head">
+                <h3>下班車</h3>
+                {etas.dirs.some((d) => d.trains.length > 1) && (
+                  <button className="mtr-more" aria-expanded={all} onClick={toggleAll}>
+                    {all ? '收埋班次表' : '所有班次'}
+                    <Icon name="chevron-down" size={16} />
+                  </button>
+                )}
+              </div>
+              {etas.dirs.map((d) => (
+                <NextRow key={d.dir} d={d} empty={empty} fmt={etaFormat} />
+              ))}
+            </section>
 
-              {all && etas.dirs.some((d) => d.trains.length) && (
-                <table className="mtr-table">
-                  <thead>
-                    <tr>
-                      <th>目的地</th>
-                      <th>月台</th>
-                      <th>下班車</th>
-                    </tr>
-                  </thead>
-                  {etas.dirs
-                    .filter((d) => d.trains.length)
-                    .map((d) => (
-                      <tbody key={d.dir}>
-                        <tr className="mtr-table-dir">
-                          <th colSpan={3}>{d.label}</th>
+            {showTable && etas.dirs.some((d) => d.trains.length) && (
+              <table className="mtr-table">
+                <thead>
+                  <tr>
+                    <th>目的地</th>
+                    <th>月台</th>
+                    <th>下班車</th>
+                  </tr>
+                </thead>
+                {etas.dirs
+                  .filter((d) => d.trains.length)
+                  .map((d) => (
+                    <tbody key={d.dir}>
+                      <tr className="mtr-table-dir">
+                        <th colSpan={3}>{d.label}</th>
+                      </tr>
+                      {d.trains.map((t, i) => (
+                        <tr key={i}>
+                          <td>
+                            {t.destName}
+                            {t.viaRacecourse && <small className="muted">（經馬場）</small>}
+                          </td>
+                          <td>
+                            <Plat n={t.plat} />
+                          </td>
+                          <td>
+                            <EtaText t={t} fmt={etaFormat} />
+                          </td>
                         </tr>
-                        {d.trains.map((t, i) => (
-                          <tr key={i}>
-                            <td>
-                              {t.destName}
-                              {t.viaRacecourse && <small className="muted">（經馬場）</small>}
-                            </td>
-                            <td>
-                              <Plat n={t.plat} />
-                            </td>
-                            <td>
-                              <EtaText t={t} fmt={etaFormat} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    ))}
-                </table>
-              )}
-            </>
-          )}
-        </div>
+                      ))}
+                    </tbody>
+                  ))}
+              </table>
+            )}
+          </>
+        )}
+      </div>
 
-        <footer className="mtr-panel-foot">
-          <span className="muted">{fresh ? `最後更新 ${hkClockSec(fresh.at)}` : ' '}</span>
-          <button className="mtr-refresh" onClick={() => {
-            setLoading(true);
-            setNonce((n) => n + 1);
-          }} disabled={loading} aria-label="重新整理">
-            <Icon name="refresh" size={16} className={loading ? 'spin' : undefined} />
-            重新整理
-          </button>
-        </footer>
-      </aside>
-    );
-  },
-);
+      <footer className="mtr-panel-foot">
+        <span className="muted">{fresh ? `最後更新 ${hkClockSec(fresh.at)}` : ' '}</span>
+        <button className="mtr-refresh" onClick={() => {
+          setLoading(true);
+          setNonce((n) => n + 1);
+        }} disabled={loading} aria-label="重新整理">
+          <Icon name="refresh" size={16} className={loading ? 'spin' : undefined} />
+          重新整理
+        </button>
+      </footer>
+    </aside>
+  );
+});
 export default MtrStationSheet;
 
 /** 下班車：一個方向一行（目的地、月台圈、時間）；後面一班細字 */

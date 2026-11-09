@@ -3,6 +3,20 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import MtrMap, { type MtrFocus, type MtrInset } from './MtrMap';
 import MtrStationSheet from './MtrStationSheet';
 
+const NARROW = '(max-width: 767.98px)';
+const isNarrow = () => typeof window !== 'undefined' && window.matchMedia(NARROW).matches;
+/** 手機（窄過 768px）：面板做貼底拉板 */
+function useNarrow() {
+  const [n, setN] = useState(isNarrow);
+  useEffect(() => {
+    const m = window.matchMedia(NARROW);
+    const f = () => setN(m.matches);
+    m.addEventListener('change', f);
+    return () => m.removeEventListener('change', f);
+  }, []);
+  return n;
+}
+
 /**
  * 「路線」分頁 → 港鐵・輕鐵：路綫圖，撳站（或者喺標題列搜尋）睇到站時間（輕鐵之後加）。
  * 面板唔遮成幅圖：量佢遮咗幾多（inset）俾地圖，地圖將個站移去淨低嘅地方。
@@ -12,7 +26,9 @@ export default function RailView({ pick }: { pick: { sta: string } | null }) {
   const [focus, setFocus] = useState<MtrFocus | null>(null);
   // 揀咗邊條綫、展唔展開班次表：轉站都記住
   const [tab, setTab] = useState<string | null>(null);
-  const [all, setAll] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches);
+  const sheet = useNarrow();
+  // 闊螢幕預設展開班次表；手機每次揀新站都由半開開始（方便繼續撳地圖）
+  const [all, setAll] = useState(() => !isNarrow());
   const wrap = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
   const [inset, setInset] = useState<MtrInset>({ right: 0, bottom: 0 });
@@ -22,11 +38,13 @@ export default function RailView({ pick }: { pick: { sta: string } | null }) {
     if (!pick) return;
     setSta(pick.sta);
     setFocus({ sta: pick.sta, zoom: true });
+    if (isNarrow()) setAll(false);
   }, [pick]);
 
   const onStation = useCallback((c: string) => {
     setSta(c);
     setFocus({ sta: c, zoom: false });
+    if (isNarrow()) setAll(false);
   }, []);
   const onClose = useCallback(() => setSta(null), []);
 
@@ -54,7 +72,7 @@ export default function RailView({ pick }: { pick: { sta: string } | null }) {
   return (
     <div className="mtr-wrap" ref={wrap}>
       <MtrMap selected={sta} onStation={onStation} focus={focus} inset={inset} />
-      {sta && <MtrStationSheet ref={panel} sta={sta} onClose={onClose} tab={tab} onTab={setTab} all={all} onAll={setAll} />}
+      {sta && <MtrStationSheet ref={panel} sta={sta} onClose={onClose} tab={tab} onTab={setTab} all={all} onAll={setAll} sheet={sheet} />}
     </div>
   );
 }

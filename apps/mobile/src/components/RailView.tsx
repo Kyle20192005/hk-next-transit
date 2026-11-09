@@ -7,7 +7,9 @@ import { MtrStationSheet } from './MtrStationSheet';
 
 const NO_INSET: MtrInset = { right: 0, bottom: 0 };
 /** 手機面板最高幾多（同網頁 CSS 一樣）：矮螢幕都要放得晒下班車，最少留 120 地圖，最高 380（或者 58%，邊個大用邊個） */
-const panelMax = (h: number) => (h ? Math.max(h * 0.58, Math.min(h - 120, 380)) : '58%');
+const panelMax = (h: number) => (h ? Math.max(h * 0.58, Math.min(h - 120, 380)) : 380);
+/** 拉板全開時頂部留幾多地圖 */
+const FULL_GAP = 56;
 
 /**
  * 「路線」分頁 → 港鐵（同網頁 components/rail/RailView.tsx 一樣）：路綫圖 + 到站面板 + 搜尋結果。
@@ -26,15 +28,21 @@ export function RailView({ query, onPicked }: { query: string; onPicked: () => v
   const [inset, setInset] = useState<MtrInset>({ right: 0, bottom: 0 });
   const results = useMemo(() => searchMtrStations(query), [query]);
 
-  const onStation = useCallback((c: string) => {
-    setSta(c);
-    setFocus({ sta: c, zoom: false });
-  }, []);
+  // 手機每次揀新站都由半開開始（方便繼續撳地圖）
+  const onStation = useCallback(
+    (c: string) => {
+      setSta(c);
+      setFocus({ sta: c, zoom: false });
+      if (!wide) setAll(false);
+    },
+    [wide],
+  );
   const pick = (c: string) => {
     Keyboard.dismiss();
     onPicked();
     setSta(c);
     setFocus({ sta: c, zoom: true });
+    if (!wide) setAll(false);
   };
   const close = useCallback(() => setSta(null), []);
 
@@ -56,7 +64,8 @@ export function RailView({ query, onPicked }: { query: string; onPicked: () => v
           all={all}
           onAll={setAll}
           onLayout={onPanelLayout}
-          style={wide ? { position: 'absolute', top: 12, right: 12, bottom: 12, width: 380 } : { position: 'absolute', left: 8, right: 8, bottom: 8, maxHeight: panelMax(box.h) }}
+          sheet={wide ? null : { full: Math.max(200, box.h - FULL_GAP), peekMax: panelMax(box.h) }}
+          style={wide ? { position: 'absolute', top: 12, right: 12, bottom: 12, width: 380 } : { position: 'absolute', left: 0, right: 0, bottom: 0 }}
         />
       )}
       {query.trim() !== '' && (
