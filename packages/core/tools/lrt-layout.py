@@ -105,9 +105,10 @@ put('友愛', XY, YT + 3.2, 'v')
 put('兆麟', ZX, YT + 4.8, 'v')
 put('三聖', ZX + 1.6, YT + 5.6, 'h')
 DS2 = ZX + YT + 5.6            # 豐景園 → 兆禧：x + y = DS2
-for i, n in enumerate(['豐景園', '海皇路', '兆禧']): put(n, ZX - 1.0 - i, DS2 - (ZX - 1.0 - i), 'd1')
-YF = DS2 - XW + 0.8            # 屯門碼頭
-put('屯門碼頭', XW, YF, 'v')
+XV = ZX - 0.8                  # 豐景園 → 兆禧 打直
+for n, y in [('豐景園', 37.0), ('海皇路', 38.0), ('兆禧', 39.0)]: put(n, XV, y, 'v')
+YF = 40.0                      # 屯門碼頭（橫軸：主綫由西面、兆禧嗰邊由東面入站，號碼排兩行）
+put('屯門碼頭', (XW + XV) / 2, YF, 'h')
 for i, n in enumerate(['青雲', '青山村', '龍門', '輕鐵車廠', '蝴蝶', '美樂']): put(n, XW, 28.2 + i * (YF - 1.9 - 28.2) / 5, 'v')
 for i, n in enumerate(['鳳地', '景峰', '新墟', '何福堂']): put(n, KX, KY + 2.5 + i * (YP - 1.0 - KY - 2.5) / 3, 'v')
 
@@ -140,8 +141,9 @@ BENDS = {
     ('市中心', '友愛'): [(ZX, YT + 2.4), (XY, YT + 2.4)],
     ('安定', '友愛'): [(ZX, YT + 4.0), (XY, YT + 4.0)],
     ('兆麟', '三聖'): [(ZX, YT + 5.6)],
-    ('兆麟', '豐景園'): [(ZX, YT + 5.6)],
-    ('兆禧', '屯門碼頭'): [(XW, DS2 - XW)],
+    ('兆麟', '豐景園'): [(ZX, YT + 5.6), (XV, YT + 6.4)],
+    ('兆禧', '屯門碼頭'): [(XV, YF)],
+    ('美樂', '屯門碼頭'): [(XW, YF)],
 }
 # 唔停站經過（615 青松 → 兆康 經麒麟唔停）
 VIA = {('青松', '兆康'): ['麒麟'], ('鳴琴', '建安'): ['J505S'], ('山景(南)', '建安'): ['J505S'],
@@ -162,8 +164,10 @@ CHAIN_ORDER = [
     (['石排', 'J505N', '鳴琴'], ['610', '615', '615P', '505']),
     (['鳴琴', '青雲', '青山村', '龍門', '輕鐵車廠', '蝴蝶', '美樂', '屯門碼頭'], ['610', '615', '615P']),
 ]
-# 終點站路線號碼：extend = 色綫穿過個站再散開；split = 穿過個站之後左右分兩邊打直排；n／s／e／w = 放喺站嗰邊（^ = 由站向上排）
-CAPS = {'元朗': 'extend', '三聖': 'extend', '屯門碼頭': 'split', '友愛': 'e', '田景': 's', '兆康': 'e', '天逸': 'e', '天水圍': 'w^'}
+# 終點站路線號碼（似港鐵輕鐵圖）：
+#   stack = 盡頭站：色綫入站前散開，每條駁住自己個號碼，成排號碼就係個站（白色膠囊包住）；兩邊都有綫入站就排兩行
+#   end   = 中途終點站：喺度完嘅綫，號碼黐住站膠囊嗰頭（end+／end- 指定邊頭）
+CAPS = {'元朗': 'stack', '三聖': 'stack', '屯門碼頭': 'stack', '友愛': 'end-', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'end'}
 # 站名位置
 LABELS = {}
 for n in ['天逸', '天富', '頌富', '天瑞', '樂湖', '天耀']: LABELS[n] = 'w'
@@ -174,11 +178,11 @@ for n in ['鍾屋村', '泥圍', '藍地']: LABELS[n] = 'se'
 LABELS.update({'兆康': 'w', '麒麟': 'n', '青松': 'n', '建生': 'n', '田景': 'n', '良景': 'w', '新圍': 'w', '大興(北)': 'n', '大興(南)': 's',
                '銀圍': 'n', '屯門醫院': 'se', '澤豐': 'se', '蔡意橋': 'e', '河田': 'e', '屯門': 'e', '石排': 'w', '鳴琴': 'w',
                '山景(北)': 'e', '山景(南)': 'e', '建安': 'e', '市中心': 'w', '杯渡': 's', '友愛': 'w', '安定': 'e', '兆麟': 'e',
-               '三聖': 'n', '屯門碼頭': 'w'})
-LABELS.update({'元朗': 'nw', '屯門醫院': 'nw', '兆麟': 'w', '坑尾村': 'w'})
+               '三聖': 'n', '屯門碼頭': 's'})
+LABELS.update({'元朗': 'n', '屯門醫院': 'nw', '兆麟': 'w', '坑尾村': 'w', '天逸': 'w', '兆康': 'e', '三聖': 'n'})
 for n in ['青雲', '青山村', '龍門', '輕鐵車廠', '蝴蝶', '美樂']: LABELS[n] = 'w'
 for n in ['鳳地', '景峰', '新墟', '何福堂']: LABELS[n] = 'e'
-for n in ['豐景園', '海皇路', '兆禧']: LABELS[n] = 'se'
+for n in ['豐景園', '海皇路', '兆禧']: LABELS[n] = 'e'
 # 圖例（右下角空位）
 LEGEND = (18.6, 30.6, 11.6, 5.4)
 LEGEND_ROWS = [('505', '三聖 ↔ 兆康'), ('507', '屯門碼頭 ↔ 田景'), ('610', '屯門碼頭 ↔ 元朗'), ('614', '屯門碼頭 ↔ 元朗'), ('614P', '屯門碼頭 ↔ 兆康'),
@@ -528,6 +532,7 @@ for s in STATIONS:
 def marker_box(s):
     m = markers[s]
     if m['kind'] == 'dot': return (m['x'] - m['r'], m['y'] - m['r'], 2 * m['r'], 2 * m['r'])
+    if m['kind'] == 'box': return (m['x'] - m['w'] / 2, m['y'] - m['h'] / 2, m['w'], m['h'])
     a = math.radians(m['angle'])
     hx = abs(math.cos(a)) * m['len'] / 2 + abs(math.sin(a)) * m['thick'] / 2
     hy = abs(math.sin(a)) * m['len'] / 2 + abs(math.cos(a)) * m['thick'] / 2
@@ -540,66 +545,73 @@ for name, mode in CAPS.items():
     s = sid(name)
     rs = [r for r in ORDER if r in ends.get(s, set())]
     if not rs: errors.append(f'{name} 唔係終點站'); continue
-    if mode == 'extend':
-        items = []
-        for r in rs:
-            (pt, d) = lane_end[(s, r)]
-            out = (-d[0], -d[1])
-            nrm = left(out)
-            items.append(((pt[0] - P[s][0]) * nrm[0] + (pt[1] - P[s][1]) * nrm[1], r, pt, out, nrm))
-        items.sort(key=lambda x: -x[0])
-        out, nrm = items[0][3], items[0][4]
-        vertical = abs(out[0]) < 1e-6
-        gap = (CAP_W if vertical else CAP_H) + 0.08
-        k = len(items)
-        c0 = sum(x[0] for x in items) / k
-        e0 = THICK / 2 + 0.2
-        cos_ = [c0 + ((k - 1) / 2 - i) * gap for i in range(k)]
-        far = e0 + max(abs(co - it[0]) for co, it in zip(cos_, items)) + 0.2
-        for co, (off, r, pt, _, _) in zip(cos_, items):
-            dl = co - off
-            p0 = (pt[0], pt[1])
-            p3 = (pt[0] + out[0] * far + nrm[0] * dl, pt[1] + out[1] * far + nrm[1] * dl)
-            if abs(dl) > 1e-6:
-                p1 = (pt[0] + out[0] * e0, pt[1] + out[1] * e0, 0.2)
-                p2 = (pt[0] + out[0] * (e0 + abs(dl)) + nrm[0] * dl, pt[1] + out[1] * (e0 + abs(dl)) + nrm[1] * dl, 0.2)
-                pts = [p0, p1, p2, p3]
-            else:
-                pts = [p0, p3]
-            cap_lanes.append((r, pts))
-            h = CAP_H / 2 if vertical else CAP_W / 2
-            caps.append({'route': r, 'x': round(p3[0] + out[0] * h, 4), 'y': round(p3[1] + out[1] * h, 4)})
-    elif mode == 'split':
-        items = []
-        for r in rs:
-            (pt, d) = lane_end[(s, r)]
-            out = (-d[0], -d[1])
-            nrm = left(out)
-            items.append(((pt[0] - P[s][0]) * nrm[0] + (pt[1] - P[s][1]) * nrm[1], r, pt, out, nrm))
-        out, nrm = items[0][3], items[0][4]
-        c0 = sum(x[0] for x in items) / len(items)
-        e0 = THICK / 2 + 0.42
-        for grp, sign in (([x for x in items if x[0] > c0], 1), ([x for x in items if x[0] <= c0], -1)):
-            grp.sort(key=lambda x: -x[0] * sign)        # 內圈（最外邊嗰條綫）先轉
-            end = max(x[0] * sign for x in grp) + 0.35
-            for rank, (off, r, pt, _, _) in enumerate(grp):
-                t = e0 + rank * (CAP_H + 0.08)
-                p1 = (pt[0] + out[0] * t, pt[1] + out[1] * t, 0.2)
-                k = end * sign - off
-                p2 = (p1[0] + nrm[0] * k, p1[1] + nrm[1] * k)
-                cap_lanes.append((r, [(pt[0], pt[1]), p1, p2]))
-                caps.append({'route': r, 'x': round(p2[0] + nrm[0] * sign * CAP_W / 2, 4), 'y': round(p2[1] + nrm[1] * sign * CAP_W / 2, 4)})
+    ax = AX[AXIS[s]]
+    N = left(ax)
+    vertN = abs(N[1]) > abs(N[0])
+    capN, capA = (CAP_H, CAP_W) if vertN else (CAP_W, CAP_H)   # 號碼膠囊沿法綫、沿軸嘅長度
+    px, py = P[s]
+    if mode == 'stack':
+        groups = {1: [], -1: []}
+        for lane in lanes:
+            r, pts, (u, v), _ = lane
+            if s not in (u, v): continue
+            sd = side_of[(s, frozenset((u, v)))]
+            q = pts[0] if u == s else pts[-1]
+            groups[sd].append(((q[0] - px) * N[0] + (q[1] - py) * N[1], r, lane, u == s))
+        both = groups[1] and groups[-1]
+        boxes = []
+        for sd, items in groups.items():
+            if not items: continue
+            items.sort(key=lambda x: -x[0])
+            k = len(items)
+            pitch = capN + 0.06
+            c0 = sum(x[0] for x in items) / k
+            tc = (capA / 2 + 0.03) if both else 0.0
+            a = (ax[0] * sd, ax[1] * sd)
+            def at(o, t): return (px + N[0] * o + a[0] * t, py + N[1] * o + a[1] * t)
+            for i, (off, r, lane, first) in enumerate(items):
+                ci = c0 + ((k - 1) / 2 - i) * pitch
+                dl = ci - off
+                t1 = tc + capA / 2 + abs(dl)
+                pts = lane[1]
+                cut = at(off, t1 + 0.12)
+                if first: pts[0] = cut
+                else: pts[-1] = cut
+                if abs(dl) > 1e-6:
+                    seg = [cut, (*at(off, t1), 0.15), (*at(ci, tc + capA / 2), 0.15), at(ci, tc)]
+                else:
+                    seg = [cut, at(ci, tc)]
+                cap_lanes.append((r, seg))
+                cx, cy = at(ci, tc)
+                caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4), 'sta': s})
+                boxes.append((cx, cy))
+        # 白色站膠囊包住所有號碼
+        w = (max(b[0] for b in boxes) - min(b[0] for b in boxes)) + CAP_W + 0.14
+        h = (max(b[1] for b in boxes) - min(b[1] for b in boxes)) + CAP_H + 0.14
+        cx = (max(b[0] for b in boxes) + min(b[0] for b in boxes)) / 2
+        cy = (max(b[1] for b in boxes) + min(b[1] for b in boxes)) / 2
+        markers[s] = {'kind': 'box', 'x': round(cx, 4), 'y': round(cy, 4), 'w': round(w, 4), 'h': round(h, 4)}
     else:
-        bx, by, bw, bh = marker_box(s)
-        k = len(rs)
-        for i, r in enumerate(rs):
-            if mode in ('s', 'n'):
-                cy = (by + bh + 0.12 + CAP_H / 2) if mode == 's' else (by - 0.12 - CAP_H / 2)
-                cx = bx + bw / 2 + (i - (k - 1) / 2) * (CAP_W + 0.08)
-            else:
-                cx = (bx + bw + 0.12 + CAP_W / 2) if mode[0] == 'e' else (bx - 0.12 - CAP_W / 2)
-                cy = by + bh / 2 + ((i - (k - 1) / 2) if mode[-1] != '^' else (i - (k - 1))) * (CAP_H + 0.08)
-            caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4)})
+        m = markers[s]
+        half = m['r'] if m['kind'] == 'dot' else m['len'] / 2
+        c = (m['x'] - px) * N[0] + (m['y'] - py) * N[1]
+        offs = {}
+        for e in adj[s]:
+            for r in edges[e]:
+                if r in rs: offs.setdefault(r, []).append(side_of[(s, e)] * (lane_port[(s, e, r)] + shift[s] * side_of[(s, e)]))
+        ends_ = {1: [], -1: []}
+        for r in rs:
+            o = sum(offs[r]) / len(offs[r])
+            end = int(mode[-1] + '1') if mode[-1] in '+-' else (1 if o >= c else -1)
+            ends_[end].append((o, r))
+        for end, items in ends_.items():
+            items.sort(key=lambda x: -x[0])
+            k = len(items)
+            for j, (o, r) in enumerate(items):
+                on = c + end * (half + capN / 2 - 0.08)
+                oa = ((k - 1) / 2 - j) * (capA + 0.06)
+                cx, cy = px + N[0] * on + ax[0] * oa, py + N[1] * on + ax[1] * oa
+                caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4), 'sta': s})
 def cap_box(c): return (c['x'] - CAP_W / 2, c['y'] - CAP_H / 2, CAP_W, CAP_H)
 
 # 單方向箭咀：每條單向色綫最長嗰段直綫中間一個
@@ -622,6 +634,12 @@ for s in STATIONS:
     zh, en = STOPS[s]
     side = LABELS.get(zh, 's')
     bx, by, bw, bh = marker_box(s)
+    for c in caps:                 # 黐住個站嘅號碼都計埋，站名喺佢哋外面
+        if c['sta'] != s: continue
+        x0, y0, w0, h0 = cap_box(c)
+        x1, y1 = max(bx + bw, x0 + w0), max(by + bh, y0 + h0)
+        bx, by = min(bx, x0), min(by, y0)
+        bw, bh = x1 - bx, y1 - by
     gap = 0.1
     cx, cy = bx + bw / 2, by + bh / 2
     w = max(text_w(zh, ZH), text_w(en, EN, True))
@@ -664,9 +682,9 @@ for s, lb in labels.items():
         if t > s and overlap(lb['box'], lt['box'], 0.12, 0.06): errors.append(f'站名「{nm}」同「{STOPS[t][0]}」太近')
 for i, c in enumerate(caps):
     for t in STATIONS:
-        if overlap(cap_box(c), marker_box(t), 0.02, 0.02): errors.append(f'{c["route"]} 號碼撞到站 {STOPS[t][0]}')
-    for r, pts, *_ in lanes:
-        if poly_hits(pts, cap_box(c), G / 2): errors.append(f'{c["route"]} 號碼撞到 {r} 綫'); break
+        if t != c['sta'] and overlap(cap_box(c), marker_box(t), 0.02, 0.02): errors.append(f'{c["route"]} 號碼撞到站 {STOPS[t][0]}')
+    for r, pts, uv, _ in lanes:
+        if c['sta'] not in uv and poly_hits(pts, cap_box(c), G / 2): errors.append(f'{c["route"]} 號碼撞到 {r} 綫'); break
     for d in caps[i + 1:]:
         if overlap(cap_box(c), cap_box(d), 0.02, 0.02): errors.append(f'{c["route"]} 同 {d["route"]} 號碼重疊')
 lx, ly, lw, lh = LEGEND
@@ -731,6 +749,9 @@ if '--svg' in sys.argv:
     for s, m in markers.items():
         if m['kind'] == 'dot':
             o.append(f'<circle cx="{m["x"]}" cy="{m["y"]}" r="{m["r"]}" fill="#fff" stroke="{INK}" stroke-width="0.045"/>')
+        elif m['kind'] == 'box':
+            x, y, w, h = m['x'], m['y'], m['w'], m['h']
+            o.append(f'<rect x="{x - w / 2:.4f}" y="{y - h / 2:.4f}" width="{w}" height="{h}" rx="{min(w, h) / 2:.4f}" fill="#fff" stroke="{INK}" stroke-width="0.045"/>')
         else:
             x, y, L, t = m['x'], m['y'], m['len'], m['thick']
             o.append(f'<rect x="{x - L / 2:.4f}" y="{y - t / 2:.4f}" width="{L}" height="{t}" rx="{t / 2}" fill="#fff" stroke="{INK}" stroke-width="0.045" transform="rotate({m["angle"]} {x} {y})"/>')
