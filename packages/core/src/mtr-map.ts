@@ -198,24 +198,35 @@ export function mtrLabelPos(box: MtrMapStation['box'], side: LabelSide, gap = 0.
 }
 
 /**
- * 轉乘輕鐵（core rail-xfer.ts）：由站向 MTR_MAP_XFER_DIR 方向拉一條出閘虛綫（同尖沙咀 ↔ 尖東一樣），
- * 駁一個站圈，再伸出一小段輕鐵色綫（LRT_BRAND）。方向同長度由 tools/mtr-layout.py 寫入，檢查過唔撞綫、唔撞字。
+ * 轉乘輕鐵（core rail-xfer.ts）：由站向 MTR_MAP_XFER_DIR 方向拉一條出閘虛綫（三節，兩頭貼住站圈），
+ * 駁一個站圈，再伸出一小段輕鐵色綫（LRT_BRAND），色綫尾寫「輕鐵」。方向同尺寸由 tools/mtr-layout.py 寫入，檢查過唔撞綫、唔撞字。
  */
 export const MTR_MAP_XFER_DIR: Readonly<Record<string, LabelSide>> = { TUM: 'e', SIH: 'e', TIS: 's', YUL: 's' };
-/** 虛綫長（兩個站圈之間）、色綫露出幾長（站圈外面） */
-export const MTR_MAP_XFER = { dash: 0.52, stub: 0.35 } as const;
-const XFER_U: Record<string, readonly [number, number]> = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0], ne: [Math.SQRT1_2, -Math.SQRT1_2], nw: [-Math.SQRT1_2, -Math.SQRT1_2], se: [Math.SQRT1_2, Math.SQRT1_2], sw: [-Math.SQRT1_2, Math.SQRT1_2] };
-/** 轉乘輕鐵虛綫：a → b 虛綫（兩個站圈邊），c = 外面站圈中心，c → e 輕鐵色綫（畫喺站圈底） */
-export function mtrXferLink(s: Pick<MtrMapStation, 'code' | 'box'>): { a: Pt; b: Pt; c: Pt; e: Pt } | null {
+/** dash = 虛綫長（兩個站圈之間），on／off = 每節長、隔幾遠；stub = 色綫露出幾長；font、gap = 「輕鐵」字大細、離色綫尾幾遠 */
+export const MTR_MAP_XFER = { dash: 0.42, on: 0.1, off: 0.06, stub: 0.2, font: 0.24, gap: 0.08 } as const;
+const XFER_U: Record<string, readonly [number, number]> = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
+/**
+ * 轉乘輕鐵虛綫：a → b 虛綫（兩個站圈邊），c = 外面站圈中心，c → e 輕鐵色綫（畫喺站圈底，圓頭）；
+ * t = 「輕鐵」字（x、y 係基線，沿住虛綫方向擺喺色綫尾：打橫喺旁邊，打直喺上／下面）
+ */
+export function mtrXferLink(s: Pick<MtrMapStation, 'code' | 'box'>): { a: Pt; b: Pt; c: Pt; e: Pt; t: { x: number; y: number; anchor: 'start' | 'middle' | 'end' } } | null {
   const dir = MTR_MAP_XFER_DIR[s.code];
-  if (!dir) return null;
-  const [ux, uy] = XFER_U[dir]!;
+  const u = dir && XFER_U[dir];
+  if (!u) return null;
   const px = s.box.x + s.box.w / 2;
   const py = s.box.y + s.box.h / 2;
-  const at = (k: number): Pt => [px + ux * k, py + uy * k];
+  const at = (k: number): Pt => [px + u[0] * k, py + u[1] * k];
   const R = MTR_MAP_DOT_R;
-  const { dash, stub } = MTR_MAP_XFER;
-  return { a: at(R), b: at(R + dash), c: at(2 * R + dash), e: at(3 * R + dash + stub) };
+  const { dash, stub, font, gap } = MTR_MAP_XFER;
+  const c = at(2 * R + dash);
+  const e = at(3 * R + dash + stub);
+  const off = MTR_MAP_GAP / 2 + gap;
+  const t =
+    dir === 'e' ? { x: e[0] + off, y: c[1] + font * 0.36, anchor: 'start' as const }
+    : dir === 'w' ? { x: e[0] - off, y: c[1] + font * 0.36, anchor: 'end' as const }
+    : dir === 's' ? { x: c[0], y: e[1] + off + font * 0.86, anchor: 'middle' as const }
+    : { x: c[0], y: e[1] - off - font * 0.14, anchor: 'middle' as const };
+  return { a: at(R), b: at(R + dash), c, e, t };
 }
 
 /** 點 p 喺唔喺線段 a–b 上（容差 0.01） */

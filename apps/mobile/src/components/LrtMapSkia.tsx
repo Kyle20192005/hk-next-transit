@@ -46,16 +46,16 @@ function drawMarker(c: SkCanvas, s: LrtMapStation, fill = '#ffffff') {
   c.restore();
 }
 
-/** 轉乘港鐵（同網頁 XferLink 一樣）：a → b 出閘虛綫，c 站圈，c → e 屯馬綫色綫（黑邊，喺站圈底） */
-const TML = mtrLine('TML')!.color;
+/** 轉乘港鐵（同網頁 XferLink 一樣）：a → b 出閘虛綫（三節），c 站圈，c → e 屯馬綫色綫（冇黑邊，喺站圈底），label =「屯馬綫」字（圖例冇） */
+const TML = mtrLine('TML')!;
 type P2 = readonly [number, number];
-function drawXfer(c: SkCanvas, l: readonly P2[]) {
+function drawXfer(c: SkCanvas, l: readonly P2[], label?: { at: readonly [number, number, 'start' | 'middle' | 'end']; t: Theme }) {
   const [a, b, o, e] = l as [P2, P2, P2, P2];
-  c.drawLine(a[0], a[1], b[0], b[1], makePaint(INK, { stroke: 0.05, dash: [0.1, 0.07] }));
-  c.drawLine(o[0], o[1], e[0], e[1], makePaint(INK, { stroke: S.lane + 2 * S.casing, cap: StrokeCap.Round }));
-  c.drawLine(o[0], o[1], e[0], e[1], makePaint(TML, { stroke: S.lane - S.sep, cap: StrokeCap.Round }));
+  c.drawLine(a[0], a[1], b[0], b[1], makePaint(INK, { stroke: 0.05, dash: [S.xfOn, S.xfOff] }));
+  c.drawLine(o[0], o[1], e[0], e[1], makePaint(TML.color, { stroke: S.xfLine, cap: StrokeCap.Round }));
   c.drawCircle(o[0], o[1], S.dot, makePaint('#ffffff'));
   c.drawCircle(o[0], o[1], S.dot, makePaint(INK, { stroke: S.ring }));
+  if (label) drawText(c, [{ text: TML.zh, size: S.xfFont, weight: 700, color: label.t.text }], label.at[0], label.at[1], label.at[2], { halo: label.t.card });
 }
 
 function drawLegend(c: SkCanvas, t: Theme) {
@@ -81,7 +81,7 @@ function drawLegend(c: SkCanvas, t: Theme) {
     const x = 0.4 + (i % L.cols) * 5.4;
     const y = 1.3 + Math.floor(i / L.cols) * 0.62;
     if (r) drawCap(c, r, x + S.capW / 2, y);
-    else drawXfer(c, [[x, y], [x + 0.3, y], [x + 0.3 + S.dot, y], [x + S.capW - 0.065, y]]);
+    else drawXfer(c, [[x, y], [x + 0.22, y], [x + 0.22 + S.dot, y], [x + S.capW - S.xfLine / 2, y]]);
     drawText(c, [{ text: zh, size: 0.26, weight: 600, color: t.text }], x + S.capW + 0.2, y + 0.09, 'start');
   });
   c.restore();
@@ -113,7 +113,7 @@ function recordMap(t: Theme): SkPicture {
         c.restore();
       }
       for (const s of LRT_MAP_STATIONS) {
-        if (s.xl) drawXfer(c, s.xl);
+        if (s.xl) drawXfer(c, s.xl, s.xt && { at: s.xt, t });
         drawMarker(c, s);
         for (const cap of LRT_MAP_CAPS) if (cap.sta === s.id) drawCap(c, cap.r, cap.x, cap.y);
         drawText(c, [{ text: lrtStopName(s.id), size: S.zh, weight: 700, color: t.text }], s.lx, s.zy, s.an, { halo: t.card });

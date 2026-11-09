@@ -14,6 +14,7 @@ import {
   MTR_MAP_TICK,
   MTR_MAP_VIEW,
   MTR_MAP_WATER,
+  MTR_MAP_XFER,
   mtrLabelPos,
   mtrLine,
   mtrLinePathD,
@@ -46,7 +47,7 @@ const NEAR = '#2f6fd6';
 function drawStation(c: SkCanvas, s: MtrMapStation, t: Theme) {
   // 轉乘輕鐵（core rail-xfer.ts）：先畫，站圈喺上面
   const x = mtrXferLink(s);
-  if (x) drawXfer(c, x.a, x.b, x.c, x.e);
+  if (x) drawXfer(c, x.a, x.b, x.c, x.e, { ...x.t, t });
   const ring = makePaint(RING);
   const fill = makePaint('#ffffff');
   for (const p of s.pts) c.drawCircle(p[0], p[1], MTR_MAP_DOT_R, ring);
@@ -66,12 +67,13 @@ function drawStation(c: SkCanvas, s: MtrMapStation, t: Theme) {
   drawText(c, [{ text: mtrStationEn(s.code), size: 0.18, weight: 500, color: t.muted }], lp.x, zhY + 0.25, lp.anchor, { halo: t.card });
 }
 
-/** 轉乘輕鐵（同網頁 XferLink 一樣）：a → b 出閘虛綫，c 站圈，c → e 輕鐵色綫（喺站圈底） */
-function drawXfer(c: SkCanvas, a: Pt, b: Pt, o: Pt, e: Pt) {
-  c.drawLine(a[0], a[1], b[0], b[1], makePaint(RING, { stroke: 0.06, dash: [0.12, 0.08] }));
+/** 轉乘輕鐵（同網頁 XferLink 一樣）：a → b 出閘虛綫（三節），c 站圈，c → e 輕鐵色綫（喺站圈底），label =「輕鐵」字（圖例冇） */
+function drawXfer(c: SkCanvas, a: Pt, b: Pt, o: Pt, e: Pt, label?: { x: number; y: number; anchor: 'start' | 'middle' | 'end'; t: Theme }) {
+  c.drawLine(a[0], a[1], b[0], b[1], makePaint(RING, { stroke: 0.06, dash: [MTR_MAP_XFER.on, MTR_MAP_XFER.off] }));
   c.drawLine(o[0], o[1], e[0], e[1], makePaint(LRT_BRAND.color, { stroke: MTR_MAP_GAP, cap: StrokeCap.Round }));
   c.drawCircle(o[0], o[1], MTR_MAP_DOT_R, makePaint(RING));
   c.drawCircle(o[0], o[1], MTR_MAP_DOT_R - MTR_MAP_RING, makePaint('#ffffff'));
+  if (label) drawText(c, [{ text: LRT_BRAND.zh, size: MTR_MAP_XFER.font, weight: 700, color: label.t.text }], label.x, label.y, label.anchor, { halo: label.t.card });
 }
 
 /** 圖例（同網頁 MapLegend 一樣）：綫兩欄，下面六個符號 */
@@ -124,7 +126,7 @@ function drawLegend(c: SkCanvas, t: Theme) {
       c.drawLine(b - MTR_MAP_GAP / 2, y, b + MTR_MAP_GAP / 2, y, makePaint(MTR_LINES[1]!.color, { stroke: MTR_MAP_TICK.width }));
     } else if (sym.kind === 'link') c.drawLine(x, y, x + 0.8, y, makePaint(RING, { stroke: 0.05 }));
     else if (sym.kind === 'walk') c.drawLine(x, y, x + 0.8, y, makePaint(RING, { stroke: 0.06, dash: [0.12, 0.08] }));
-    else if (sym.kind === 'lrt') drawXfer(c, [x, y], [x + 0.3, y], [x + 0.3 + R, y], [x + 0.8 - MTR_MAP_GAP / 2, y]);
+    else if (sym.kind === 'lrt') drawXfer(c, [x, y], [x + 0.26, y], [x + 0.26 + R, y], [x + 0.8 - MTR_MAP_GAP / 2, y]);
     else c.drawLine(x, y, x + 0.8, y, makePaint(MTR_LINES.find((l) => l.code === 'EAL')!.color, { stroke: MTR_MAP_GAP, dash: [0.22, 0.14] }));
     label(x + 1.05, y + 0.1, sym.zh, sym.en);
   });

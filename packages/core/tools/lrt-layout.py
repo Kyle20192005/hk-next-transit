@@ -35,10 +35,13 @@ THICK = 0.26      # 膠囊厚度（沿軸）
 DOT = 0.14        # 單一色綫站圓點半徑
 ZH, EN = 0.3, 0.17
 CAP_W, CAP_H = 0.78, 0.28   # 路線號碼膠囊
-XF_DASH, XF_STUB = 0.44, 0.32   # 轉乘港鐵：出閘虛綫長（站同外面站圈之間）、屯馬綫色綫露出幾長
+# 轉乘港鐵：出閘虛綫長（三節 0.08、中間隔 0.06，兩頭貼住站同外面站圈）、屯馬綫色綫露出幾長同闊度（唔要黑邊）、「屯馬綫」字大細、離色綫尾幾遠
+XF_DASH, XF_ON, XF_OFF, XF_STUB, XF_LINE, XF_FONT, XF_GAP = 0.36, 0.08, 0.06, 0.14, 0.22, 0.24, 0.08
 XF_COLOR = re.search(r"code: 'TML'[^}]*color: '(#\w+)'", open(os.path.join(ROOT, 'src/mtr.ts')).read()).group(1)   # 屯馬綫色
 # 由站向邊個方向拉出去（最後方向；揀冇綫、冇字嗰邊，下面檢查）
 XFER_DIR = {'天水圍': 's', '元朗': 'e', '兆康': 'n', '屯門': 'n'}
+# 「屯馬綫」字預設喺色綫尾（沿住虛綫方向）；兆康上面係「麒麟」，改擺喺色綫右邊（e／w = 色綫中間旁邊）
+XFER_TEXT = {'兆康': 'e'}
 # 港鐵轉乘站（core rail-xfer.ts MTR_LRT_XFER）
 XFER = set(re.findall(r"\w+: '(\d+)'", re.search(r'MTR_LRT_XFER[^{]*\{([^}]*)\}', open(os.path.join(ROOT, 'src/rail-xfer.ts')).read()).group(1)))
 INK = '#1d1d1f'
@@ -822,8 +825,32 @@ for s in STATIONS:
     a = {'n': (m['x'], by), 's': (m['x'], by + bh), 'e': (bx + bw, m['y']), 'w': (bx, m['y'])}[XFER_DIR[zh]]
     at = lambda k: (round(a[0] + u[0] * k, 4), round(a[1] + u[1] * k, 4))
     xlinks[s] = (a, at(XF_DASH), at(XF_DASH + DOT), at(XF_DASH + 2 * DOT + XF_STUB))
+def xfer_text(s):
+    """「屯馬綫」字：喺色綫尾，沿住虛綫方向（打橫喺旁邊，打直喺上／下面）→ (x, 基線 y, 對齊, 框)"""
+    _, _, c, e = xlinks[s]; k = XFER_DIR[STOPS[s][0]]; off = XF_LINE / 2 + XF_GAP
+    w, h = 3 * XF_FONT, XF_FONT
+    side = XFER_TEXT.get(STOPS[s][0])
+    if side:
+        u = U4[k]; m = ((c[0] + u[0] * DOT + e[0]) / 2, (c[1] + u[1] * DOT + e[1]) / 2)
+        if side == 'e': return m[0] + off, m[1] + XF_FONT * 0.36, 'start', (m[0] + off, m[1] - h / 2, w, h)
+        return m[0] - off, m[1] + XF_FONT * 0.36, 'end', (m[0] - off - w, m[1] - h / 2, w, h)
+    if k == 'e': return e[0] + off, c[1] + XF_FONT * 0.36, 'start', (e[0] + off, c[1] - h / 2, w, h)
+    if k == 'w': return e[0] - off, c[1] + XF_FONT * 0.36, 'end', (e[0] - off - w, c[1] - h / 2, w, h)
+    if k == 's': return c[0], e[1] + off + XF_FONT * 0.86, 'middle', (c[0] - w / 2, e[1] + off, w, h)
+    return c[0], e[1] - off - XF_FONT * 0.14, 'middle', (c[0] - w / 2, e[1] - off - h, w, h)
+xtexts = {s: xfer_text(s) for s in xlinks}
 for s, (a, b, c, e) in xlinks.items():
     nm = STOPS[s][0]
+    tb = xtexts[s][3]
+    for r, pts in all_lanes:
+        if poly_hits(pts, tb, G / 2 + CASE): errors.append(f'「{nm}」屯馬綫字壓住 {r} 綫'); break
+    for t2, lt in labels.items():
+        if overlap(tb, lt['box'], 0.12, 0.06): errors.append(f'「{nm}」屯馬綫字撞到站名「{STOPS[t2][0]}」')
+    for t2 in STATIONS:
+        if overlap(tb, marker_box(t2), 0.08, 0.08): errors.append(f'「{nm}」屯馬綫字撞到站 {STOPS[t2][0]}')
+    for c2 in caps:
+        if overlap(tb, cap_box(c2), 0.06, 0.06): errors.append(f'「{nm}」屯馬綫字撞到 {c2["route"]} 號碼')
+    if overlap(tb, LEGEND): errors.append(f'「{nm}」屯馬綫字入咗圖例')
     half = DOT + 0.04
     box = (min(a[0], e[0]) - half, min(a[1], e[1]) - half, abs(e[0] - a[0]) + 2 * half, abs(e[1] - a[1]) + 2 * half)
     # 唔計起點（貼住個站）嗰一小段
@@ -847,8 +874,8 @@ for r, pts in all_lanes:
 
 xs = [m['x'] for m in markers.values()] + [l['box'][0] for l in labels.values()] + [l['box'][0] + l['box'][2] for l in labels.values()] + [c['x'] + CAP_W / 2 for c in caps] + [c['x'] - CAP_W / 2 for c in caps] + [lx + lw]
 ys = [m['y'] for m in markers.values()] + [l['box'][1] for l in labels.values()] + [l['box'][1] + l['box'][3] for l in labels.values()] + [c['y'] + CAP_H / 2 for c in caps] + [ly, ly + lh]
-xs += [e[0] + DOT for *_, e in xlinks.values()] + [e[0] - DOT for *_, e in xlinks.values()]
-ys += [e[1] + DOT for *_, e in xlinks.values()] + [e[1] - DOT for *_, e in xlinks.values()]
+xs += [e[0] + DOT for *_, e in xlinks.values()] + [e[0] - DOT for *_, e in xlinks.values()] + [x[3][0] for x in xtexts.values()] + [x[3][0] + x[3][2] for x in xtexts.values()]
+ys += [e[1] + DOT for *_, e in xlinks.values()] + [e[1] - DOT for *_, e in xlinks.values()] + [x[3][1] for x in xtexts.values()] + [x[3][1] + x[3][3] for x in xtexts.values()]
 VIEW = (round(min(xs) - 0.6, 2), round(min(ys) - 0.6, 2), round(max(xs) - min(xs) + 1.2, 2), round(max(ys) - min(ys) + 1.2, 2))
 
 print(f'{len(P)} 個站、{len(edges)} 段路軌、{len(lanes)} 條色綫、{len(caps)} 個號碼、{len(arrows)} 個箭咀；範圍 {VIEW}', file=sys.stderr)
@@ -885,10 +912,9 @@ def cap_svg(x, y, route):
 
 LEGEND_XFER = '轉乘港鐵屯馬綫'
 def xl_svg(a, b, c, e):
-    # 出閘虛綫、屯馬綫色綫（黑邊，喺站圈底）、站圈
-    return (f'<line x1="{a[0]}" y1="{a[1]}" x2="{b[0]}" y2="{b[1]}" stroke="{INK}" stroke-width="0.05" stroke-dasharray="0.1 0.07"/>'
-            f'<line x1="{c[0]}" y1="{c[1]}" x2="{e[0]}" y2="{e[1]}" stroke="{INK}" stroke-width="{G + 2 * CASE}" stroke-linecap="round"/>'
-            f'<line x1="{c[0]}" y1="{c[1]}" x2="{e[0]}" y2="{e[1]}" stroke="{XF_COLOR}" stroke-width="{G - SEP}" stroke-linecap="round"/>'
+    # 出閘虛綫、屯馬綫色綫（冇黑邊，喺站圈底）、站圈
+    return (f'<line x1="{a[0]}" y1="{a[1]}" x2="{b[0]}" y2="{b[1]}" stroke="{INK}" stroke-width="0.05" stroke-dasharray="{XF_ON} {XF_OFF}"/>'
+            f'<line x1="{c[0]}" y1="{c[1]}" x2="{e[0]}" y2="{e[1]}" stroke="{XF_COLOR}" stroke-width="{XF_LINE}" stroke-linecap="round"/>'
             f'<circle cx="{c[0]}" cy="{c[1]}" r="{DOT}" fill="#fff" stroke="{INK}" stroke-width="0.045"/>')
 
 if '--svg' in sys.argv:
@@ -931,7 +957,10 @@ if '--svg' in sys.argv:
     # 圖例：虛綫 + 站圈 + 屯馬綫色綫（同網頁、App 一樣：x 至 x + CAP_W）
     o.append(xl_svg((x, y), (x + 0.3, y), (x + 0.3 + DOT, y), (x + CAP_W - 0.065, y)))
     o.append(f'<text x="{x + CAP_W + 0.2}" y="{y + 0.09}" font-size="0.24" font-weight="600" fill="#111">{LEGEND_XFER}</text>')
-    for s, l4 in xlinks.items(): o.append(xl_svg(*l4))
+    for s, l4 in xlinks.items():
+        o.append(xl_svg(*l4))
+        x, y, an, _ = xtexts[s]
+        o.append(f'<text x="{x:.4f}" y="{y:.4f}" text-anchor="{an}" font-size="{XF_FONT}" font-weight="700" fill="#111">屯馬綫</text>')
     for s, lb in labels.items():
         zh, en = STOPS[s]
         o.append(f'<text x="{lb["x"]}" y="{lb["zhY"]}" text-anchor="{lb["anchor"]}" font-size="{ZH}" font-weight="700" fill="#111">{zh}</text>')
@@ -964,7 +993,9 @@ if '--write' in sys.argv:
             bx, by = min(bx, x0), min(by, y0)
             bw, bh = x1 - bx, y1 - by
         row.update({'hit': [r3(bx), r3(by), r3(bw), r3(bh)], 'lx': r3(lb['x']), 'zy': r3(lb['zhY']), 'ey': r3(lb['enY']), 'an': lb['anchor']})
-        if s in xlinks: row['xl'] = [[r3(p[0]), r3(p[1])] for p in xlinks[s]]
+        if s in xlinks:
+            row['xl'] = [[r3(p[0]), r3(p[1])] for p in xlinks[s]]
+            row['xt'] = [r3(xtexts[s][0]), r3(xtexts[s][1]), xtexts[s][2]]
         st_rows.append(row)
     vx, vy, vw, vh = VIEW
     out = [
@@ -972,14 +1003,14 @@ if '--write' in sys.argv:
         '/** 成幅圖範圍（地圖單位） */',
         f'export const LRT_MAP_VIEW = {{ minX: {vx}, minY: {vy}, width: {vw}, height: {vh} }} as const;',
         '/** 尺寸：色綫闊、色綫之間黑綫、外面黑邊、號碼膠囊、站名字款 */',
-        f'export const LRT_MAP_SIZE = {{ lane: {G}, sep: {SEP}, casing: {CASE}, capW: {CAP_W}, capH: {CAP_H}, ring: 0.045, zh: {ZH}, en: {EN}, dot: {DOT} }} as const;',
+        f'export const LRT_MAP_SIZE = {{ lane: {G}, sep: {SEP}, casing: {CASE}, capW: {CAP_W}, capH: {CAP_H}, ring: 0.045, zh: {ZH}, en: {EN}, dot: {DOT}, xfOn: {XF_ON}, xfOff: {XF_OFF}, xfLine: {XF_LINE}, xfFont: {XF_FONT} }} as const;',
         '/** 色綫（SVG path d，轉角已經係圓弧）：o = 跨過其他綫，最後先畫，有自己黑邊 */',
         'export interface LrtMapLane { r: string; d: string; o?: 1 }',
         f'export const LRT_MAP_LANES: readonly LrtMapLane[] = {js(lane_rows)};',
         '/** 單方向箭咀（白色 V 形，angle 度） */',
         f'export const LRT_MAP_ARROWS: readonly {{ x: number; y: number; a: number }}[] = {js([{"x": r3(a["x"]), "y": r3(a["y"]), "a": a["angle"]} for a in arrows])};',
-        '/** 站：k = dot（圓點）／pill（膠囊，len 長、th 厚、a 角度）／box（盡頭站白色膠囊）；hit = 撳得嘅範圍（包埋號碼）；站名 lx、zy（中文 baseline）、ey（英文）、an（對齊）；xl = 轉乘港鐵（core rail-xfer.ts）：a → b 出閘虛綫、c 外面站圈中心、c → e 屯馬綫色綫 */',
-        'export interface LrtMapStation { id: string; k: "dot" | "pill" | "box"; x: number; y: number; r?: number; len?: number; th?: number; a?: number; w?: number; h?: number; hit: readonly [number, number, number, number]; lx: number; zy: number; ey: number; an: "start" | "middle" | "end"; xl?: readonly (readonly [number, number])[] }',
+        '/** 站：k = dot（圓點）／pill（膠囊，len 長、th 厚、a 角度）／box（盡頭站白色膠囊）；hit = 撳得嘅範圍（包埋號碼）；站名 lx、zy（中文 baseline）、ey（英文）、an（對齊）；xl = 轉乘港鐵（core rail-xfer.ts）：a → b 出閘虛綫、c 外面站圈中心、c → e 屯馬綫色綫（冇黑邊）；xt =「屯馬綫」字（x、基線 y、對齊） */',
+        'export interface LrtMapStation { id: string; k: "dot" | "pill" | "box"; x: number; y: number; r?: number; len?: number; th?: number; a?: number; w?: number; h?: number; hit: readonly [number, number, number, number]; lx: number; zy: number; ey: number; an: "start" | "middle" | "end"; xl?: readonly (readonly [number, number])[]; xt?: readonly [number, number, "start" | "middle" | "end"] }',
         f'export const LRT_MAP_STATIONS: readonly LrtMapStation[] = {js(st_rows)};',
         '/** 終點站路線號碼（膠囊中心） */',
         f'export const LRT_MAP_CAPS: readonly {{ r: string; x: number; y: number; sta: string }}[] = {js([{"r": c["route"], "x": c["x"], "y": c["y"], "sta": c["sta"]} for c in caps])};',

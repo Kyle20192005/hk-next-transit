@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { LRT_BRAND, MTR_LINES, MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LEGEND, MTR_MAP_LEGEND_SYMBOLS, MTR_MAP_LINES, MTR_MAP_LINKS, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName, mtrXferLink, type Pt } from '@hknt/core';
+import { LRT_BRAND, MTR_LINES, MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LEGEND, MTR_MAP_LEGEND_SYMBOLS, MTR_MAP_LINES, MTR_MAP_LINKS, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, MTR_MAP_XFER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName, mtrXferLink, type Pt } from '@hknt/core';
 import Icon from '../Icon';
 import { useMapView, type MapFocus, type MapInset } from './useMapView';
 
@@ -166,14 +166,19 @@ export default function MtrMap({
   );
 }
 
-/** 轉乘輕鐵：a → b 出閘虛綫（同尖沙咀 ↔ 尖東一樣），c 站圈，c → e 輕鐵色綫（喺站圈底） */
-function XferLink({ a, b, c, e }: { a: Pt; b: Pt; c: Pt; e: Pt }) {
+/** 轉乘輕鐵：a → b 出閘虛綫（三節，兩頭貼住站圈），c 站圈，c → e 輕鐵色綫（喺站圈底），t =「輕鐵」字（圖例冇） */
+function XferLink({ a, b, c, e, t }: { a: Pt; b: Pt; c: Pt; e: Pt; t?: { x: number; y: number; anchor: 'start' | 'middle' | 'end' } }) {
   return (
     <g aria-hidden="true">
-      <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} className="mtr-link dashed" />
+      <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} className="mtr-link" strokeWidth={0.06} strokeDasharray={`${MTR_MAP_XFER.on} ${MTR_MAP_XFER.off}`} />
       <line x1={c[0]} y1={c[1]} x2={e[0]} y2={e[1]} stroke={LRT_BRAND.color} strokeWidth={MTR_MAP_GAP} strokeLinecap="round" />
       <circle cx={c[0]} cy={c[1]} r={MTR_MAP_DOT_R} className="mtr-ring" />
       <circle cx={c[0]} cy={c[1]} r={MTR_MAP_DOT_R - MTR_MAP_RING} className="mtr-fill" />
+      {t && (
+        <text x={t.x} y={t.y} textAnchor={t.anchor} className="rail-xfer-name" style={{ fontSize: MTR_MAP_XFER.font }}>
+          {LRT_BRAND.zh}
+        </text>
+      )}
     </g>
   );
 }
@@ -228,7 +233,7 @@ function MapLegend() {
           ];
         } else if (sym.kind === 'link') icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} className="mtr-link" />;
         else if (sym.kind === 'walk') icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} className="mtr-link dashed" />;
-        else if (sym.kind === 'lrt') icon = <XferLink a={[x, y]} b={[x + 0.3, y]} c={[x + 0.3 + R, y]} e={[x + 0.8 - MTR_MAP_GAP / 2, y]} />;
+        else if (sym.kind === 'lrt') icon = <XferLink a={[x, y]} b={[x + 0.26, y]} c={[x + 0.26 + R, y]} e={[x + 0.8 - MTR_MAP_GAP / 2, y]} />;
         else icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} stroke={MTR_LINES.find((l) => l.code === 'EAL')!.color} strokeWidth={MTR_MAP_GAP} className="mtr-line dashed" />;
         return (
           <g key={sym.kind}>

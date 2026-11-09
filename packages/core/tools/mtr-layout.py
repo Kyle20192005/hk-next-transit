@@ -205,12 +205,20 @@ for s, r in rects.items():
 # 轉乘輕鐵（core rail-xfer.ts MTR_LRT_XFER；同 mtr-map.ts mtrXferLink 一樣）：由站向 XFER_DIR 拉出閘虛綫，
 # 駁一個站圈，再伸出一小段輕鐵色綫。檢查：唔撞綫、唔撞站名、唔撞其他站、唔入圖例
 XFER_DIR = dict(TUM='e', SIH='e', TIS='s', YUL='s')
-XF_DASH, XF_STUB = 0.52, 0.35   # 出閘虛綫（0.12 0.08 三節）、輕鐵色綫露出幾長
+# 出閘虛綫長（三節 0.1、中間隔 0.06，兩頭貼住站圈）、輕鐵色綫露出幾長、「輕鐵」字大細、字同色綫尾之間
+XF_DASH, XF_ON, XF_OFF, XF_STUB, XF_FONT, XF_GAP = 0.42, 0.1, 0.06, 0.2, 0.24, 0.08
 U = dict(n=(0,-1), s=(0,1), e=(1,0), w=(-1,0))
 def xfer_link(s):
     x,y,w,h = box_of(s); px, py = x+w/2, y+h/2; u = U[XFER_DIR[s]]
     at = lambda k: (px+u[0]*k, py+u[1]*k)
     return at(DOT_R), at(DOT_R+XF_DASH), at(2*DOT_R+XF_DASH), at(3*DOT_R+XF_DASH+XF_STUB)
+def xfer_text(s):
+    """「輕鐵」字（同 core mtrXferLink 嘅 t 一樣）：喺色綫尾，沿住虛綫方向（打橫喺旁邊，打直喺上／下面）→ 框 (x, y, w, h)"""
+    _, _, c, e = xfer_link(s); k = XFER_DIR[s]; cap = G/2; w = 2*XF_FONT; h = XF_FONT
+    if k == 'e': return (e[0]+cap+XF_GAP, c[1]-h/2, w, h)
+    if k == 'w': return (e[0]-cap-XF_GAP-w, c[1]-h/2, w, h)
+    if k == 's': return (c[0]-w/2, e[1]+cap+XF_GAP, w, h)
+    return (c[0]-w/2, e[1]-cap-XF_GAP-h, w, h)
 def pt_seg(p, a, b):
     dx, dy = b[0]-a[0], b[1]-a[1]; L2 = dx*dx+dy*dy
     k = 0 if L2 == 0 else max(0, min(1, ((p[0]-a[0])*dx+(p[1]-a[1])*dy)/L2))
@@ -218,20 +226,29 @@ def pt_seg(p, a, b):
 for s in XFER_DIR:
     a, b, c, e = xfer_link(s)
     n = 40; samples = [(a[0]+(e[0]-a[0])*i/n, a[1]+(e[1]-a[1])*i/n) for i in range(n+1)]
+    tr = xfer_text(s)
     for code, l in L.items():
         hit = False
         for path in l['paths']:
             for i in range(1, len(path)):
                 # 站附近（自己條綫穿過個站）唔計
                 if any(pt_seg(q, path[i-1], path[i]) < G/2 + DOT_R + 0.05 and d(q, a) > DOT_R + G/2 + 0.1 for q in samples): hit = True
+                if seg_hits_rect(path[i-1], path[i], tr): errs.append(f'{s}「輕鐵」字壓住 {code} 綫')
         if hit: errs.append(f'{s} 轉乘輕鐵虛綫撞到 {code} 綫')
     xs = [q[0] for q in (a, e)]; ys = [q[1] for q in (a, e)]
     lr = (min(xs)-DOT_R, min(ys)-DOT_R, max(xs)-min(xs)+2*DOT_R, max(ys)-min(ys)+2*DOT_R)
     for t2, r2 in rects.items():
         if rect_hit(lr, r2, 0.1): errs.append(f'{s} 轉乘輕鐵虛綫撞到站名 {t2}')
+        if rect_hit(tr, r2, 0.15): errs.append(f'{s}「輕鐵」字撞到站名 {t2}')
     for t2 in st:
         if t2 != s and rect_hit(lr, box_of(t2), 0.1): errs.append(f'{s} 轉乘輕鐵虛綫撞到站 {t2}')
-    if rect_hit(lr, LEGEND, 0.1): errs.append(f'{s} 轉乘輕鐵虛綫入咗圖例')
+        if rect_hit(tr, box_of(t2), 0.1): errs.append(f'{s}「輕鐵」字撞到站 {t2}')
+    for s2 in XFER_DIR:
+        if s2 == s: continue
+        a2, _, _, e2 = xfer_link(s2)
+        lr2 = (min(a2[0], e2[0])-DOT_R, min(a2[1], e2[1])-DOT_R, abs(e2[0]-a2[0])+2*DOT_R, abs(e2[1]-a2[1])+2*DOT_R)
+        if rect_hit(tr, lr2, 0.12) or rect_hit(lr, lr2, 0.12): errs.append(f'{s} 轉乘輕鐵同 {s2} 嗰條太近')
+    if rect_hit(lr, LEGEND, 0.1) or rect_hit(tr, LEGEND, 0.1): errs.append(f'{s} 轉乘輕鐵入咗圖例')
 # 圖例範圍
 for code, l in L.items():
     for path in l['paths']:
@@ -268,7 +285,7 @@ if '--ts' in sys.argv or '--write' in sys.argv:
         t = re.sub(r'(export const MTR_MAP_LEGEND = )\{.*?\}( as const;)', lambda m: m.group(1) + leg_ts + m.group(2), t, count=1)
         xf_ts = '{ ' + ', '.join(f"{k}: '{v}'" for k, v in XFER_DIR.items()) + ' }'
         t = re.sub(r'(export const MTR_MAP_XFER_DIR: Readonly<Record<string, LabelSide>> = )\{.*?\};', lambda m: m.group(1) + xf_ts + ';', t, count=1)
-        t = re.sub(r'(export const MTR_MAP_XFER = )\{.*?\}( as const;)', lambda m: m.group(1) + f'{{ dash: {XF_DASH}, stub: {XF_STUB} }}' + m.group(2), t, count=1)
+        t = re.sub(r'(export const MTR_MAP_XFER = )\{.*?\}( as const;)', lambda m: m.group(1) + f'{{ dash: {XF_DASH}, on: {XF_ON}, off: {XF_OFF}, stub: {XF_STUB}, font: {XF_FONT}, gap: {XF_GAP} }}' + m.group(2), t, count=1)
         links_ts = '[' + ', '.join(f"{{ a: '{a}', b: '{b}'" + (', dashed: true' if dsh else '') + ' }' for a, b, dsh in LINKS) + ']'
         t = re.sub(r'(export const MTR_MAP_LINKS: readonly MtrMapLink\[\] = )\[.*?\];', lambda m: m.group(1) + links_ts + ';', t, count=1)
         open(tp, 'w').write(t)

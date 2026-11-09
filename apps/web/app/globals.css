@@ -992,6 +992,7 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .lrt-sta.on .lrt-marker { fill: var(--brand); }
 .lrt-cap-in { fill: #fff; }
 .lrt-cap-text { font-size: 0.165px; font-weight: 800; fill: #111; }
+.rail-xfer-name { font-weight: 700; fill: var(--text); paint-order: stroke; stroke: var(--card); stroke-width: 0.08px; stroke-linejoin: round; }
 .lrt-routes { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 16px 10px; }
 .lrt-chip {
   flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; padding: 1px 7px;

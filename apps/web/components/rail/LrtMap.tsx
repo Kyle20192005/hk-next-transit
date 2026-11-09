@@ -76,7 +76,7 @@ export default function LrtMap({
           {LRT_MAP_STATIONS.map((s) => (
             <g key={s.id} data-sta={s.id} className={`mtr-sta lrt-sta${selected === s.id ? ' on' : ''}`} role="button" aria-label={`輕鐵${lrtStopName(s.id)}站`}>
               <rect x={s.hit[0] - 0.2} y={s.hit[1] - 0.2} width={s.hit[2] + 0.4} height={s.hit[3] + 0.4} className="mtr-hit" />
-              {s.xl && <XferLink l={s.xl} />}
+              {s.xl && <XferLink l={s.xl} t={s.xt} />}
               <Marker s={s} />
               {LRT_MAP_CAPS.filter((c) => c.sta === s.id).map((c) => (
                 <Cap key={c.r} r={c.r} x={c.x} y={c.y} />
@@ -137,16 +137,20 @@ function Cap({ r, x, y }: { r: string; x: number; y: number }) {
   );
 }
 
-/** 轉乘港鐵（core rail-xfer.ts）：a → b 出閘虛綫，c 站圈，c → e 屯馬綫色綫（黑邊，喺站圈底）；位置由 tools/lrt-layout.py 排 */
-function XferLink({ l }: { l: readonly (readonly [number, number])[] }) {
+/** 轉乘港鐵（core rail-xfer.ts）：a → b 出閘虛綫（三節），c 站圈，c → e 屯馬綫色綫（冇黑邊，喺站圈底），t =「屯馬綫」字（圖例冇）；位置由 tools/lrt-layout.py 排 */
+function XferLink({ l, t }: { l: readonly (readonly [number, number])[]; t?: readonly [number, number, 'start' | 'middle' | 'end'] }) {
   const [a, b, c, e] = l as [readonly [number, number], readonly [number, number], readonly [number, number], readonly [number, number]];
-  const tml = mtrLine('TML')!.color;
+  const tml = mtrLine('TML')!;
   return (
     <g aria-hidden="true">
-      <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={INK} strokeWidth={0.05} strokeDasharray="0.1 0.07" />
-      <line x1={c[0]} y1={c[1]} x2={e[0]} y2={e[1]} stroke={INK} strokeWidth={S.lane + 2 * S.casing} strokeLinecap="round" />
-      <line x1={c[0]} y1={c[1]} x2={e[0]} y2={e[1]} stroke={tml} strokeWidth={S.lane - S.sep} strokeLinecap="round" />
+      <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={INK} strokeWidth={0.05} strokeDasharray={`${S.xfOn} ${S.xfOff}`} />
+      <line x1={c[0]} y1={c[1]} x2={e[0]} y2={e[1]} stroke={tml.color} strokeWidth={S.xfLine} strokeLinecap="round" />
       <circle cx={c[0]} cy={c[1]} r={S.dot} className="lrt-marker" strokeWidth={S.ring} />
+      {t && (
+        <text x={t[0]} y={t[1]} textAnchor={t[2]} className="rail-xfer-name" style={{ fontSize: S.xfFont }}>
+          {tml.zh}
+        </text>
+      )}
     </g>
   );
 }
@@ -165,7 +169,7 @@ function Legend() {
         const y = 1.3 + Math.floor(i / L.cols) * 0.62;
         return (
           <g key={r || 'xfer'}>
-            {r ? <Cap r={r} x={x + S.capW / 2} y={y} /> : <XferLink l={[[x, y], [x + 0.3, y], [x + 0.3 + S.dot, y], [x + S.capW - 0.065, y]]} />}
+            {r ? <Cap r={r} x={x + S.capW / 2} y={y} /> : <XferLink l={[[x, y], [x + 0.22, y], [x + 0.22 + S.dot, y], [x + S.capW - S.xfLine / 2, y]]} />}
             <text x={x + S.capW + 0.2} y={y + 0.09} className="mtr-legend-zh">
               {zh}
             </text>
