@@ -950,6 +950,15 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 @keyframes mtr-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
 /* 揀咗嘅站：重點色光圈 */
 .mtr-focus { fill: color-mix(in srgb, var(--accent) 18%, transparent); stroke: var(--accent); stroke-width: 0.05; }
+/* 附近嘅站：藍色光圈；左上角「附近」膠囊撳去嗰個站 */
+.mtr-near { fill: rgb(47 111 214 / 0.16); stroke: #2f6fd6; stroke-width: 0.05; stroke-dasharray: 0.12 0.06; }
+.mtr-near-pill {
+  position: absolute; left: 10px; top: 10px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; max-width: calc(100% - 20px);
+  padding: 6px 12px 6px 10px; border: 0; border-radius: 999px; background: var(--card); color: var(--text); box-shadow: var(--shadow);
+  font: inherit; font-size: 0.875rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.mtr-near-pill svg { color: #2f6fd6; flex: none; }
+.mtr-near-pill .muted { font-weight: 600; }
 .mtr-focus-pulse { fill: none; stroke: var(--accent); stroke-width: 0.06; transform-box: fill-box; transform-origin: center; animation: mtr-pulse 1.1s ease-out 3; opacity: 0; }
 @keyframes mtr-pulse { from { transform: scale(1); opacity: 0.9; } to { transform: scale(2.2); opacity: 0; } }
 /* 港鐵站搜尋（黃色標題列） */

@@ -3,6 +3,7 @@ import { Linking, PanResponder, Platform, Pressable, StyleSheet, Text, View, typ
 import {
   Canvas,
   Circle,
+  DashPathEffect,
   FillType,
   Group,
   PaintStyle,
@@ -56,6 +57,9 @@ const MAX_PX = 90;
 const RING = '#23262b';
 const STATIONS = mtrMapStations();
 const NO_INSET: MtrInset = { right: 0, bottom: 0 };
+const NO_NEAR: string[] = [];
+/** 附近嘅站：同定位圖示一樣嘅藍 */
+const NEAR = '#2f6fd6';
 
 /** 唔准拖到成幅圖離開畫面（留返一半）；縮放有上下限 */
 function clamp(v: MapView, s: Size): MapView {
@@ -303,11 +307,14 @@ export function MtrMap({
   onStation,
   focus = null,
   inset = NO_INSET,
+  near = NO_NEAR,
 }: {
   selected: string | null;
   onStation: (sta: string) => void;
   focus?: MtrFocus | null;
   inset?: MtrInset;
+  /** 附近嘅站（藍色虛線光圈，同揀咗嘅站嘅橙色分開；同網頁一樣） */
+  near?: string[];
 }) {
   const t = useTheme();
   const [size, setSize] = useState<Size>({ w: 0, h: 0 });
@@ -420,6 +427,21 @@ export function MtrMap({
           <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
             <Group transform={transform}>
               <Picture picture={picture} />
+              {near.map((code) => {
+                const s = STATIONS.find((x) => x.code === code);
+                if (!s) return null;
+                const cx = s.box.x + s.box.w / 2;
+                const cy = s.box.y + s.box.h / 2;
+                const r = Math.max(s.box.w, s.box.h) / 2 + 0.22;
+                return (
+                  <Group key={code}>
+                    <Circle cx={cx} cy={cy} r={r} color="rgba(47,111,214,0.16)" />
+                    <Circle cx={cx} cy={cy} r={r} color={NEAR} style="stroke" strokeWidth={0.05}>
+                      <DashPathEffect intervals={[0.12, 0.06]} />
+                    </Circle>
+                  </Group>
+                );
+              })}
               {/* 揀咗嘅站：重點色光圈 + 白心變黃 */}
               {sel && (
                 <Group>

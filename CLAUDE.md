@@ -112,6 +112,9 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
   之後用戶自己拖開就唔好扯返轉頭。揀咗嘅站有重點色光圈。面板頂按綫分頁（分頁頂有綫色，轉站記住揀咗邊條綫）→「下班車」每個方向一行
   （目的地、綫色月台圈、時間 + 細字「之後 N 分鐘」）→「所有班次」展開成個表（目的地｜月台｜下班車，按方向分組；闊螢幕預設展開）→ 底部「最後更新 HH:MM:SS」同重新整理。
   時間用 core `mtrTrainEta`：API 分鐘數 0 =「正在離開」、1 =「即將到站」，其他 N 分鐘（跟設定可以顯示鐘數）。
+- **附近嘅站**（2026-11，用戶要求）：路綫圖用首頁嗰份定位（`useNearbyStops(true)`，有快取），800 米內嘅站加**藍色虛線光圈**（`#2f6fd6`，同定位圖示一樣；
+  揀咗嘅站係橙色 accent），冇就標 2 公里內最近一個（core `mtrCardStations(mtr, 800, 3)`）；左上角膠囊「附近：X · N 米」撳去嗰個站；
+  第一次知道附近站而又未揀站：唔喺畫面就移過去（focus zoom false，唔變大細）。網頁 `MtrMap` `near` prop（`.mtr-near`），App Skia `DashPathEffect`。
 - **車站搜尋**：core `searchMtrStations`（中文、英文唔理大細楷同空格、站代號；「茘」當「荔」；尾「站」拎走）。網頁下拉結果（上下鍵、Enter），App 結果浮喺地圖頂。
 - 港鐵間中成條綫冇到站資料（2026-11-09 早上觀塘綫：`curr_time` 係「-」、冇 UP／DOWN），`parseMtrSchedule` 回傳 `noData`，
   寫「港鐵暫時冇提供 XX 嘅到站時間，列車可能照常行駛」，唔好寫「暫時冇班次」。

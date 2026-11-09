@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
-import { mtrLine, mtrRecent, mtrStationEn, mtrStationLines, mtrStationName, searchMtrStations } from '@hknt/core';
+import { formatDistance, mtrCardStations, mtrLine, mtrRecent, mtrStationEn, mtrStationLines, mtrStationName, searchMtrStations } from '@hknt/core';
+import { Icon } from './Icon';
+import { useNearbyStops } from './Nearby';
 import { addRecent } from '@/lib/recent';
-import { radius, shadowLg, useTheme } from '@/lib/theme';
+import { radius, shadow, shadowLg, useTheme } from '@/lib/theme';
 import { MtrMap, type MtrFocus, type MtrInset } from './MtrMap';
 import { MtrStationSheet } from './MtrStationSheet';
 
@@ -28,6 +30,15 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [inset, setInset] = useState<MtrInset>({ right: 0, bottom: 0 });
   const results = useMemo(() => searchMtrStations(query), [query]);
+  // 附近嘅站（用首頁嗰份定位，有快取）：800 米內嘅都標，冇就標 2 公里內最近一個（同網頁一樣）
+  const { state: nearby } = useNearbyStops(true);
+  const near = nearby.kind === 'ok' ? mtrCardStations(nearby.mtr, 800, 3) : [];
+  // 第一次知道附近有咩站：唔喺畫面就移過去（唔變大細）；已經揀咗站就唔郁
+  const [movedNear, setMovedNear] = useState(false);
+  if (!movedNear && near[0]) {
+    setMovedNear(true);
+    if (!sta) setFocus({ sta: near[0].sta, zoom: false });
+  }
   // 由首頁、收藏撳入嚟（?sta=）：飛去（放大置中）再打開
   const openKey = open ? `${open.sta}:${open.n}` : null;
   const [seenOpen, setSeenOpen] = useState<string | null>(null);
@@ -70,7 +81,22 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
 
   return (
     <View style={{ flex: 1 }} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
-      <MtrMap selected={sta} onStation={onStation} focus={focus} inset={sta ? inset : NO_INSET} />
+      <MtrMap selected={sta} onStation={onStation} focus={focus} inset={sta ? inset : NO_INSET} near={near.map((n) => n.sta)} />
+      {near[0] && (
+        <Pressable
+          onPress={() => {
+            setSta(near[0]!.sta);
+            setFocus({ sta: near[0]!.sta, zoom: true });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`附近港鐵站：${mtrStationName(near[0].sta)}，${formatDistance(near[0].distance)}`}
+          style={{ position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingLeft: 10, paddingRight: 12, borderRadius: 999, backgroundColor: t.card, ...shadow }}
+        >
+          <Icon name="navigate" size={16} color="#2f6fd6" />
+          <Text style={{ fontSize: 14, fontWeight: '700', color: t.text }}>附近：{mtrStationName(near[0].sta)}</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: t.muted }}>· {formatDistance(near[0].distance)}</Text>
+        </Pressable>
+      )}
       {sta && (
         <MtrStationSheet
           sta={sta}

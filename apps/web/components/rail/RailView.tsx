@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import MtrMap, { type MtrFocus, type MtrInset } from './MtrMap';
 import MtrStationSheet from './MtrStationSheet';
-import { mtrRecent } from '@hknt/core';
+import { formatDistance, mtrCardStations, mtrRecent, mtrStationName } from '@hknt/core';
+import Icon from '../Icon';
+import { useNearbyStops } from '../home/Nearby';
 import { addRecent } from '@/lib/recent';
 
 const NARROW = '(max-width: 767.98px)';
@@ -34,6 +36,19 @@ export default function RailView({ pick }: { pick: { sta: string } | null }) {
   const wrap = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
   const [inset, setInset] = useState<MtrInset>({ right: 0, bottom: 0 });
+  // 附近嘅站（用首頁嗰份定位，有快取）：800 米內嘅都標，冇就標 2 公里內最近一個
+  const { state: nearby } = useNearbyStops(true);
+  const near = nearby.kind === 'ok' ? mtrCardStations(nearby.mtr, 800, 3) : [];
+  const nearKey = near.map((n) => n.sta).join(',');
+  // 第一次知道附近有咩站：唔喺畫面就移過去（唔變大細）；已經揀咗站就唔郁
+  const movedNear = useRef(false);
+  useEffect(() => {
+    const first = nearKey.split(',')[0];
+    if (!first || movedNear.current || sta) return;
+    movedNear.current = true;
+    setFocus({ sta: first, zoom: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearKey]);
 
   // 標題列搜尋揀咗站：飛去（放大置中）再打開
   useEffect(() => {
@@ -78,7 +93,21 @@ export default function RailView({ pick }: { pick: { sta: string } | null }) {
 
   return (
     <div className="mtr-wrap" ref={wrap}>
-      <MtrMap selected={sta} onStation={onStation} focus={focus} inset={inset} />
+      <MtrMap selected={sta} onStation={onStation} focus={focus} inset={inset} near={near.map((n) => n.sta)} />
+      {near[0] && (
+        <button
+          className="mtr-near-pill"
+          onClick={() => {
+            setSta(near[0]!.sta);
+            setFocus({ sta: near[0]!.sta, zoom: true });
+          }}
+          aria-label={`附近港鐵站：${mtrStationName(near[0].sta)}，${formatDistance(near[0].distance)}`}
+        >
+          <Icon name="navigate" size={16} />
+          附近：{mtrStationName(near[0].sta)}
+          <span className="muted">· {formatDistance(near[0].distance)}</span>
+        </button>
+      )}
       {sta && <MtrStationSheet ref={panel} sta={sta} onClose={onClose} tab={tab} onTab={setTab} all={all} onAll={setAll} sheet={sheet} />}
     </div>
   );

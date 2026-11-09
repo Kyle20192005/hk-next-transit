@@ -20,6 +20,7 @@ export default function MtrMap({
   onStation,
   focus = null,
   inset = { right: 0, bottom: 0 },
+  near = [],
 }: {
   selected: string | null;
   onStation: (sta: string) => void;
@@ -27,6 +28,8 @@ export default function MtrMap({
   focus?: MtrFocus | null;
   /** 面板遮住咗嘅位（px）：置中同「睇唔睇到」只計淨低嘅地方 */
   inset?: MtrInset;
+  /** 附近嘅站（藍色光圈，同揀咗嘅站嘅橙色分開） */
+  near?: string[];
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -225,6 +228,12 @@ export default function MtrMap({
           {links.map((k) => (
             <line key={k.key} x1={k.p[0]} y1={k.p[1]} x2={k.q[0]} y2={k.q[1]} className={k.dashed ? 'mtr-link dashed' : 'mtr-link'} />
           ))}
+          {/* 附近嘅站：藍色光圈（同定位圖示一樣嘅藍） */}
+          {near.map((code) => {
+            const s = stations.find((x) => x.code === code);
+            if (!s) return null;
+            return <circle key={`near-${code}`} cx={s.box.x + s.box.w / 2} cy={s.box.y + s.box.h / 2} r={Math.max(s.box.w, s.box.h) / 2 + 0.22} className="mtr-near" aria-hidden="true" />;
+          })}
           {/* 揀咗嘅站：綫色以外嘅重點色光圈（第一次閃三下） */}
           {selected &&
             (() => {
