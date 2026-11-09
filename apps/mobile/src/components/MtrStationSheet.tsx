@@ -76,13 +76,13 @@ export function MtrStationSheet({
   return (
     <View onLayout={onLayout} style={[{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadowLg }, style]}>
       {/* 站名 */}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingTop: 14, paddingBottom: 10, paddingLeft: 18, paddingRight: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 10, paddingBottom: 8, paddingLeft: 16, paddingRight: 10 }}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 8 }}>
-          <Text style={{ fontSize: 22, fontWeight: '800', color: t.text }}>{mtrStationName(sta)}</Text>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: t.text }}>{mtrStationName(sta)}</Text>
           <Text style={{ fontSize: 14, color: t.muted }}>{mtrStationEn(sta)}</Text>
         </View>
-        <Pressable onPress={onClose} accessibilityLabel="關閉" style={{ width: 36, height: 36, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
-          <Icon name="close" size={20} color={t.muted} />
+        <Pressable onPress={onClose} accessibilityLabel="關閉" style={{ width: 32, height: 32, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
+          <Icon name="close" size={18} color={t.muted} />
         </Pressable>
       </View>
 
@@ -97,7 +97,7 @@ export function MtrStationSheet({
               onPress={() => onTab(c)}
               accessibilityRole="tab"
               accessibilityState={{ selected: on }}
-              style={{ flex: 1, alignItems: 'center', paddingTop: 8, paddingBottom: 8, borderTopWidth: 4, borderTopColor: l.color, borderTopLeftRadius: 8, borderTopRightRadius: 8, backgroundColor: on ? l.color + '29' : t.surface2 }}
+              style={{ flex: 1, alignItems: 'center', paddingTop: 6, paddingBottom: 6, borderTopWidth: 3, borderTopColor: l.color, borderTopLeftRadius: 8, borderTopRightRadius: 8, backgroundColor: on ? l.color + '29' : t.surface2 }}
             >
               <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: on ? t.text : t.muted }}>
                 {l.zh}
@@ -107,7 +107,7 @@ export function MtrStationSheet({
         })}
       </View>
 
-      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ padding: 14, gap: 10 }}>
+      <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}>
         {etas?.delayed && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, borderRadius: radius.s, backgroundColor: t.specialSoft }}>
             <Icon name="warning" size={16} color={t.special} />
@@ -122,21 +122,24 @@ export function MtrStationSheet({
         {etas && !etas.noData && (
           <>
             {/* 下班車：每個方向一行 */}
-            <View style={{ borderRadius: radius.m, backgroundColor: t.surface2, paddingHorizontal: 12, paddingVertical: 4 }}>
-              <Text style={{ marginTop: 6, marginBottom: 2, fontSize: 13, fontWeight: '700', color: t.muted }}>下班車</Text>
+            <View style={{ borderRadius: radius.m, backgroundColor: t.surface2, paddingHorizontal: 12, paddingVertical: 2 }}>
+              {/* 「所有班次」放喺同一行右邊，慳一行位（矮螢幕都見到晒兩個方向） */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 30, marginRight: -6 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: t.muted }}>下班車</Text>
+                {etas.dirs.some((d) => d.trains.length > 1) && (
+                  <Pressable onPress={() => onAll(!all)} accessibilityRole="button" accessibilityState={{ expanded: all }} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingHorizontal: 6 }}>
+                    <Text style={{ color: t.accent, fontWeight: '700', fontSize: 14 }}>{all ? '收埋班次表' : '所有班次'}</Text>
+                    <View style={{ transform: [{ rotate: all ? '180deg' : '0deg' }] }}>
+                      <Icon name="chevron-down" size={16} color={t.accent} />
+                    </View>
+                  </Pressable>
+                )}
+              </View>
               {etas.dirs.map((d, i) => (
                 <NextRow key={d.dir} d={d} empty={empty} fmt={etaFormat} t={t} color={info.color} ink={info.ink} first={i === 0} />
               ))}
             </View>
 
-            {etas.dirs.some((d) => d.trains.length > 1) && (
-              <Pressable onPress={() => onAll(!all)} accessibilityRole="button" accessibilityState={{ expanded: all }} style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 4 }}>
-                <Text style={{ color: t.accent, fontWeight: '700', fontSize: 14 }}>{all ? '收埋班次表' : '所有班次'}</Text>
-                <View style={{ transform: [{ rotate: all ? '180deg' : '0deg' }] }}>
-                  <Icon name="chevron-down" size={18} color={t.accent} />
-                </View>
-              </Pressable>
-            )}
 
             {/* 所有班次表 */}
             {all && hasTrains && (
@@ -173,7 +176,7 @@ export function MtrStationSheet({
         )}
       </ScrollView>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: t.line }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingLeft: 16, paddingRight: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: t.line }}>
         <Text style={{ fontSize: 12, color: t.muted, ...tabular }}>{fresh ? `最後更新 ${hkClockSec(fresh.at)}` : ' '}</Text>
         <Pressable
           onPress={() => {
@@ -207,7 +210,7 @@ function NextRow({ d, empty, fmt, t, color, ink, first: isFirst }: { d: MtrDirec
   const [first, second] = d.trains;
   const after = second && mtrTrainEta(second, fmt);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, borderTopWidth: isFirst ? 0 : 1, borderTopColor: t.line }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, borderTopWidth: isFirst ? 0 : 1, borderTopColor: t.line }}>
       <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: t.text }}>
         {first ? `往 ${first.destName}` : d.label}
         {first?.viaRacecourse ? <Text style={{ color: t.muted, fontSize: 13, fontWeight: '400' }}>（經馬場）</Text> : null}

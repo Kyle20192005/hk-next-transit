@@ -6,6 +6,8 @@ import { MtrMap, type MtrFocus, type MtrInset } from './MtrMap';
 import { MtrStationSheet } from './MtrStationSheet';
 
 const NO_INSET: MtrInset = { right: 0, bottom: 0 };
+/** 手機面板最高幾多（同網頁 CSS 一樣）：矮螢幕都要放得晒下班車，最少留 120 地圖，最高 380（或者 58%，邊個大用邊個） */
+const panelMax = (h: number) => (h ? Math.max(h * 0.58, Math.min(h - 120, 380)) : '58%');
 
 /**
  * 「路線」分頁 → 港鐵（同網頁 components/rail/RailView.tsx 一樣）：路綫圖 + 到站面板 + 搜尋結果。
@@ -54,7 +56,7 @@ export function RailView({ query, onPicked }: { query: string; onPicked: () => v
           all={all}
           onAll={setAll}
           onLayout={onPanelLayout}
-          style={wide ? { position: 'absolute', top: 12, right: 12, bottom: 12, width: 380 } : { position: 'absolute', left: 8, right: 8, bottom: 8, maxHeight: '58%' }}
+          style={wide ? { position: 'absolute', top: 12, right: 12, bottom: 12, width: 380 } : { position: 'absolute', left: 8, right: 8, bottom: 8, maxHeight: panelMax(box.h) }}
         />
       )}
       {query.trim() !== '' && (

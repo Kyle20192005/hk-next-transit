@@ -98,18 +98,21 @@ const MtrStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => vo
           {etas && !etas.noData && (
             <>
               <section className="mtr-next" aria-label="下班車">
-                <h3>下班車</h3>
+                {/* 「所有班次」放喺同一行右邊，慳一行位（矮螢幕都見到晒兩個方向） */}
+                <div className="mtr-next-head">
+                  <h3>下班車</h3>
+                  {etas.dirs.some((d) => d.trains.length > 1) && (
+                    <button className="mtr-more" aria-expanded={all} onClick={() => onAll(!all)}>
+                      {all ? '收埋班次表' : '所有班次'}
+                      <Icon name="chevron-down" size={16} />
+                    </button>
+                  )}
+                </div>
                 {etas.dirs.map((d) => (
                   <NextRow key={d.dir} d={d} empty={empty} fmt={etaFormat} />
                 ))}
               </section>
 
-              {etas.dirs.some((d) => d.trains.length > 1) && (
-                <button className="mtr-more" aria-expanded={all} onClick={() => onAll(!all)}>
-                  {all ? '收埋班次表' : '所有班次'}
-                  <Icon name="chevron-down" size={18} />
-                </button>
-              )}
               {all && etas.dirs.some((d) => d.trains.length) && (
                 <table className="mtr-table">
                   <thead>
