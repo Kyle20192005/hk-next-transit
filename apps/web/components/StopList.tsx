@@ -2,7 +2,7 @@
 import { getPrefs } from '@/lib/prefs';
 import { busesClient } from '@/lib/buses';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { alightSummary, COMPANIES, matchStops, shareText, BusStabilizer, LIVE_REFRESH, type LastBus, parseLiveBuses, busDistanceTo, busFraction, formatDistance, adjustLastBus, labelEtas, lastBusEtaIndex, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
+import { alightSummary, companyNames, matchStops, routeTitle, shareText, BusStabilizer, LIVE_REFRESH, type LastBus, parseLiveBuses, busDistanceTo, busFraction, formatDistance, adjustLastBus, labelEtas, lastBusEtaIndex, secondsFrom, type Dir, type Eta, type TrackedBus } from '@hknt/core';
 import { OPEN_STOP_EVENT, publishBuses, publishFocus, setOpenStopIndex } from '@/lib/events';
 import StopRow, { type RowBus } from './StopRow';
 import { companyColor, companyInk } from '@/lib/company';
@@ -26,6 +26,10 @@ type Props = {
   cumMetres: number[];
   /** 路線主要公司（時間線同巴士用公司代表色） */
   company: string;
+  /** 往邊度（收藏、分享用；同標題列一樣） */
+  dest: string;
+  /** 最後一個站係終點站（唔上得車）；專線小巴循環線最後一個站之後仲要返總站，唔係 */
+  endIsTerminus?: boolean;
   /** 每個站上車嘅車費（同 stops 對應）；joyYou = null 即係唔適用樂悠咭 */
   fares: ({ adult: string; joyYou: string | null } | null)[];
   /** 每個站嘅尾班車（時間表估算；同 stops 對應） */
@@ -48,7 +52,8 @@ const BUSES_REFRESH_MS = LIVE_REFRESH.busesMs;
  * - 打開站時：攞到站時間、地圖放大過去；每班車標示「距離 N 個站／未開出」
  * - 後面嘅站顯示由打開咗嘅站出發要幾耐，同下一班車大概幾時到
  */
-export default function StopList({ co, multiCompany, companies, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, fares, lastBus, initialOpen, children }: Props) {
+export default function StopList({ co, multiCompany, companies, route, stops, selectedVariantId, segSeconds: avgSeg, cumMetres, company, dest, endIsTerminus = true, fares, lastBus, initialOpen, children }: Props) {
+  const isEnd = (i: number) => i === stops.length - 1 && endIsTerminus;
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [etas, setEtas] = useState<Eta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +110,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
         const { latitude: la, longitude: lo } = pos.coords;
         let best: { index: number; metres: number } | null = null;
         stops.forEach((s, i) => {
-          if (s.lat === undefined || s.lng === undefined || i === stops.length - 1) return; // 終點站唔使
+          if (s.lat === undefined || s.lng === undefined || isEnd(i)) return; // 終點站唔使
           const dy = (s.lat - la) * 111320;
           const dx = (s.lng - lo) * 111320 * Math.cos((la * Math.PI) / 180);
           const m = Math.hypot(dx, dy);
@@ -296,7 +301,8 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
       const mins = Math.max(0, Math.round((bus.nextEta - busNow) / 60000));
       const isLast = id === lastStable?.id;
       const label = (isLast ? '尾班車：' : '') + (bus.schedule ? '按時間表估計：' : '') + (mins === 0 ? `即將到 ${stops[from + 1]?.name ?? ''}` : `約 ${mins} 分鐘到 ${stops[from + 1]?.name ?? ''}`);
-      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label, schedule: bus.schedule, last: isLast, color: companyColor(multiCompany ? (bus.company ?? company) : company), ink: companyInk(multiCompany ? (bus.company ?? company) : company) }]);
+      const busCo = multiCompany ? (bus.company ?? company) : company;
+      out.set(row, [...(out.get(row) ?? []), { key: id, half, t, label, schedule: bus.schedule, last: isLast, company: busCo, color: companyColor(busCo), ink: companyInk(busCo) }]);
     }
     return out;
   }, [live, stable, busNow, stops, multiCompany, company, lastStable?.id]);
@@ -314,15 +320,17 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
           }),
         }
       : null;
-  const companyLabel = companies.map((c) => COMPANIES[c]?.name ?? c).join('・');
+  const companyLabel = companyNames(companies);
+  // 專線小巴：「2（新界）」；其他公司就係路線號碼
+  const title = routeTitle(co, route);
   const share = async () => {
     if (openIndex === null) return;
     const s = stops[openIndex]!;
     const url = `${location.origin}/${co}/${route}?dir=${s.dir}&stop=${s.stopId}`;
-    const text = shareText({ company: companyLabel, route, dest: stops[stops.length - 1]?.name ?? '', stop: s.name, nextAt: nextAtOpen, now: Date.now() });
+    const text = shareText({ company: companyLabel, route: title, dest, stop: s.name, nextAt: nextAtOpen, now: Date.now() });
     try {
       if (navigator.share) {
-        await navigator.share({ title: `${route} 到站時間`, text, url });
+        await navigator.share({ title: `${title} 到站時間`, text, url });
         return;
       }
     } catch (e) {
@@ -420,7 +428,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
             index={i}
             name={s.name}
             multiCompany={multiCompany}
-            terminus={i === 0 || i === stops.length - 1}
+            terminus={i === 0 || isEnd(i)}
             buses={rowBuses.get(i) ?? []}
             open={openIndex === i}
             onToggle={() => {
@@ -451,7 +459,7 @@ export default function StopList({ co, multiCompany, companies, route, stops, se
             selectedVariantId={selectedVariantId}
             nearestMetres={nearest?.index === i ? nearest.metres : null}
             here={s.lat !== undefined && s.lng !== undefined ? { lat: s.lat, lng: s.lng, name: s.name, current: { co, route, dir: s.dir } } : null}
-            fav={i < stops.length - 1 ? { co, route, dir: s.dir, dest: stops[stops.length - 1]?.name ?? '', companies, stopId: s.stopId, stopName: s.name } : null}
+            fav={!isEnd(i) ? { co, route, dir: s.dir, dest, companies, stopId: s.stopId, stopName: s.name } : null}
             fare={fares[i] ?? null}
             lastBus={openIndex === i ? openLast : null}
             lastEtaIndex={openIndex === i ? lastEtaIndex : -1}

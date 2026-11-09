@@ -1,24 +1,45 @@
 import type { ReactNode } from 'react';
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COMPANIES, type Company } from '@hknt/core';
+import { companyInfo, GMB_REGION_NAME, routeRegion, type Company } from '@hknt/core';
 import { radius, shadow, useTheme } from '@/lib/theme';
-import { BusGlyph, Icon, type IconName } from './Icon';
+import { Icon, VehicleGlyph, type IconName } from './Icon';
 import { Logo } from './Logo';
 
-/** 公司標籤：巴士圖示 + 公司名，用公司代表色；聯營線合併做一個分色標籤 */
+/**
+ * 公司標籤：車輛圖示（專線小巴用小巴，其他巴士）+ 公司名，用公司代表色；聯營線合併做一個分色標籤。
+ * 唔認得嘅公司（伺服器加咗新公司）用 core companyInfo 嘅灰色後備，唔好 throw。
+ */
 export function CompanyTag({ companies, compact = false }: { companies: readonly Company[]; compact?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', alignSelf: 'flex-start', borderRadius: 6, overflow: 'hidden' }}>
       {companies.map((c, i) => {
-        const info = COMPANIES[c];
+        const info = companyInfo(c);
         return (
           <View key={c} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 1, backgroundColor: info.bg }}>
-            {i === 0 && !compact && <BusGlyph size={11} color={info.ink} />}
+            {i === 0 && !compact && <VehicleGlyph company={c} size={11} color={info.ink} />}
             <Text style={{ color: info.ink, fontSize: 11, fontWeight: '800', letterSpacing: 0.3 }}>{info.name}</Text>
           </View>
         );
       })}
+    </View>
+  );
+}
+
+/**
+ * 專線小巴地區標籤（港島／九龍／新界，同網頁 RegionTag／.region-tag 一樣）：卡片底、灰框、灰字，大細同 CompanyTag 一樣；
+ * 唔係專線小巴就乜都唔畫。預設 alignSelf flex-start（直排入面唔好拉闊）；橫排入面要置中就傳 inline。
+ */
+export function RegionTag({ co, route, inline = false }: { co: string | undefined; route: string; inline?: boolean }) {
+  const t = useTheme();
+  const region = routeRegion(co, route);
+  if (!region) return null;
+  return (
+    <View
+      accessibilityLabel={`${GMB_REGION_NAME[region]}區`}
+      style={{ alignSelf: inline ? 'center' : 'flex-start', paddingHorizontal: 5, borderRadius: 6, borderWidth: 1, borderColor: t.line, backgroundColor: t.card }}
+    >
+      <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.3, color: t.muted }}>{GMB_REGION_NAME[region]}</Text>
     </View>
   );
 }

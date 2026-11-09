@@ -3,11 +3,11 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { formatDistance, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrStationName, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, tramDepartureRows, tramStopTitle, type DepartureRow, type NearbyCache, type NearMtr } from '@hknt/core';
+import { formatDistance, routeCode, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrStationName, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, tramDepartureRows, tramStopTitle, type DepartureRow, type NearbyCache, type NearMtr } from '@hknt/core';
 import { api, type NearStop } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { warmRoute } from '@/lib/prefetch';
-import { CompanyTag, ScheduledTag } from './ui';
+import { CompanyTag, RegionTag, ScheduledTag } from './ui';
 import { Icon } from './Icon';
 import { EtaInline } from './EtaInline';
 import { getPrefs, usePrefs } from '@/lib/prefs';
@@ -226,7 +226,7 @@ export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boole
   return (
     <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
       <Pressable onPress={() => setOpen((o) => !o)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingLeft: 16, paddingRight: 14 }}>
-        <Icon name="pin" size={18} color={t.accent} />
+        <Icon name={stop.co === 'gmb' ? 'minibus' : 'pin'} size={18} color={t.accent} />
         <Text style={{ flex: 1, fontWeight: '700', fontSize: 16, color: t.text }}>{stop.name}</Text>
         <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: 'hidden', backgroundColor: t.surface2, color: t.muted, fontSize: 12, fontWeight: '700', ...tabular }}>
           {formatDistance(stop.distance)}
@@ -246,7 +246,11 @@ export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boole
                 accessibilityRole="link"
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: t.line }}>
                 <View style={{ width: 96, gap: 3 }}>
-                  <Text style={{ fontSize: 19, fontWeight: '800', color: t.text, ...tabular }}>{r.route}</Text>
+                  {/* 專線小巴：號碼（NT-2 → 2）旁邊標地區 */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Text style={{ fontSize: 19, fontWeight: '800', color: t.text, ...tabular }}>{routeCode(r.co, r.route)}</Text>
+                    <RegionTag co={r.co} route={r.route} inline />
+                  </View>
                   <CompanyTag companies={r.companies} />
                 </View>
                 <Text numberOfLines={1} style={{ flex: 1, color: t.text, fontWeight: '500' }}>

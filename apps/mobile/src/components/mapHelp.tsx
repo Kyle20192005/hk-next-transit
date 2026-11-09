@@ -10,6 +10,15 @@ function helpText(company: string, multiCompany: boolean): { title: string; intr
   if (company === 'MTRB') {
     return { title: '巴士位置點樣嚟？', intro: '港鐵巴士行緊嘅車有 GPS 位置，地圖直接顯示，每 20 秒更新。', bullets: ['未開出、或者冇 GPS 嘅車，位置按到站時間推算。'], foot: '僅供參考，以港鐵巴士到站時間為準。' };
   }
+  if (company === 'GMB') {
+    // 同網頁 RouteMap 嘅 MapHelpText 一字不差：專線小巴冇 GPS，「未開出」係時間表時間，唔畫
+    return {
+      title: '小巴位置點樣計？',
+      intro: '專線小巴冇提供 GPS：地圖上嘅小巴位置係推算出嚟：',
+      bullets: ['每 20 秒讀取每個站嘅到站時間，睇邊架車已經過咗邊個站，推算佢喺邊兩個站之間。', '未開出（按時間表，到站時間標「原定」）嘅班次唔會喺地圖出現。', '到站時間推遲（例如塞車）時，小巴會停喺原位，唔會倒退，等時間追上先再郁。'],
+      foot: '僅供參考，以專線小巴到站時間為準。',
+    };
+  }
   if (company === 'NLB') {
     return {
       title: '巴士位置點樣計？',

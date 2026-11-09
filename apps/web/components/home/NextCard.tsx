@@ -10,7 +10,8 @@ import {
   lrtDepartureRows,
   lrtStopName,
   groupFavorites,
-  groupStopHeads,
+  isGmbOnlyHead,
+  nearCardHeads,
   minutesLabel,
   mtrDepartureRows,
   mtrCardStations,
@@ -37,8 +38,9 @@ import { groupKey } from './nextcard-key';
 import { liveClient } from '@/lib/buses';
 
 const MAX_CARDS = 5;
-/** 載入幾多個站頭（有啲冇車，要多攞幾個先夠 5 張） */
+/** 載入幾多個站頭（有啲冇車，要多攞幾個先夠 5 張）：有巴士站嘅站頭、淨係專線小巴嘅站頭分開計，小巴唔會逼走巴士 */
 const LOAD_HEADS = 8;
+const LOAD_GMB_HEADS = 3;
 const ROWS = 4;
 const REFRESH_MS = 30_000;
 const TAB_KEY = 'hknt.nextTab';
@@ -142,9 +144,7 @@ function NearbyPane({ state, onLocate, onMore, onMtr }: { state: NearbyState; on
             name: m.kind === 'lrt' ? lrtStopName(m.sta) : mtrStationName(m.sta),
             distance: m.distance,
           })),
-          ...groupStopHeads(state.stops)
-            .slice(0, LOAD_HEADS)
-            .map((h) => ({ key: h.key, kind: 'bus' as const, head: h, name: h.name, distance: h.distance })),
+          ...nearCardHeads(state.stops, LOAD_HEADS, LOAD_GMB_HEADS).map((h) => ({ key: h.key, kind: 'bus' as const, head: h, name: h.name, distance: h.distance })),
         ]
       : [];
   const data = useHeadRows(items);
@@ -159,7 +159,7 @@ function NearbyPane({ state, onLocate, onMore, onMtr }: { state: NearbyState; on
       />
     );
   }
-  if (!items.length) return <Message text={`${radiusLabel(radius)}內冇巴士站`} />;
+  if (!items.length) return <Message text={`${radiusLabel(radius)}內冇巴士或小巴站`} />;
   // 冇班次嘅站頭唔出卡。全部載入完先出（逐張加會推走畫面）；出咗嘅卡之後冇車都保留，唔好令卡跳位
   const ready = items.every((h) => data[h.key]);
   if (!ready && !shown.current.size) return <Message text="載入中…" />;
@@ -178,7 +178,8 @@ function NearbyPane({ state, onLocate, onMore, onMtr }: { state: NearbyState; on
       items={cards}
       header={(h) => (
         <>
-          <Icon name={h.kind === 'mtr' ? 'train' : h.kind === 'lrt' ? 'lrt' : 'navigate'} size={18} className="nc-loc-icon" />
+          {/* 站頭全部係專線小巴站就用小巴圖示 */}
+          <Icon name={h.kind === 'mtr' ? 'train' : h.kind === 'lrt' ? 'lrt' : h.kind === 'bus' && isGmbOnlyHead(h.head) ? 'minibus' : 'navigate'} size={18} className="nc-loc-icon" />
           <strong>{h.kind === 'mtr' ? `港鐵${h.name}站` : h.kind === 'lrt' ? `輕鐵${h.name}站` : h.name}</strong>
           <span className="muted">{formatDistance(h.distance)}</span>
         </>
@@ -238,7 +239,7 @@ function FavPane({ favs, onAll, onMtr }: { favs: Favorite[]; onAll: () => void; 
   const [now] = useState(() => Date.now());
   const { favs: ordered, active } = favsForNow(favs, favGroups, now);
   const groups = groupFavorites(ordered);
-  if (!groups.length) return <Message text="喺路線頁撳星號收藏路線，打開一個站撳「收藏呢個站」，或者喺港鐵、輕鐵路綫圖撳站嘅星號，就會喺度見到下一班車。" />;
+  if (!groups.length) return <Message text="喺巴士或小巴路線頁撳星號收藏路線，打開一個站撳「收藏呢個站」，或者喺港鐵、輕鐵路綫圖撳站嘅星號，就會喺度見到下一班車。" />;
   return (
     <Swiper
       items={groups}

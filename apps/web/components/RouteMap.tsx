@@ -5,8 +5,9 @@ import { createPortal } from 'react-dom';
 import Icon from './Icon';
 import maplibregl, { type GeoJSONSource, type LngLatLike } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { BusStabilizer, pointOnPath, stopPathIndices, type LatLng } from '@hknt/core';
-import { companyColor, companyInk } from '@/lib/company';
+import { BusStabilizer, pointOnPath, stopPathIndices, vehicleNoun, type LatLng } from '@hknt/core';
+import { companyColor, companyInk, companyNames } from '@/lib/company';
+import { VEHICLE_PATH } from './VehicleIcon';
 import { BUSES_EVENT, FOCUS_STOP_EVENT, OPEN_STOP_EVENT, latestBuses, latestFocus, type BusesDetail } from '@/lib/events';
 import { firstSymbolLayer, loadMapStyle } from '@/lib/map-style';
 
@@ -180,7 +181,8 @@ export default function RouteMap({ lines, stops, multiCompany = false, company }
             node.title = (isLast ? '尾班車：' : '') + (b.schedule ? '按時間表估計：' : '') + (mins <= 0 ? `即將到 ${next?.name ?? ''}` : `約 ${mins} 分鐘到 ${next?.name ?? ''}`);
             const bg = (multiCompany && companyColor(b.company)) || brand;
             const fg = multiCompany && b.company ? companyInk(b.company) : ink;
-            node.innerHTML = `<span style="background:${bg}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="${fg}" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM18 11H6V6h12v5Z"/></svg></span>${isLast ? '<b class="map-bus-tag">尾班</b>' : ''}`;
+            // 車輛圖示：專線小巴畫小巴，其他畫巴士
+            node.innerHTML = `<span style="background:${bg}" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="${fg}" d="${VEHICLE_PATH(b.company ?? company)}"/></svg></span>${isLast ? '<b class="map-bus-tag">尾班</b>' : ''}`;
             busMarkers.push(new maplibregl.Marker({ element: node }).setLngLat(where).addTo(map));
           }
           // 打開站後第一次：調整地圖，同時睇到個站同最近嗰架車；左右留位，站名標籤唔會俾地圖邊切走
@@ -286,18 +288,20 @@ export default function RouteMap({ lines, stops, multiCompany = false, company }
   }, [lines, stops, multiCompany, company, dark]);
 
   const [help, setHelp] = useState(false);
+  // 說明掣、對話框標題跟車種（巴士／小巴）
+  const helpTitle = `${vehicleNoun(company)}位置點樣計？`;
   return (
     <div className="route-map-wrap">
       <div ref={el} className="route-map card" role="region" aria-label="路線地圖">
         {failed && <p className="map-failed muted">地圖載入唔到（{failed}），站點列表照用得</p>}
       </div>
-      <button className="map-help-btn" onClick={() => setHelp((h) => !h)} aria-expanded={help} aria-label="巴士位置點樣計？">
+      <button className="map-help-btn" onClick={() => setHelp((h) => !h)} aria-expanded={help} aria-label={helpTitle}>
         <Icon name="info" size={20} />
       </button>
       {help &&
         createPortal(
           <div className="map-help-backdrop" onClick={() => setHelp(false)}>
-            <div className="map-help card" role="dialog" aria-modal="true" aria-label="巴士位置點樣計" onClick={(e) => e.stopPropagation()}>
+            <div className="map-help card" role="dialog" aria-modal="true" aria-label={helpTitle.replace('？', '')} onClick={(e) => e.stopPropagation()}>
               <MapHelpText company={company} multiCompany={multiCompany} />
               <button className="map-help-close" onClick={() => setHelp(false)}>知道</button>
             </div>
@@ -315,11 +319,12 @@ function stopTag(s: MapStop, color: string, ink: string): string {
   return `<span class="map-tag-num" style="background:${color};color:${ink}">${s.index + 1}</span><span class="map-tag-name">${esc(s.name)}</span>`;
 }
 
-const CO_NAME: Record<string, string> = { CTB: '城巴', KMB: '九巴', NLB: '新大嶼山巴士', MTRB: '港鐵巴士' };
+/** 「?」說明用嘅公司名（新大嶼山巴士全寫） */
+const coName = (company: string) => (company === 'NLB' ? '新大嶼山巴士' : companyNames([company]) || '巴士公司');
 
-/** 「?」說明：按公司講（港鐵巴士有真 GPS，其他係推算） */
+/** 「?」說明：按公司講（港鐵巴士有真 GPS，其他係推算；專線小巴冇 GPS、未開出唔出） */
 function MapHelpText({ company, multiCompany }: { company: string; multiCompany: boolean }) {
-  const src = multiCompany ? '城巴同九巴' : (CO_NAME[company] ?? '巴士公司');
+  const src = multiCompany ? '城巴同九巴' : coName(company);
   const estimate = (
     <>
       <li>每 20 秒讀取{src}每個站嘅到站時間，睇邊架車已經過咗邊個站，推算佢喺邊兩個站之間。</li>
@@ -336,6 +341,20 @@ function MapHelpText({ company, multiCompany }: { company: string; multiCompany:
           <li>未開出、或者冇 GPS 嘅車，位置按到站時間推算。</li>
         </ul>
         <p className="muted">僅供參考，以港鐵巴士到站時間為準。</p>
+      </>
+    );
+  }
+  if (company === 'GMB') {
+    return (
+      <>
+        <strong>小巴位置點樣計？</strong>
+        <p>專線小巴冇提供 GPS：地圖上嘅小巴位置係<b>推算</b>出嚟：</p>
+        <ul>
+          <li>每 20 秒讀取每個站嘅到站時間，睇邊架車已經過咗邊個站，推算佢喺邊兩個站之間。</li>
+          <li>未開出（按時間表，到站時間標「原定」）嘅班次唔會喺地圖出現。</li>
+          <li>到站時間推遲（例如塞車）時，小巴會停喺原位，唔會倒退，等時間追上先再郁。</li>
+        </ul>
+        <p className="muted">僅供參考，以專線小巴到站時間為準。</p>
       </>
     );
   }

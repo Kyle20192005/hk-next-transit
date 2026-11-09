@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { formatDistance, type Company } from '@hknt/core';
+import { formatDistance, routeCode, type Company } from '@hknt/core';
 import CompanyTag from './CompanyTag';
+import RegionTag from './RegionTag';
 import Icon from './Icon';
 import { warmRoute } from '@/lib/prefetch';
 import type { Co } from '@/lib/data';
@@ -24,7 +25,7 @@ interface HereRoute {
 const REFRESH_MS = 30_000;
 
 /**
- * 「喺度搭得」：打開咗嘅站（連 40 米內其他公司嘅站）可以搭嘅所有路線同下一兩班車。
+ * 「喺度搭得」：打開咗嘅站（連 40 米內其他公司嘅站，包括專線小巴站）可以搭嘅所有路線同下一兩班車。
  * 由右邊拉出（同詳細班次一樣）；撳一行入嗰條線，並打開同一個站。
  */
 export default function HereDrawer({ lat, lng, name, current }: { lat: number; lng: number; name: string; current: { co: Co; route: string; dir: 'O' | 'I' } }) {
@@ -65,7 +66,8 @@ export default function HereDrawer({ lat, lng, name, current }: { lat: number; l
   return (
     <>
       <button className="pill-btn" onClick={() => setOpen(true)} aria-haspopup="dialog">
-        <Icon name="bus" size={18} />
+        {/* 圖示跟而家睇緊嘅路線：專線小巴用小巴（同 App 一樣） */}
+        <Icon name={current.co === 'gmb' ? 'minibus' : 'bus'} size={18} />
         喺度搭得
       </button>
       {open && (
@@ -99,7 +101,10 @@ export default function HereDrawer({ lat, lng, name, current }: { lat: number; l
                         onClick={() => setOpen(false)}
                       >
                         <span className="route-id">
-                          <span className="route-num sm">{r.route}</span>
+                          <span className="route-num-row">
+                            <span className="route-num sm">{routeCode(r.co, r.route)}</span>
+                            <RegionTag co={r.co} route={r.route} />
+                          </span>
                           <CompanyTag companies={r.companies} />
                         </span>
                         <span className="here-text">

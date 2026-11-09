@@ -402,6 +402,14 @@ create policy own on user_settings using (user_id = auth.uid()) with check (user
 - [ ] 前端改經 tracker：**暫時關**（`AREA_ETAS_VIA_TRACKER = false`）。2026-11-08 正式環境實測：首頁一次 8 個站頭，
       中環一個位置要成 90 個上游請求，`UPSTREAM_RPS=8` 下 tracker 排隊十幾秒，前端 1.5 秒後同時問 Vercel → 兩邊都做（浪費一倍）。
       量完上限、調高 `UPSTREAM_RPS` 再開；或者先做「九巴成條線一次過」同按站合併請求，減少每個位置要問幾多次
+- [x] 專線小巴（2026-11，0.29.0）：`data.etagmb.gov.hk`（CloudFront + API Gateway，冇見過 rate-limit header）。
+      `/eta/stop/{站}` 一次攞晒成個站所有路線，`/api/buses` 每個站每輪 1 個請求（11 個站嘅方向每 15 秒約每秒 0.75 個）。
+      tracker：`companyOf` 認 `etagmb`（`/health` 分開統計 GMB）；500「ETA unavailable」同 404 = 呢個站冇到站服務，
+      照 cache 10 秒、唔計 `errorRate`（`isSoftMiss`），唔係每次再問；probe 加第三部伺服器（`PROBE_ONLY=gmb`，一個站一個網址）。
+      暫定 tracker `data.etagmb.gov.hk=8`、pipeline `GMB_RPS=3`。
+      `/api/here`、`/api/stop-etas`（同 Vercel 一樣）要 `gmb=1` 先有專線小巴（舊版 App 唔識新公司）；`/api/here` 最多 6 個巴士站 + 3 個小巴站。
+- [ ] 部署後量專線小巴上限：`PROBE_ONLY=gmb node dist/probe.js`（每級 5／10／15／20），tracker 設第一級出錯嘅約 60%，
+      tracker + pipeline 加埋低過嗰級；結果寫返呢度
 - 之後：九巴改用 `route-eta`（成條線一次）代替逐站，請求量大減
 
 ### 階段 1b：WebSocket 推送

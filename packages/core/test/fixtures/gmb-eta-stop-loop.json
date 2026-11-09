@@ -1,0 +1,239 @@
+{
+ "type": "ETA-Stop",
+ "version": "1.0",
+ "generated_timestamp": "2026-11-09T21:40:53.255+08:00",
+ "data": [
+  {
+   "route_id": 2000970,
+   "route_seq": 1,
+   "stop_seq": 1,
+   "enabled": true,
+   "eta": [
+    {
+     "eta_seq": 1,
+     "diff": 15,
+     "timestamp": "2026-11-09T21:56:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    },
+    {
+     "eta_seq": 2,
+     "diff": 43,
+     "timestamp": "2026-11-09T22:24:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    }
+   ]
+  },
+  {
+   "route_id": 2000968,
+   "route_seq": 1,
+   "stop_seq": 1,
+   "enabled": true,
+   "eta": [
+    {
+     "eta_seq": 1,
+     "diff": 7,
+     "timestamp": "2026-11-09T21:48:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    },
+    {
+     "eta_seq": 2,
+     "diff": 19,
+     "timestamp": "2026-11-09T22:00:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    },
+    {
+     "eta_seq": 3,
+     "diff": 31,
+     "timestamp": "2026-11-09T22:12:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    }
+   ]
+  },
+  {
+   "route_id": 2000967,
+   "route_seq": 1,
+   "stop_seq": 1,
+   "enabled": true,
+   "eta": [
+    {
+     "eta_seq": 1,
+     "diff": 7,
+     "timestamp": "2026-11-09T21:48:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    },
+    {
+     "eta_seq": 2,
+     "diff": 19,
+     "timestamp": "2026-11-09T22:00:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    },
+    {
+     "eta_seq": 3,
+     "diff": 31,
+     "timestamp": "2026-11-09T22:12:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    }
+   ]
+  },
+  {
+   "route_id": 2000971,
+   "route_seq": 1,
+   "stop_seq": 1,
+   "enabled": true,
+   "eta": [
+    {
+     "eta_seq": 1,
+     "diff": 7,
+     "timestamp": "2026-11-09T21:48:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    },
+    {
+     "eta_seq": 2,
+     "diff": 19,
+     "timestamp": "2026-11-09T22:00:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    },
+    {
+     "eta_seq": 3,
+     "diff": 31,
+     "timestamp": "2026-11-09T22:12:00.000+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    }
+   ]
+  },
+  {
+   "route_id": 2000967,
+   "route_seq": 1,
+   "stop_seq": 7,
+   "enabled": true,
+   "eta": [
+    {
+     "eta_seq": 1,
+     "diff": 19,
+     "timestamp": "2026-11-09T22:00:16.297+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    },
+    {
+     "eta_seq": 2,
+     "diff": 31,
+     "timestamp": "2026-11-09T22:12:16.297+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    },
+    {
+     "eta_seq": 3,
+     "diff": 43,
+     "timestamp": "2026-11-09T22:24:16.297+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    }
+   ]
+  },
+  {
+   "route_id": 2000971,
+   "route_seq": 1,
+   "stop_seq": 13,
+   "enabled": true,
+   "eta": [
+    {
+     "eta_seq": 1,
+     "diff": 3,
+     "timestamp": "2026-11-09T21:43:34.231+08:00",
+     "remarks_tc": null,
+     "remarks_sc": null,
+     "remarks_en": null
+    },
+    {
+     "eta_seq": 2,
+     "diff": 13,
+     "timestamp": "2026-11-09T21:53:37.931+08:00",
+     "remarks_tc": null,
+     "remarks_sc": null,
+     "remarks_en": null
+    },
+    {
+     "eta_seq": 3,
+     "diff": 24,
+     "timestamp": "2026-11-09T22:04:25.141+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    }
+   ]
+  },
+  {
+   "route_id": 2000968,
+   "route_seq": 1,
+   "stop_seq": 14,
+   "enabled": true,
+   "eta": [
+    {
+     "eta_seq": 1,
+     "diff": 9,
+     "timestamp": "2026-11-09T21:50:04.999+08:00",
+     "remarks_tc": null,
+     "remarks_sc": null,
+     "remarks_en": null
+    },
+    {
+     "eta_seq": 2,
+     "diff": 15,
+     "timestamp": "2026-11-09T21:55:42.968+08:00",
+     "remarks_tc": null,
+     "remarks_sc": null,
+     "remarks_en": null
+    },
+    {
+     "eta_seq": 3,
+     "diff": 28,
+     "timestamp": "2026-11-09T22:08:36.155+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    }
+   ]
+  },
+  {
+   "route_id": 2000970,
+   "route_seq": 1,
+   "stop_seq": 16,
+   "enabled": true,
+   "eta": [
+    {
+     "eta_seq": 1,
+     "diff": 33,
+     "timestamp": "2026-11-09T22:14:19.949+08:00",
+     "remarks_tc": "未開出",
+     "remarks_sc": "未开出",
+     "remarks_en": "Scheduled"
+    }
+   ]
+  }
+ ]
+}

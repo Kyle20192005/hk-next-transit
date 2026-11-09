@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
-import { COMPANIES, filterNews, formatDistance, groupStopHeads, LRT_BRAND, lrtRoute, lrtStopName, lrtStopRoutes, mtrLine, mtrStationLines, mtrStationName, nearestRailStation, radiusLabel, toolById, TRAM_BRAND, tramStopTitle, type NewsFilter, type ToolId } from '@hknt/core';
+import { companyInfo, filterNews, formatDistance, groupStopHeads, LRT_BRAND, lrtRoute, lrtStopName, lrtStopRoutes, mtrLine, mtrStationLines, mtrStationName, nearestRailStation, radiusLabel, routeCode, toolById, TRAM_BRAND, tramStopTitle, type NewsFilter, type ToolId } from '@hknt/core';
 import { Icon } from '@/components/Icon';
 import { HomeHeader } from '@/components/HomeHeader';
 import { useNearbyStops } from '@/components/Nearby';
@@ -14,6 +14,7 @@ import { openLrt, openMtr, openTram } from '@/lib/open-mtr';
 import { useRecent } from '@/lib/recent';
 import { usePrefs } from '@/lib/prefs';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
+import { RegionTag } from '@/components/ui';
 
 const RECENT_SHOWN = 5;
 /** 大字下面兩行（最近鐵路站、最近巴士站）字大細（2026-11 用戶要求細啲：14 → 12，同網頁 .hero-sub 一樣） */
@@ -40,7 +41,9 @@ export default function HomeTab() {
     return () => clearTimeout(id);
   }, [hasPos]);
 
-  const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
+  // 「最近巴士站」：唔計專線小巴站（大卡「下班車」照出小巴站）；冇地區名先用最近站頭名，嗰度小巴站都計（例如布袋澳得小巴站）
+  const head = state.kind === 'ok' ? groupStopHeads(state.stops.filter((s) => s.co !== 'gmb'))[0] : undefined;
+  const nameHead = state.kind === 'ok' ? (head ?? groupStopHeads(state.stops)[0]) : undefined;
   const area = state.kind === 'ok' ? state.area : null;
   // 最近鐵路站（2 公里內）：港鐵站同輕鐵站邊個近出邊個，只出一行（同網頁一樣，2026-11 用戶要求）
   const railNear = state.kind === 'ok' ? nearestRailStation(state.mtr, state.lat, state.lng) : null;
@@ -143,10 +146,10 @@ export default function HomeTab() {
           )}
         </Section>
 
-        {/* 最近睇過：巴士路線、港鐵站、輕鐵站同電車站；未有記錄都出，話俾人知點樣先會記低 */}
+        {/* 最近睇過：巴士路線、小巴路線、港鐵站、輕鐵站同電車站；未有記錄都出，話俾人知點樣先會記低 */}
         <Section title="最近睇過">
           <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
-            {recent.length === 0 && <Text style={{ padding: 14, color: t.muted, lineHeight: 20 }}>未有記錄：打開巴士路線、港鐵站、輕鐵站或者電車站就會喺度見到，方便再開。</Text>}
+            {recent.length === 0 && <Text style={{ padding: 14, color: t.muted, lineHeight: 20 }}>未有記錄：打開巴士路線、小巴路線、港鐵站、輕鐵站或者電車站就會喺度見到，方便再開。</Text>}
             {recent.slice(0, RECENT_SHOWN).map((r, i) => {
               const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: t.line };
               if (r.co === 'tram') {
@@ -199,7 +202,8 @@ export default function HomeTab() {
                     <Icon name="chevron-right" size={18} color={t.muted} />
                   </Pressable>
                 );
-              const c = COMPANIES[r.companies[0] ?? 'CTB'];
+              // 唔認得嘅公司用 companyInfo 後備，唔好 throw
+              const c = companyInfo(r.companies[0] ?? 'CTB');
               const co = r.co;
               return (
                 <Pressable
@@ -210,8 +214,9 @@ export default function HomeTab() {
                   style={row}
                 >
                   <View style={{ minWidth: 56, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: 'center', backgroundColor: c.bg }}>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink, ...tabular }}>{r.route}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink, ...tabular }}>{routeCode(co, r.route)}</Text>
                   </View>
+                  <RegionTag co={co} route={r.route} inline />
                   <Text numberOfLines={1} style={{ flex: 1, fontSize: 16, fontWeight: '600', color: t.text }}>
                     <Text style={{ fontSize: 13, fontWeight: '500', color: t.muted }}>往 </Text>
                     {r.dest}
@@ -228,9 +233,9 @@ export default function HomeTab() {
         scrollY={scrollY}
         onHeight={setHeaderH}
         onRange={setRange}
-        name={area ? area.n : head ? head.name : state.kind === 'locating' ? '定位中…' : '香港'}
+        name={area ? area.n : nameHead ? nameHead.name : state.kind === 'locating' ? '定位中…' : '香港'}
         en={area?.en}
-        pill={area ? area.n : head ? head.name : null}
+        pill={area ? area.n : nameHead ? nameHead.name : null}
         onSearch={() => go('nav')}
         sub={
           state.kind === 'ok' ? (

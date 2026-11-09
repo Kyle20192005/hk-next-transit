@@ -4,6 +4,7 @@ import { fetchKmbEta } from './kmb';
 import { inferAll } from './infer';
 import { fetchNlbEta } from './nlb';
 import { fetchMtrbEta } from './mtrb';
+import { gmbEtas } from './gmb';
 
 /**
  * 某條路線喺某個站嘅到站時間：聯營線合併城巴同九巴兩間公司嘅車，按時間排。
@@ -14,6 +15,8 @@ import { fetchMtrbEta } from './mtrb';
  * - 九巴嘅方向（bound）同城巴可以相反，所以九巴班次嘅 dir 改做呢個走法喺呢個站用嘅方向，
  *   等前端照用 e.dir 篩選。
  * - 城巴「九巴時段」、九巴「城巴時段」呢類冇時間嘅佔位項目會過濾走。
+ * - 專線小巴：一次 /eta/stop 攞晒成個站，按 (route_id, route_seq) 對走法（certain）；
+ *   500「ETA unavailable」= 呢個站冇到站服務，當冇車，唔當攞唔到（failed）。
  */
 export async function etasAtStop(
   route: RouteData,
@@ -87,6 +90,9 @@ export async function etasAtStopDetailed(
       );
     }
   }
+
+  // 專線小巴：走法由 (route_id, route_seq) 指明，唔使推斷；冇 GPS（「未開出」= scheduled）
+  if (route.company === 'GMB') parts.push(retry(() => gmbEtas(stopId, [route], fetcher)).catch(fail('GMB')));
 
   if (route.company === 'CTB' && companies.includes('CTB')) {
     parts.push(

@@ -1,9 +1,9 @@
 'use client';
 import { forwardRef } from 'react';
 import { formatDistance, lastBusText, shortName, updatedAgo, type Eta, type LastBus } from '@hknt/core';
-import BusIcon from './BusIcon';
+import VehicleIcon from './VehicleIcon';
 import CompanyTag from './CompanyTag';
-import { COMPANIES } from '@/lib/company';
+import { companyInfo } from '@hknt/core';
 import FavButton from './FavButton';
 import HereDrawer from './HereDrawer';
 import type { Co } from '@/lib/data';
@@ -22,7 +22,8 @@ export interface RowBus {
   half: 'below' | 'above';
   t: number;
   label: string;
-  /** 公司代表色同上面圖示色 */
+  /** 公司（專線小巴畫小巴圖示）、代表色同上面圖示色 */
+  company?: string;
   color?: string;
   ink?: string;
   /** 尾班車（追蹤緊）：旁邊標「尾班」 */
@@ -114,7 +115,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
     <li className={`stop${open ? ' open' : ''}${terminus ? ' terminus' : ''}${pickable ? ' pickable' : ''}${isAlight ? ' alight' : ''}`} ref={ref}>
       {buses.map((b) => (
         <span key={b.key} className={`tl-bus${b.schedule ? ' is-schedule' : ''}${b.last ? ' is-last' : ''}`} style={{ top: busTop(b), ...(b.color ? { background: b.color, color: b.ink } : {}) }} title={b.label} aria-hidden="true">
-          <BusIcon />
+          <VehicleIcon company={b.company} />
         </span>
       ))}
       <button onClick={onToggle} aria-expanded={open}>
@@ -224,7 +225,7 @@ const StopRow = forwardRef<HTMLLIElement, Props>(function StopRow(
           )}
           {failed.length > 0 && (
             <div className="eta-failed" role="status">
-              <Icon name="warning" size={16} /> {failed.map((c) => COMPANIES[c as keyof typeof COMPANIES]?.name ?? c).join('、')}資料暫時攞唔到，可能少咗班次，稍後會自動再試
+              <Icon name="warning" size={16} /> {failed.map((c) => companyInfo(c).name).join('、')}資料暫時攞唔到，可能少咗班次，稍後會自動再試
             </div>
           )}
           {/* 動作列：喺到站時間下面，唔好同大字搶位 */}

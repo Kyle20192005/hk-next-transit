@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { busDepartureRows, favDepartureRows, groupFavorites, groupStopHeads, minutesLabel } from './departures';
+import { busDepartureRows, favDepartureRows, groupFavorites, groupStopHeads, isGmbOnlyHead, minutesLabel, nearCardHeads } from './departures';
 
 describe('groupStopHeads', () => {
   it('40 米內嘅站併做一個站頭，遠啲嘅另開', () => {
@@ -7,6 +7,22 @@ describe('groupStopHeads', () => {
     const heads = groupStopHeads([s('a', 22.28, 10), s('b', 22.2802, 30), s('c', 22.282, 200)]);
     expect(heads.map((h) => h.stops.map((x) => x.id))).toEqual([['a', 'b'], ['c']]);
     expect(heads[0]!.distance).toBe(10);
+  });
+});
+
+describe('nearCardHeads', () => {
+  // 每個站隔 100 米（唔會併埋）；co 跟次序
+  const s = (id: string, co: string, k: number) => ({ id, co, name: id, lat: 22.28 + k * 0.001, lng: 114.16, distance: k * 100 });
+  it('巴士站頭同淨係小巴嘅站頭分開計上限，再按距離排', () => {
+    const stops = [s('g1', 'gmb', 0), s('g2', 'gmb', 1), s('b1', 'ctb', 2), s('g3', 'gmb', 3), s('b2', 'kmb', 4), s('b3', 'ctb', 5)];
+    const heads = nearCardHeads(stops, 2, 2);
+    expect(heads.map((h) => h.key)).toEqual(['gmb-g1', 'gmb-g2', 'ctb-b1', 'kmb-b2']);
+  });
+  it('有巴士站嘅站頭（連埋小巴站）當巴士站頭', () => {
+    const stops = [s('g1', 'gmb', 0), { ...s('b1', 'ctb', 0), lat: 22.2801 }, s('b2', 'ctb', 3)];
+    const heads = nearCardHeads(stops, 1, 5);
+    expect(heads.map((h) => h.stops.map((x) => x.id))).toEqual([['g1', 'b1']]);
+    expect(isGmbOnlyHead(heads[0]!)).toBe(false);
   });
 });
 
@@ -67,6 +83,26 @@ describe('favDepartureRows', () => {
     );
     expect(rows.map((r) => r.badge.text)).toEqual(['C', 'B', 'A']);
     expect(minutesLabel(rows[2]!.at, now)).toBe('');
+  });
+});
+
+describe('專線小巴標籤', () => {
+  const now = Date.parse('2026-11-09T21:40:00+08:00');
+  it('標籤拎走地區（NT-2 → 2），key 同 link 照用完整路線檔名', () => {
+    const [row] = busDepartureRows(
+      [{ co: 'gmb', route: 'KLN-25MS', dir: 'O', dest: '彩虹', companies: ['GMB'], stopId: '20000024', etas: [{ eta: new Date(now + 3 * 60000).toISOString(), company: 'GMB', scheduled: true }] }],
+      now,
+    );
+    expect(row!.badge).toEqual({ text: '25MS', bg: '#1E9E5A', ink: '#0A1F12' });
+    expect(row!.key).toBe('gmb-KLN-25MS-O');
+    expect(row!.link).toEqual({ co: 'gmb', route: 'KLN-25MS', dir: 'O', stop: '20000024' });
+    expect(row!.scheduled).toBe(true);
+  });
+  it('收藏卡一樣', () => {
+    const [row] = favDepartureRows([{ fav: { co: 'gmb', route: 'NT-2', dir: 'I', dest: '大埔', companies: ['GMB'], stopId: '20003337' }, etas: [] }], now);
+    expect(row!.badge.text).toBe('2');
+    expect(row!.link.route).toBe('NT-2');
+    expect(row!.noService).toBe(true);
   });
 });
 

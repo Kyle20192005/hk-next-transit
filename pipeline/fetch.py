@@ -7,14 +7,21 @@
 - 新大嶼山巴士、港鐵巴士：路線、站點、車費
 - 港鐵巴士走線：OpenStreetMap（政府 CSDI 冇港鐵巴士走線；ODbL，要註明「© OpenStreetMap 貢獻者」）
 - 站到站平均行車時間（hk-bus-time-between-stops）
+- 專線小巴（全部可選：失敗只係今次冇小巴，唔會令成個更新失敗）：
+  運輸署 JSON_GMB.json（站序、站名、座標、全程車費）、CSDI 專線小巴走線（GMB_ROUTE_LINE）、
+  專線小巴 API 路線資料（data.etagmb.gov.hk，走法名稱「正常班次」「特別班次」等）
 用法: python3 pipeline/fetch.py [--skip-existing]
 
 data.gov.hk（rt.data.gov.hk）冇公開請求上限，但同一個 IP 問得太密會回 403（2026-11-08 喺 VPS 用 32 條線程即刻俾人擋）。
 所以所有去 rt.data.gov.hk 嘅請求共用一個限速（RT_RPS，預設每秒 8 個），403／429 會等耐啲再試。
 城巴站資料（站名、座標）好少變：設定 CTB_STOP_CACHE（例如 /state/ctb-stops.json）就重用上次嘅，
 每次只問新站，同埋最舊嘅 CTB_STOP_REFRESH 個（預設 400）。
+專線小巴 API（data.etagmb.gov.hk）同 tracker 同一個 IP、上限未量：限速 GMB_RPS（預設每秒 3 個）。
+設定 GMB_STATE_DIR（VPS：/state/gmb）就記住上次成功嘅小巴檔：路線資料每次只問有改過嘅 route_id
+（同埋最耐冇問過嘅 GMB_ROUTE_REFRESH 條，預設 20），任何一個小巴來源下載失敗都用返上次成功嗰份。
+冇 GMB_STATE_DIR（例如 GitHub Actions）而 cache 都冇就全部重新問（大約 575 個請求，每秒 3 個約 3–4 分鐘）。
 """
-import io, json, os, sys, time, zipfile, threading, urllib.error, urllib.request
+import io, json, os, shutil, sys, time, zipfile, threading, urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +31,9 @@ UA = {'User-Agent': 'hk-next-transit-pipeline/0.1'}
 RT_RPS = float(os.environ.get('RT_RPS', '8'))
 CTB_STOP_CACHE = os.environ.get('CTB_STOP_CACHE')
 CTB_STOP_REFRESH = int(os.environ.get('CTB_STOP_REFRESH', '400'))
+GMB_RPS = float(os.environ.get('GMB_RPS', '3'))      # 同 tracker 同一個 IP；未量上限，保守
+GMB_STATE = os.environ.get('GMB_STATE_DIR')          # VPS：/state/gmb，記住上次成功嘅小巴檔
+GMB_ROUTE_REFRESH = int(os.environ.get('GMB_ROUTE_REFRESH', '20'))   # 增量更新時順便重新問最耐冇問過嘅幾多條
 
 
 class RateLimit:
@@ -44,15 +54,23 @@ class RateLimit:
 
 
 RT_LIMIT = RateLimit(RT_RPS)
+GMB_LIMIT = RateLimit(GMB_RPS)
 
 GTFS_URL = 'https://static.data.gov.hk/td/pt-headway-tc/gtfs.zip'
 TD_BUS_URL = 'https://static.data.gov.hk/td/routes-fares-geojson/JSON_BUS.json'
+# 專線小巴：站序、站名、座標、全程車費（同 API、GTFS 同一套 8 位數站 ID）
+TD_GMB_URL = 'https://static.data.gov.hk/td/routes-fares-geojson/JSON_GMB.json'
 CSDI_WFS = ('https://portal.csdi.gov.hk/server/services/common/td_rcd_1638844988873_41214/MapServer/WFSServer'
             '?service=wfs&version=2.0.0&request=GetFeature&typenames=csdi:FB_ROUTE_LINE&outputFormat=geojson')
+# 專線小巴走線：每個 route_id + route_seq 一條（MultiLineString，只有一段）
+CSDI_GMB_WFS = ('https://portal.csdi.gov.hk/server/services/common/td_rcd_1697082463580_57453/MapServer/WFSServer'
+                '?service=wfs&version=2.0.0&request=GetFeature&typenames=csdi:GMB_ROUTE_LINE&outputFormat=geojson')
 CTB = 'https://rt.data.gov.hk/v2/transport/citybus'
 # 九巴：有「全部」endpoint，三次 call 就攞晒
 KMB = 'https://data.etabus.gov.hk/v1/transport/kmb'
 NLB = 'https://rt.data.gov.hk/v2/transport/nlb'
+# 專線小巴 API（運輸署）：CloudFront 後面，重複網址會 cache
+GMB = 'https://data.etagmb.gov.hk'
 MTRB_CSV = 'https://opendata.mtr.com.hk/data'
 # OpenStreetMap：港鐵巴士 network relation，再加冇入 network 嘅接駁巴士 route_master（K12、K14）
 OSM_API = 'https://api.openstreetmap.org/api/0.6'
@@ -69,10 +87,10 @@ TRAM_STOPS_URL = 'https://static.data.gov.hk/tramways/datasets/tram_stops/summar
 
 
 def http(url, timeout=120, tries=6):
-    limited = 'rt.data.gov.hk' in url
+    limiter = RT_LIMIT if 'rt.data.gov.hk' in url else GMB_LIMIT if 'data.etagmb.gov.hk' in url else None
     for i in range(tries):
-        if limited:
-            RT_LIMIT.wait()
+        if limiter:
+            limiter.wait()
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout) as r:
                 return r.read()
@@ -115,16 +133,21 @@ def fetch_td_bus():
     print('JSON_BUS ok')
 
 
+def csdi_features(url, page=500):
+    """CSDI WFS 分頁攞晒所有 feature"""
+    feats = []
+    while True:
+        d = json.loads(http(f'{url}&count={page}&startIndex={len(feats)}', 600))
+        feats += d['features']
+        if len(d['features']) < page:
+            return feats
+
+
 def fetch_csdi_lines():
     path = os.path.join(CACHE, 'csdi_lines.json')
     if done(path):
         return
-    feats, page = [], 500
-    while True:
-        d = json.loads(http(f'{CSDI_WFS}&count={page}&startIndex={len(feats)}', 600))
-        feats += d['features']
-        if len(d['features']) < page:
-            break
+    feats = csdi_features(CSDI_WFS)
     json.dump({'type': 'FeatureCollection', 'features': feats}, open(path, 'w'))
     print('CSDI 走線', len(feats))
 
@@ -269,23 +292,149 @@ def fetch_ctb():
     print('城巴', len(routes), '路線', len(rs), '路線站點', len(ids), '站（今次問咗', len(todo), '個，其餘用 cache）')
 
 
+# ---------------- 專線小巴（全部可選） ----------------
+def write_json(path, data):
+    """先寫暫存檔再改名：寫到一半出錯唔會留低爛檔"""
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+def gmb_state(name):
+    return os.path.join(GMB_STATE, name) if GMB_STATE else None
+
+
+def with_state(name, fn):
+    """專線小巴來源：成功就將 cache/<name> 抄去 GMB_STATE（上次成功嗰份）；
+    失敗就用返 GMB_STATE 嗰份，冇先報錯（fetch 當可選，build 會跳過小巴）"""
+    path, state = os.path.join(CACHE, name), gmb_state(name)
+    try:
+        fn(path)
+    except Exception as e:
+        if state and os.path.exists(state):
+            shutil.copyfile(state, path)
+            print(f'⚠️ 用上次成功嘅 {name}（今次下載失敗：{e}）')
+            return
+        raise
+    if state and os.path.exists(path):
+        try:   # /state 寫唔到唔好令下載失敗
+            os.makedirs(GMB_STATE, exist_ok=True)
+            shutil.copyfile(path, state + '.tmp')
+            os.replace(state + '.tmp', state)
+        except OSError as e:
+            print(f'專線小巴 {name} 寫唔到去 {GMB_STATE}：', e)
+
+
+def _td_gmb(path):
+    if done(path):
+        return
+    raw = http(TD_GMB_URL, 600)
+    n = len(json.loads(raw.decode('utf-8-sig'))['features'])
+    if n < 5000:   # 2026-11：13106 個（路線站點）；太少即係下載唔完整
+        raise RuntimeError(f'JSON_GMB 只有 {n} 個路線站點')
+    with open(path + '.tmp', 'wb') as f:
+        f.write(raw)
+    os.replace(path + '.tmp', path)
+    print('JSON_GMB', n, '個路線站點')
+
+
+def fetch_td_gmb():
+    with_state('td_gmb.json', _td_gmb)
+
+
+def _csdi_gmb_lines(path):
+    if done(path):
+        return
+    feats = csdi_features(CSDI_GMB_WFS)
+    if len(feats) < 500:   # 2026-11：1167 條
+        raise RuntimeError(f'CSDI 專線小巴走線只有 {len(feats)} 條')
+    write_json(path, {'type': 'FeatureCollection', 'features': feats})
+    print('CSDI 專線小巴走線', len(feats))
+
+
+def fetch_csdi_gmb_lines():
+    with_state('csdi_gmb_lines.json', _csdi_gmb_lines)
+
+
+def gmb_get(path):
+    return json.loads(http(f'{GMB}{path}', 60))['data']
+
+
+def _gmb_routes(path):
+    """專線小巴 API 路線資料（走法名稱、方向起訖點）：{'routes': {route_id: {at, lastUpdate, data}}}。
+    有上次嘅（GMB_STATE 或者 cache）就增量：/last-update/route 一次，再只問新嘅、改過嘅 route_id；
+    冇就 /route 攞所有號碼，再逐個 /route/{地區}/{號碼}（一次攞晒嗰個號碼所有 route_id）"""
+    if done(path):
+        return
+    import urllib.parse
+    prev = None
+    for p in (gmb_state('gmb_routes.json'), path):
+        if p and os.path.exists(p):
+            try:
+                prev = json.load(open(p, encoding='utf-8'))['routes']
+                break
+            except Exception as e:   # 爛咗就全部重新問
+                print('專線小巴路線 cache 讀唔到：', e)
+    updates = {str(x['route_id']): x['last_update_date'] for x in gmb_get('/last-update/route')}
+    if len(updates) < 300:   # 2026-11：約 780 個 route_id
+        raise RuntimeError(f'/last-update/route 只有 {len(updates)} 個 route_id')
+    now = int(time.time())
+    # 線程數細：真正限速靠 GMB_LIMIT（同 tracker 同一個 IP）
+    with ThreadPoolExecutor(3) as ex:
+        if prev:
+            changed = [r for r, t in updates.items() if r not in prev or prev[r].get('lastUpdate') != t]
+            seen = set(changed)
+            stale = sorted((r for r in updates if r in prev and r not in seen),
+                           key=lambda r: prev[r].get('at', 0))[:GMB_ROUTE_REFRESH]
+            todo = changed + stale
+            got = list(ex.map(lambda r: gmb_get(f'/route/{r}'), todo))
+            routes = {r: prev[r] for r in updates if r in prev}   # 唔再喺 last-update 嘅 = 取消咗
+            how = f'增量，今次問咗 {len(todo)} 個 route_id'
+        else:
+            pairs = [(reg, code) for reg, codes in gmb_get('/route')['routes'].items() for code in codes]
+            got = list(ex.map(lambda rc: gmb_get(f'/route/{rc[0]}/{urllib.parse.quote(rc[1])}'), pairs))
+            routes = {}
+            how = f'全部重新問，{len(pairs)} 個號碼'
+    for objs in got:
+        for obj in objs or []:
+            rid = str(obj['route_id'])
+            routes[rid] = {'at': now, 'lastUpdate': updates.get(rid), 'data': obj}
+    if len(routes) < 300:
+        raise RuntimeError(f'專線小巴路線只有 {len(routes)} 個 route_id')
+    write_json(path, {'routes': routes})
+    print('專線小巴路線', len(routes), '個 route_id（' + how + '）')
+
+
+def fetch_gmb_routes():
+    with_state('gmb_routes.json', _gmb_routes)
+
+
+# 可選：失敗只會警告（今次可能冇專線小巴），唔會令成個數據更新失敗
+OPTIONAL = {'fetch_td_gmb', 'fetch_csdi_gmb_lines', 'fetch_gmb_routes'}
+
 if __name__ == '__main__':
     os.makedirs(CACHE, exist_ok=True)
     t = time.time()
-    failed = []
+    failed, warned = [], []
 
     def run(f):
         try:
             f()
         except Exception as e:  # 記低，全部做完先一齊報；唔好令 build.py 讀唔到檔先爆
-            failed.append(f'{f.__name__}: {e}')
+            (warned if f.__name__ in OPTIONAL else failed).append(f'{f.__name__}: {e}')
 
-    ths = [threading.Thread(target=run, args=(f,)) for f in (fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_osm_mtrb, fetch_osm_places, fetch_journey_times, fetch_tram_stops)]
+    ths = [threading.Thread(target=run, args=(f,)) for f in (
+        fetch_gtfs, fetch_td_bus, fetch_csdi_lines, fetch_ctb, fetch_kmb, fetch_nlb, fetch_mtrb, fetch_osm_mtrb,
+        fetch_osm_places, fetch_journey_times, fetch_tram_stops, fetch_td_gmb, fetch_csdi_gmb_lines, fetch_gmb_routes)]
     for th in ths: th.start()
     for th in ths: th.join()
+    if warned:
+        print('⚠️ 專線小巴下載失敗（今次可能冇小巴或者少咗走線、走法名，其他照樣更新）：', *warned, sep='\n  ')
+    if any('403' in x for x in failed + warned):
+        print('  403 Forbidden：data.gov.hk／data.etagmb.gov.hk 擋咗呢個 IP（問得太密），等一陣（例如 30–60 分鐘）再試，'
+              '或者減細 RT_RPS／GMB_RPS')
     if failed:
         print('下載失敗：', *failed, sep='\n  ')
-        if any('403' in x for x in failed):
-            print('  403 Forbidden：data.gov.hk 擋咗呢個 IP（問得太密），等一陣（例如 30–60 分鐘）再試，或者減細 RT_RPS')
         sys.exit(1)
     print(f'完成 {time.time() - t:.0f}s')

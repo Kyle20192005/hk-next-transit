@@ -11,6 +11,8 @@ export interface MapBus {
   longitude: number;
   color: string;
   ink: string;
+  /** 架車屬邊間公司（冇就用路線嘅）：專線小巴畫小巴圖示 */
+  company?: string;
   /** 按時間表推算：半透明 */
   schedule: boolean;
   /** 尾班車（追蹤緊）：下面標「尾班」 */

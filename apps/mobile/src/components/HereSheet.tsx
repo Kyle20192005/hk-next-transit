@@ -2,11 +2,11 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatDistance } from '@hknt/core';
+import { formatDistance, routeCode } from '@hknt/core';
 import { api, type Co, type HereRoute } from '@/lib/api';
 import { radius, shadowLg, tabular, useTheme } from '@/lib/theme';
 import { Icon } from './Icon';
-import { CompanyTag, ScheduledTag } from './ui';
+import { CompanyTag, RegionTag, ScheduledTag } from './ui';
 import { warmRoute } from '@/lib/prefetch';
 import { EtaInline } from './EtaInline';
 
@@ -30,7 +30,8 @@ export function HereButton({ target }: { target: HereTarget }) {
         accessibilityRole="button"
         style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: t.brand, transform: [{ scale: pressed ? 0.97 : 1 }] })}
       >
-        <Icon name="bus" size={18} color={t.onBrand} />
+        {/* 圖示跟而家睇緊嘅路線：專線小巴用小巴 */}
+        <Icon name={target.current.co === 'gmb' ? 'minibus' : 'bus'} size={18} color={t.onBrand} />
         <Text style={{ fontSize: 13, fontWeight: '700', color: t.onBrand }}>喺度搭得</Text>
       </Pressable>
       {open && <HereSheet target={target} onClose={() => setOpen(false)} />}
@@ -105,7 +106,11 @@ function HereSheet({ target, onClose }: { target: HereTarget; onClose: () => voi
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: t.line, backgroundColor: isCurrent(r) ? t.brandSoft : 'transparent' }}
                 >
                   <View style={{ width: 96, gap: 3 }}>
-                    <Text style={{ fontSize: 19, fontWeight: '800', color: t.text, ...tabular }}>{r.route}</Text>
+                    {/* 專線小巴：號碼（NT-2 → 2）旁邊標地區 */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Text style={{ fontSize: 19, fontWeight: '800', color: t.text, ...tabular }}>{routeCode(r.co, r.route)}</Text>
+                      <RegionTag co={r.co} route={r.route} inline />
+                    </View>
                     <CompanyTag companies={r.companies} />
                   </View>
                   <View style={{ flex: 1 }}>

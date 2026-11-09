@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { etasAtStop, etasAtStopDetailed, fixCtbDir, pickNlbVariant, type RouteData, type Variant } from '../src';
+import { etasAtStop, etasAtStopDetailed, fixCtbDir, GMB_BASE, pickNlbVariant, type RouteData, type Variant } from '../src';
+import gmbStop from './fixtures/gmb-eta-stop.json';
 
 // 聯營線：城巴路線檔，站 S1 嘅九巴站 ID 係 K1；九巴嘅 bound 同城巴相反（城巴 O = 九巴 I）
 const route = {
@@ -180,6 +181,63 @@ describe('新大嶼山巴士、港鐵巴士', () => {
       ['331', false, true],
       ['540', true, false],
     ]);
+  });
+});
+
+describe('專線小巴', () => {
+  const STOP = '20000024';
+  // NT-X：正常走法 2006408（route_seq 1，經呢個站 stop_seq 4）同反方向嘅 2006510（route_seq 2）
+  const gmb = {
+    company: 'GMB', companies: ['GMB'], route: 'NT-X', region: 'NT', code: 'X',
+    origTc: '起點', destTc: '終點', origEn: 'From', destEn: 'To',
+    stops: { [STOP]: { nameTc: '站', nameEn: '', lat: 22.4, lng: 114.1 } }, directions: { O: [STOP], I: [STOP] }, ctbOnlyStops: [],
+    variants: [
+      { id: '2006408-1', govRouteId: '2006408', govDir: '1', name: '起點 - 終點', special: false, stops: [STOP], stopDirs: ['O'], stopMatch: ['A'],
+        offsets: [0], schedules: [], line: null, lineAligned: false, expSeq: { [`O:${STOP}`]: 4 }, gmb: { routeId: '2006408', routeSeq: 1 } },
+      { id: '2006510-2', govRouteId: '2006510', govDir: '2', name: '終點 - 起點', special: false, stops: [STOP], stopDirs: ['I'], stopMatch: ['A'],
+        offsets: [0], schedules: [], line: null, lineAligned: false, expSeq: { [`I:${STOP}`]: 9 }, gmb: { routeId: '2006510', routeSeq: 2 } },
+    ],
+  } as unknown as RouteData;
+
+  it('一次 /eta/stop，按 route_id + route_seq 對走法，走法 certain，未開出 = 原定', async () => {
+    const calls: string[] = [];
+    const f = (async (input: RequestInfo | URL) => (calls.push(String(input)), new Response(JSON.stringify(gmbStop)))) as typeof fetch;
+    const r = await etasAtStopDetailed(gmb, STOP, {}, f);
+    expect(calls).toEqual([`${GMB_BASE}/eta/stop/${STOP}`]);
+    expect(r.failed).toEqual([]);
+    expect(r.etas.map((e) => [e.eta!.slice(11, 16), e.dir, e.variant?.variantId, e.scheduled])).toEqual([
+      ['21:55', 'O', '2006408-1', true],
+      ['21:55', 'I', '2006510-2', true],
+      ['22:05', 'I', '2006510-2', true],
+      ['22:06', 'O', '2006408-1', true],
+      ['22:15', 'I', '2006510-2', true],
+      ['22:18', 'O', '2006408-1', true],
+    ]);
+    expect(r.etas.every((e) => e.company === 'GMB' && e.variant?.confidence === 'certain' && e.route === 'NT-X')).toBe(true);
+    expect(r.etas[0]).toMatchObject({ destTc: '終點', seq: 4, remarkTc: '未開出' });
+    expect(r.etas[1]).toMatchObject({ destTc: '起點', seq: 9 });
+  });
+
+  it('「ETA unavailable」= 冇到站服務：冇班次，但唔當攞唔到', async () => {
+    let calls = 0;
+    const f = (async () => (calls++, new Response(JSON.stringify({ code: 500, message: 'ETA unavailable' }), { status: 500 }))) as typeof fetch;
+    expect(await etasAtStopDetailed(gmb, STOP, {}, f)).toEqual({ etas: [], failed: [] });
+    expect(calls).toBe(1); // 唔使重試
+  });
+
+  it('重試都唔得：failed GMB', async () => {
+    let calls = 0;
+    const f = (async () => (calls++, new Response('bad gateway', { status: 502 }))) as typeof fetch;
+    expect(await etasAtStopDetailed(gmb, STOP, {}, f)).toEqual({ etas: [], failed: ['GMB'] });
+    expect(calls).toBe(2);
+  });
+
+  it('唔會問城巴、九巴', async () => {
+    const f = (async (input: RequestInfo | URL) => {
+      expect(String(input).startsWith(GMB_BASE)).toBe(true);
+      return new Response(JSON.stringify({ data: [] }));
+    }) as typeof fetch;
+    expect((await etasAtStopDetailed(gmb, STOP, {}, f)).etas).toEqual([]);
   });
 });
 

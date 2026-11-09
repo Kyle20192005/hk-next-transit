@@ -6,10 +6,13 @@
   out/tram.json            香港電車路線、站序、估計到站秒數、開車時間（pipeline/tram.py）
   out/ctb/index.json       城巴路線列表
   out/ctb/<路線>.json      每條路線：站點、走法、時間表、走線、ETA seq 對照、站到站行車時間
+  out/kmb/、nlb/、mtrb/    九巴（連龍運）、新大嶼山巴士、港鐵巴士路線檔（kmb.py、others.py）
+  out/gmb/<地區-號碼>.json  專線小巴路線檔（gmb.py，例如 NT-2）；出錯就跳過，原因寫 out/report/gmb_skipped.txt
+  out/index.json、stops.json  所有公司嘅統一路線索引同站點索引（out/ctb/ 嘅只有城巴，俾舊 App）
   out/report/ctb_stop_map.csv  站點配對結果（A/B/C/X 分級，用嚟人手覆核）
 用法: python3 pipeline/build.py
 """
-import csv, collections, datetime as dt, json, math, os, re
+import csv, collections, datetime as dt, json, math, os, re, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE, OUT = os.path.join(HERE, 'cache'), os.path.join(HERE, 'out')
@@ -77,6 +80,15 @@ def line_len(seg):
 def hhmm_to_min(t):
     h, m = t.replace(':', '')[:2], t.replace(':', '')[2:4]
     return int(h) * 60 + int(m)
+
+
+REGION_ORDER = {'HKI': 1, 'KLN': 2, 'NT': 3}
+
+
+def route_key(r):
+    """路線排序：按顯示號碼（專線小巴拎走地區，NT-2 當 2），同號碼按地區（港島、九龍、新界），再按公司"""
+    c = r.get('code') or r['route']
+    return (re.sub(r'\D', '', c).zfill(4) if re.match(r'^\d', c) else 'Z' + c, c, REGION_ORDER.get(r.get('region'), 0), r.get('co', ''))
 
 
 # ---------- 讀政府 GTFS ----------
@@ -245,7 +257,11 @@ def segment_times(v, cstops, journey):
     有實測數據（hk-bus-time-between-stops）就用；冇就用距離除以呢個走法實測段嘅平均車速。
     回傳 (秒數列表, 係咪實測列表)
     """
-    stops = variant_stop_order(v)
+    return pair_times(variant_stop_order(v), cstops, journey)
+
+
+def pair_times(stops, cstops, journey):
+    """站 ID 列表相鄰兩個站嘅行車時間（秒）同係咪實測（segment_times 用；專線小巴按真實站序計，連重複站）"""
     pos = lambda sid: (cstops[sid]['lat'], cstops[sid]['lng'])
     pairs = list(zip(stops, stops[1:]))
     dists = [dist(pos(a), pos(b)) for a, b in pairs]
@@ -495,7 +511,6 @@ def main():
             continue
         index.append({'co': 'ctb', 'companies': ['CTB'], 'route': rno, 'origTc': info['orig_tc'], 'destTc': info['dest_tc'],
                       'dirs': sorted(dirs, reverse=True), 'variants': len(vs), 'special': 0})
-    route_key = lambda r: (re.sub(r'\D', '', r['route']).zfill(4) if re.match(r'^\d', r['route']) else 'Z' + r['route'], r['route'], r.get('co', ''))
     index.sort(key=route_key)
     kmb_primary_done = set()
     kmb_index, kmb_by_stop, kstops = K.build_kmb({
@@ -508,6 +523,20 @@ def main():
     import others as O
     octx = {'lines': lines, 'journey': journey, 'used_services': used_services}
     other_parts = [('nlb',) + O.build_nlb(octx), ('mtrb',) + O.build_mtrb(octx)]
+    # 專線小巴：出錯（例如 JSON_GMB 下載唔到、格式改咗）唔好拖累成個數據更新：跳過，寫低原因（check.py 當警告）
+    shutil.rmtree(f'{OUT}/gmb', ignore_errors=True)   # 唔好留低上次嘅路線檔（取消咗嘅路線）
+    for x in ('gmb_skipped.txt', 'gmb_missing.txt'):    # 上次嘅報告（check.py 會讀）
+        if os.path.exists(f'{OUT}/report/{x}'):
+            os.remove(f'{OUT}/report/{x}')
+    try:
+        import gmb as GM   # 喺 try 入面：gmb.py 本身出錯（例如打錯字）都唔好拖累巴士數據
+        other_parts.append(('gmb',) + GM.build_gmb({'journey': journey, 'used_services': used_services, 'fares': fares}))
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        shutil.rmtree(f'{OUT}/gmb', ignore_errors=True)
+        os.makedirs(f'{OUT}/report', exist_ok=True)
+        open(f'{OUT}/report/gmb_skipped.txt', 'w', encoding='utf-8').write(traceback.format_exc())
+        print('⚠️ 專線小巴數據生成失敗，今次冇小巴：', repr(e))
     # 站點索引（附近車站用）：每個城巴站有邊幾條路線、邊個方向、往邊度
     by_stop = collections.defaultdict(list)
     for (rno, d), l in clists.items():

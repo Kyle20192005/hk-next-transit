@@ -70,6 +70,14 @@ export class TokenBucket {
 
 type Stored = { at: number; status: number; contentType: string; body: string };
 
+/**
+ * 「冇到站服務」嘅回應：專線小巴個站冇 ETA 服務會回 500「ETA unavailable」（或者 404）。
+ * 呢啲唔係出錯：照 cache（唔使每次再問），唔計入出錯率（/health errorRate 唔好俾佢搞高）。
+ */
+export function isSoftMiss(url: string, status: number, body: string): boolean {
+  return url.includes('data.etagmb.gov.hk') && (status === 404 || (status === 500 && body.includes('ETA unavailable')));
+}
+
 export interface UpstreamStats {
   requests: number;
   cacheHits: number;
@@ -81,6 +89,7 @@ export interface UpstreamStats {
 
 /** 按網址認公司（統計用） */
 export function companyOf(url: string): string {
+  if (url.includes('etagmb')) return 'GMB'; // 專線小巴（data.etagmb.gov.hk）
   if (url.includes('citybus')) return 'CTB';
   if (url.includes('kmb')) return 'KMB';
   if (url.includes('nlb')) return 'NLB';
@@ -94,7 +103,8 @@ export function companyOf(url: string): string {
 export function createUpstream(opts: { ttlMs: number; rps: number; rpsByHost?: Record<string, number>; fetchImpl?: typeof fetch; now?: () => number }) {
   const base = opts.fetchImpl ?? fetch;
   const now = opts.now ?? Date.now;
-  // 每個伺服器各自限速：城巴同新大嶼山（rt.data.gov.hk）、九巴（data.etabus.gov.hk）、港鐵巴士係唔同伺服器，唔使互相搶
+  // 每個伺服器各自限速：城巴同新大嶼山（rt.data.gov.hk）、九巴（data.etabus.gov.hk）、專線小巴（data.etagmb.gov.hk）、
+  // 港鐵巴士係唔同伺服器，唔使互相搶
   const buckets = new Map<string, TokenBucket>();
   const bucketFor = (url: string) => {
     let host = 'other';
@@ -145,7 +155,7 @@ export function createUpstream(opts: { ttlMs: number; rps: number; rpsByHost?: R
           const res = await base(url, { ...init, signal: AbortSignal.timeout(8000) });
           const stored: Stored = { at: now(), status: res.status, contentType: res.headers.get('content-type') ?? '', body: await res.text() };
           s.totalMs += now() - t0;
-          if (res.ok) cache.set(key, stored);
+          if (res.ok || isSoftMiss(url, res.status, stored.body)) cache.set(key, stored);
           else {
             s.errors++;
             s.lastError = `HTTP ${res.status}`;

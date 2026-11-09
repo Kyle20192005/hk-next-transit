@@ -23,7 +23,13 @@ Dokploy 要連到 GitHub（Settings → Git → GitHub，裝 Dokploy 嘅 GitHub 
    GITHUB_TOKEN=<上面嘅 token>
    DATA_REPO=Kyle20192005/hk-next-transit
    RUN_ON_START=1
+   GMB_STATE_DIR=/state/gmb
+   GMB_RPS=3
    ```
+
+   `GMB_STATE_DIR`：專線小巴來源（JSON_GMB、CSDI 走線、API 路線資料）上次成功嗰份存喺 `/state` volume，
+   路線資料之後每日只問有改過嘅 route_id；任何一個來源下載失敗都用返上次成功嗰份，冇就跳過專線小巴（照樣發佈其他公司）。
+   `GMB_RPS`：去 `data.etagmb.gov.hk` 每秒最多幾多個請求（同 tracker 同一個 IP，未量上限前保守用 3）。
 
    `RUN_ON_START=1` 第一次部署即刻跑一次（大約 2–3 分鐘），睇 Logs 見到 `[pipeline] … 完成` 就得，之後可以拎走。
    想監察：喺 healthchecks.io 開一個 check（每日一次，寬限 1 個鐘），加 `PING_URL=<佢俾嘅網址>`，冇更新到會電郵通知。
@@ -35,6 +41,8 @@ Dokploy 要連到 GitHub（Settings → Git → GitHub，裝 Dokploy 嘅 GitHub 
 > 而家所有 `rt.data.gov.hk` 請求共用限速（`RT_RPS`，預設每秒 8 個），403 會等 5–80 秒再試。
 > 第一次（冇站 cache）城巴部分大約 7–8 分鐘，之後大約 2–3 分鐘。再見到 403 就喺 Environment 加 `RT_RPS=4`。
 > tracker 同 pipeline 用同一個 IP：俾人擋嗰陣 tracker 都會攞唔到城巴數據（前端會退返 Vercel）。
+> 專線小巴（`data.etagmb.gov.hk`，CloudFront 後面）係另一部伺服器，限速分開計（pipeline `GMB_RPS`、tracker `UPSTREAM_RPS_BY_HOST`），
+> 但係都係同一個 IP：兩邊加埋要低過量到嘅上限（見下面「量上游請求上限」）。
 6. 人手再跑（例如真係大量路線取消要強制發佈）：Dokploy 嗰個 Application 嘅 Terminal（或者 `docker exec`）：
 
    ```bash
@@ -54,12 +62,14 @@ pipeline 每次都 clone 最新 `main`，改 pipeline 程式唔使重新部署�
    DATA_BASE_URL=<同 Vercel 嘅 DATA_BASE_URL 一樣>
    DATA_TOKEN=<同 Vercel 一樣；公開 repo 唔使>
    UPSTREAM_RPS=14
-   UPSTREAM_RPS_BY_HOST=rt.data.gov.hk=20,data.etabus.gov.hk=10
+   UPSTREAM_RPS_BY_HOST=rt.data.gov.hk=20,data.etabus.gov.hk=10,data.etagmb.gov.hk=8
    POLL_MS=20000
    CORS_ORIGINS=https://eta.kyle05.dev
    ```
 
    其他可調（有預設）：`POLL_MS`（15000）、`IDLE_MS`（180000）、`UPSTREAM_TTL_MS`（10000）、`MAX_LINES`（60）。
+   `data.etagmb.gov.hk=8`（專線小巴）係未量之前嘅暫定值，部署後跑 `PROBE_ONLY=gmb` 再改（見下面）。
+   冇寫 `data.etagmb.gov.hk` 就用程式內置嘅 8（`apps/tracker/src/config.ts` 嘅 `DEFAULT_RPS_BY_HOST`），唔會跌返去 `UPSTREAM_RPS`；量完要改就喺環境變數寫。
    `CORS_ORIGINS` 只管瀏覽器；App 唔受影響。本地開發想用 localhost 就加埋 `,http://localhost:3000`。
 3. Domains：加 `rt.<網域>` → port **8080**，開 HTTPS（Let's Encrypt）。
 4. Deploy 之後開 `https://rt.<網域>/health`，見到 `"ok": true` 同 `dataVersion` 就得。
@@ -104,10 +114,21 @@ data.gov.hk 冇公開請求上限，全部請求由 VPS 一個 IP 發出。喺 t
 node dist/probe.js
 ```
 
-四間公司一齊試，按伺服器分開計（`rt.data.gov.hk` = 城巴＋新大嶼山＋港鐵巴士；`data.etabus.gov.hk` = 九巴），兩部同時問；
+五間公司一齊試，按伺服器分開計（`rt.data.gov.hk` = 城巴＋新大嶼山＋港鐵巴士；`data.etabus.gov.hk` = 九巴；
+`data.etagmb.gov.hk` = 專線小巴，一個站一個網址），幾部同時問；
 每個網址只問一次（唔會撞中 cache）。由每秒 5 個開始，每級 30 秒逐級加，任何一部出錯或者 429／403 就停，最後話你 `UPSTREAM_RPS` 設幾多。
 預設最多試到每秒 20 個。**已經量過（2026-11-08）**：rt.data.gov.hk 每秒 40 個即刻 403 封 IP、35 個冇事；九巴 20 個開始超時。唔好再試高過 35。揀夜晚人少嗰陣跑。
 結果記入 `docs/realtime-backend.md`。
+
+**專線小巴（未量）**：有專線小巴數據之後，淨係試佢一部：
+
+```bash
+PROBE_ONLY=gmb node dist/probe.js
+```
+
+每級 5、10、15、20（預設上限 20）。冇到站服務嘅站回 500「ETA unavailable」，probe 唔當出錯（tracker 都係：照 cache、唔計 `errorRate`）。
+tracker 用第一級出錯嘅大約 60%，而且 tracker（`UPSTREAM_RPS_BY_HOST` 嘅 `data.etagmb.gov.hk`）加 pipeline（`GMB_RPS`）要低過嗰級；
+改完 tracker 嘅 Environment 再 Deploy，結果記入 `docs/realtime-backend.md` 同 CLAUDE.md。
 
 ### 前端接 tracker
 

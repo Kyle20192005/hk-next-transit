@@ -193,6 +193,18 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .co { align-self: flex-start; display: inline-flex; border-radius: 6px; overflow: hidden; font-size: 0.6875rem; font-weight: 800; line-height: 1.45; letter-spacing: 0.03em; white-space: nowrap; }
 .co-part { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; }
 .co-compact { font-size: 0.6875rem; }
+/* 專線小巴地區（港島／九龍／新界）：中性灰邊，唔用公司色；同 .co 一樣高 */
+.region-tag { flex: none; align-self: flex-start; display: inline-flex; align-items: center; padding: 0 5px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--card); font-size: 0.6875rem; font-weight: 700; line-height: 1.45; letter-spacing: 0.03em; white-space: nowrap; }
+/* 號碼 + 地區標籤同一行（附近、喺度搭得） */
+.route-num-row { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.route-num-row .region-tag { align-self: center; }
+.recent-row .region-tag, .fav-route-head .region-tag, .fav-route-head .co { align-self: center; }
+/* 小巴地區篩選：黃色標題區入面嘅分段掣（同上面交通工具分類分得開） */
+.region-seg { display: flex; gap: 2px; padding: 3px; margin-top: -4px; border-radius: 999px; background: var(--on-brand-soft); }
+.region-seg button { flex: 1; min-width: 0; padding: 5px 0; border: 0; border-radius: 999px; background: transparent; color: var(--on-brand); font-size: 0.875rem; font-weight: 700; cursor: pointer; }
+.region-seg button[aria-checked="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+/* 闊螢幕：唔使成行咁闊 */
+@media (min-width: 768px) { .region-seg { align-self: flex-start; width: 100%; max-width: 400px; } }
 .route-dirs { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .route-dir { position: relative; display: flex; flex-direction: column; justify-content: center; flex: 1; min-height: 46px; padding: 8px 36px 8px 4px; color: var(--text); }
 .route-dir + .route-dir { border-top: 1px solid var(--line); }
@@ -353,6 +365,10 @@ button.nc-row { width: 100%; border: 0; background: none; font: inherit; text-al
 .hh-bg::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 400px; background: var(--brand); }
 .hh-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; pointer-events: auto; }
 .hh-pill { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; max-width: 40vw; padding: 5px 10px 5px 8px; border-radius: 999px; background: var(--on-brand-soft); font-size: 0.875rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; }
+/* 品牌唔好俾膠囊逼窄（冇地區名時膠囊係站頭名，可以好長，例如得小巴站嘅「布袋澳村道, 近布袋澳」）：膠囊自己縮、截短（同 App 一樣） */
+.hh-bar > .logo, .hh-bar > h1, .hh-bar > .app-sub { flex-shrink: 0; white-space: nowrap; }
+.hh-pill { min-width: 0; }
+.hh-pill-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .hh-btn { margin-left: 6px; opacity: 0; pointer-events: none; }
 .hh-bar:not(:has(.hh-pill)) .hh-btn { margin-left: auto; }
 .hh-loc { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 6px; }
@@ -554,6 +570,8 @@ svg[data-duo] [fill="currentColor"] { fill-opacity: 1; }
 }
 .route-bar h1 { flex: none; font-size: 2rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .route-bar h1 small { display: block; font-size: 0.6875rem; font-weight: 700; opacity: 0.7; letter-spacing: 0.02em; margin-bottom: 3px; }
+/* 專線小巴地區：公司名旁邊細框（同一個號碼三個地區都可以有） */
+.route-bar-region { display: inline-block; margin-left: 4px; padding: 0 4px; border: 1px solid currentColor; border-radius: 4px; line-height: 1.3; }
 .route-dest { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; margin-left: 6px; font-size: 1.0625rem; font-weight: 700; line-height: 1.25; }
 .route-dest-to { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .route-dest small { font-weight: 500; opacity: 0.75; margin-right: 4px; }

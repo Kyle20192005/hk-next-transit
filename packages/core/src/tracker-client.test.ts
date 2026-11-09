@@ -69,18 +69,18 @@ describe('createBusesClient', () => {
     };
     const c = createBusesClient({ trackerBase: 'https://rt', fallbackBase: '', fetcher: fake, areaViaTracker: true });
     await c.here(22.3, 114.18);
-    expect(calls.slice(-2)).toEqual(['https://rt/api/here?lat=22.3&lng=114.18', '/api/here?lat=22.3&lng=114.18']);
+    expect(calls.slice(-2)).toEqual(['https://rt/api/here?lat=22.3&lng=114.18&gmb=1', '/api/here?lat=22.3&lng=114.18&gmb=1']);
     expect(c.usingTracker()).toBe(true);
     busy = false;
     await c.stopEtas('ctb', '001106');
-    expect(calls.pop()).toBe('https://rt/api/stop-etas?co=ctb&stop=001106');
+    expect(calls.pop()).toBe('https://rt/api/stop-etas?co=ctb&stop=001106&gmb=1');
   });
   it('area requests (here / stop-etas) use fallback while AREA_ETAS_VIA_TRACKER is off', async () => {
     const calls: string[] = [];
     const c = createBusesClient({ trackerBase: 'https://rt', fallbackBase: 'https://eta', fetcher: async (i) => (calls.push(String(i)), new Response('{}')) });
     await c.here(22.3, 114.18);
     await c.stopEtas('kmb', 'ABC');
-    expect(calls).toEqual(['https://eta/api/here?lat=22.3&lng=114.18', 'https://eta/api/stop-etas?co=kmb&stop=ABC']);
+    expect(calls).toEqual(['https://eta/api/here?lat=22.3&lng=114.18&gmb=1', 'https://eta/api/stop-etas?co=kmb&stop=ABC&gmb=1']);
   });
   it('eta goes through tracker too', async () => {
     const calls: string[] = [];

@@ -12,6 +12,7 @@ export * from './eta';
 export * from './fare';
 export * from './nlb';
 export * from './mtrb';
+export * from './gmb';
 export * from './company';
 export * from './map-style';
 export * from './transport';

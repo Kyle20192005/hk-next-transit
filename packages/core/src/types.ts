@@ -1,3 +1,6 @@
+import type { Co } from './ids';
+import type { GmbRegion } from './gmb';
+
 /** 方向：O = outbound，I = inbound（城巴同九巴各自定義，聯營線兩邊可以相反） */
 export type Dir = 'O' | 'I';
 
@@ -59,16 +62,25 @@ export interface Variant {
   nlb?: { routeId: string; via?: string };
   /** 港鐵巴士：ETA 成條線一次攞，用 lineRef 分走法 */
   mtrb?: { lineRef: string };
+  /**
+   * 專線小巴：ETA 用 route_id + route_seq 對走法（一個走法 = 一個 (route_id, route_seq)）。
+   * routeSeq 係營辦商真正嘅 seq（1／2）；dir 已經按主走法定好方向，兩者唔一定一樣。
+   */
+  gmb?: { routeId: string; routeSeq: number };
 }
 
 export interface RouteData {
   /** 路線檔屬邊間公司嘅數據（決定站 ID 係城巴定九巴） */
-  company: 'CTB' | 'KMB' | 'NLB' | 'MTRB';
+  company: 'CTB' | 'KMB' | 'NLB' | 'MTRB' | 'GMB';
   /** 實際營辦嘅公司；聯營線係 ['CTB', 'KMB'] */
   companies?: Company[];
   /** 樂悠咭（$2 計劃）適唔適用：機場 A／NA、馬場、旅遊、包車路線唔適用 */
   joyYou?: boolean;
+  /** 路線檔名；專線小巴係「地區-號碼」（NT-2），顯示用 routeCode() */
   route: string;
+  /** 專線小巴：地區同顯示號碼（route = `${region}-${code}`）；其他公司冇 */
+  region?: GmbRegion;
+  code?: string;
   origTc: string | null;
   destTc: string | null;
   origEn: string | null;
@@ -83,11 +95,15 @@ export interface RouteData {
 export interface RouteIndex {
   generatedAt: string;
   routes: {
-    /** 路線檔喺邊：ctb/<路線> 或 kmb/<路線>（舊數據冇呢欄，當 ctb） */
-    co?: 'ctb' | 'kmb' | 'nlb' | 'mtrb';
+    /** 路線檔喺邊：ctb/<路線>、kmb/<路線>、gmb/<地區-號碼> 等（舊數據冇呢欄，當 ctb） */
+    co?: Co;
     /** 營辦公司；聯營線兩間 */
     companies?: Company[];
+    /** 路線檔名；專線小巴係「地區-號碼」（NT-2），顯示用 routeCode() */
     route: string;
+    /** 專線小巴：地區同顯示號碼；其他公司冇 */
+    region?: GmbRegion;
+    code?: string;
     origTc: string;
     destTc: string;
     /** 有邊幾個方向（O = 由 orig 往 dest，I = 回程）；只有 O 即係單向 */
@@ -103,7 +119,8 @@ export type Calendar = Record<
   { days: boolean[]; start: string; end: string; add: string[]; remove: string[] }
 >;
 
-export type Company = 'CTB' | 'KMB' | 'LWB' | 'NLB' | 'MTRB';
+/** 營辦公司；GMB = 專線小巴（全部營辦商當一間，政府數據冇分） */
+export type Company = 'CTB' | 'KMB' | 'LWB' | 'NLB' | 'MTRB' | 'GMB';
 
 /** 統一格式嘅到站時間 */
 export interface Eta {
@@ -119,7 +136,7 @@ export interface Eta {
   destEn: string;
   remarkTc: string;
   remarkEn: string;
-  /** 九巴「原定班次」：時間表時間，唔係實時；唔用嚟推算巴士位置 */
+  /** 九巴「原定班次」、專線小巴「未開出」：時間表時間，唔係實時；唔用嚟推算巴士位置 */
   scheduled?: boolean;
   /** 呢個時間唔係由 GPS 計（新大嶼山巴士 noGPS = 1）：唔用嚟追蹤位置 */
   noGps?: boolean;

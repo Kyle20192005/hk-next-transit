@@ -198,7 +198,7 @@ export default function HomeHeader({
           {pill && (
             <span className="hh-pill" ref={pillSlot} aria-hidden="true">
               <Icon name="navigate" size={13} />
-              {pill}
+              <span className="hh-pill-text">{pill}</span>
             </span>
           )}
           <button className="bar-btn hh-btn" ref={btnSlot} onClick={onSearch} aria-label="導航：想去邊度？" tabIndex={-1}>

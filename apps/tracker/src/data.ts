@@ -77,7 +77,7 @@ export async function getIndex(): Promise<RouteIndex> {
   return (await cached<RouteIndex>('index.json')) ?? { generatedAt: '', routes: [] };
 }
 
-/** 統一站點索引（約 2.6MB，載入一次放記憶體）：附近、喺度搭得用 */
+/** 統一站點索引（約 2.6MB，加咗專線小巴約 3.5MB；載入一次放記憶體）：附近、喺度搭得用 */
 export async function getAllStops(): Promise<AnyStopEntry[]> {
   await dataVersion();
   return (await cached<{ stops: AnyStopEntry[] }>('stops.json'))?.stops ?? [];

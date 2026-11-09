@@ -1,3 +1,5 @@
+import { GMB_OPT_IN } from './gmb';
+
 /**
  * 實時數據（巴士位置、某站到站時間）用邊個後端（網頁同 App 共用）：設咗 tracker 網址就先問 tracker（香港 VPS，所有人共用同一份上游請求），
  * tracker 1.5 秒未覆就同時問後備（Vercel 同名 API），邊個先返用邊個；出錯即刻用後備。
@@ -92,10 +94,11 @@ export function createLiveClient(opts: {
     buses: (co: string, route: string, variantId: string) => get(busesPath(co, route, variantId)),
     /** 某路線喺某站嘅到站時間（tracker 追蹤緊呢條線就直接用佢 cache 住嘅，唔使再問巴士公司） */
     eta: (co: string, route: string, stopId: string) => get(etaPath(co, route, stopId)),
+    // gmb=1：呢個版本識專線小巴（舊版 App 冇呢個，伺服器就唔俾佢專線小巴，見 gmb.ts 嘅 GMB_OPT_IN）
     /** 一個站所有路線嘅下一兩班（附近車站） */
-    stopEtas: (co: string, stopId: string) => area(`/api/stop-etas?co=${co}&stop=${encodeURIComponent(stopId)}`),
+    stopEtas: (co: string, stopId: string) => area(`/api/stop-etas?co=${co}&stop=${encodeURIComponent(stopId)}&${GMB_OPT_IN}`),
     /** 呢個位置可以搭嘅所有路線（喺度搭得、首頁下班車） */
-    here: (lat: number, lng: number) => area(`/api/here?lat=${lat}&lng=${lng}`),
+    here: (lat: number, lng: number) => area(`/api/here?lat=${lat}&lng=${lng}&${GMB_OPT_IN}`),
     /** 港鐵站所有綫嘅到站時間 */
     mtr: (sta: string) => get(`/api/mtr?sta=${encodeURIComponent(sta)}`),
     /** 輕鐵站每個月台嘅到站時間 */

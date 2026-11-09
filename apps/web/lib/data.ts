@@ -109,12 +109,13 @@ export async function getCtbStops(): Promise<StopIndexEntry[]> {
 /** 路線檔位置（core 共用） */
 export { CO_LIST, isCo, type Co };
 
+/** 路線檔（專線小巴 route = 「地區-號碼」，轉大楷：nt-2 → gmb/NT-2.json） */
 export function getRoute(co: Co, route: string): Promise<RouteData | null> {
   if (!isCo(co) || !SAFE_ROUTE.test(route)) return Promise.resolve(null);
   return load<RouteData>(`${co}/${route.toUpperCase()}.json`);
 }
 
-/** 統一路線索引（兩間公司）；舊數據冇就用城巴索引 */
+/** 統一路線索引（所有公司，包括專線小巴；舊版 App 嘅過濾喺 /api/routes 做）；舊數據冇就用城巴索引 */
 export async function getIndex(): Promise<RouteIndex> {
   return (await load<RouteIndex>('index.json')) ?? (await getCtbIndex());
 }
@@ -122,7 +123,7 @@ export async function getIndex(): Promise<RouteIndex> {
 /** 統一站點索引項目（core 共用） */
 export type { AnyStopEntry };
 
-/** 統一站點索引（城巴站 + 九巴站）；舊數據冇就用城巴站 */
+/** 統一站點索引（所有公司嘅站，包括專線小巴）；舊數據冇就用城巴站 */
 export async function getAllStops(): Promise<AnyStopEntry[]> {
   const all = await load<{ stops: AnyStopEntry[] }>('stops.json');
   if (all) return all.stops;

@@ -82,12 +82,15 @@ export function HomeHeader({
       {/* 黃色底：同捲動 1:1 收起；上面再墊一截，iPhone 拉落唔露灰 */}
       <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: -600, bottom: 0, backgroundColor: t.brand, borderBottomLeftRadius: radius.bar, borderBottomRightRadius: radius.bar, transform: [{ translateY: lerp(-D, false) }], ...shadow }} />
       <View onLayout={(e) => setBar(box(e))} style={BRAND_ROW}>
-        <Brand />
+        {/* 品牌唔好俾膠囊逼窄（站頭名可以好長，例如得小巴站嘅地方「布袋澳村道, 近布袋澳」）：膠囊自己縮、截短 */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: BRAND_ROW.gap, flexShrink: 0 }}>
+          <Brand />
+        </View>
         <View style={{ flex: 1 }} />
         {pill && (
-          <Animated.View onLayout={(e) => setPillB(box(e))} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 160, paddingVertical: 5, paddingLeft: 8, paddingRight: 10, borderRadius: 999, backgroundColor: t.onBrandSoft, opacity: between(D * 0.9, D, 0, 1) }}>
+          <Animated.View onLayout={(e) => setPillB(box(e))} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 160, flexShrink: 1, paddingVertical: 5, paddingLeft: 8, paddingRight: 10, borderRadius: 999, backgroundColor: t.onBrandSoft, opacity: between(D * 0.9, D, 0, 1) }}>
             <Icon name="navigate" size={13} color={t.onBrand} />
-            <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '800', color: t.onBrand }}>
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 14, fontWeight: '800', color: t.onBrand }}>
               {pill}
             </Text>
           </Animated.View>

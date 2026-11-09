@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-「下一程」（NextLeg）：香港公共交通實時到站 App（名嘅意思：下一班 + 旅程，將來有導航）。目前做城巴、九巴（連龍運）、聯營線、新大嶼山巴士、港鐵巴士、港鐵（重鐵路綫圖 + 到站）同輕鐵（路綫圖 + 到站），網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
+「下一程」（NextLeg）：香港公共交通實時到站 App（名嘅意思：下一班 + 旅程，將來有導航）。目前做城巴、九巴（連龍運）、聯營線、新大嶼山巴士、港鐵巴士、專線小巴、港鐵（重鐵路綫圖 + 到站）、輕鐵（路綫圖 + 到站）同電車（路綫圖 + 時間表），網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
 App 同網頁版功能一致（四間公司、分頁、收藏、走法、地圖、時間線、巴士位置、班次表、港鐵路綫圖）。舊 App 用嘅 `/api/ctb` 保留。
 
 ## 結構
@@ -71,8 +71,10 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 - 已部署：tracker `https://rt.kyle05.dev`（VPS 嘅 80／443 係 Moodle 嘅 Caddy，HTTPS 由佢 reverse_proxy，Dokploy 唔設 Domain）；
   pipeline 每日 04:17。data.gov.hk 同一個 IP 問得太密會 403（32 條線程、大約每秒 100 個試過俾封）；probe 實測每秒 20 個冇問題，
   實測（2026-11-08，`node dist/probe.js`，四間公司、唔重複網址）：rt.data.gov.hk 每秒 35 個冇事、**40 個即刻 403 封 IP**；
-  九巴（data.etabus.gov.hk）15 個冇事、20 個開始超時。設定：tracker `UPSTREAM_RPS_BY_HOST=rt.data.gov.hk=20,data.etabus.gov.hk=10`、
+  九巴（data.etabus.gov.hk）15 個冇事、20 個開始超時。設定：tracker `UPSTREAM_RPS_BY_HOST=rt.data.gov.hk=20,data.etabus.gov.hk=10,data.etagmb.gov.hk=8`、
   pipeline `RT_RPS=12`（pipeline 同 tracker 同一個 IP，加埋都要低過 35）。**唔好再試高過 35**。
+  專線小巴（data.etagmb.gov.hk，另一部伺服器、同一個 IP）未量過上限：tracker 暫用 8（`config.ts` 嘅 `DEFAULT_RPS_BY_HOST` 內置，env 寫咗就蓋過）、
+  pipeline `GMB_RPS=3`；部署後喺 VPS 行 `PROBE_ONLY=gmb node dist/probe.js` 量完再記低。
 
 ## 九巴同聯營線
 
@@ -274,6 +276,48 @@ App `src/components/{TramView,TramMap,TramMapSkia,TramStationSheet}.tsx`（`(tab
 - 營辦商 ETA 時間一律轉做 `+08:00` ISO（`toHkIso`），唔好出 UTC，否則介面顯示錯鐘數。
 - 站點列表每個站最多顯示 5 班。
 
+## 專線小巴（GMB）
+
+2026-11（0.29.0）。「路線」分頁 →「小巴」，路線頁、附近、收藏、最近睇過、首頁大卡、喺度搭得全部同巴士共用一套（core、網頁、App）。紅色小巴冇數據，唔做。
+
+- **ID**：core `Co` 有 `'gmb'`（公司 `GMB`，專線小巴，綠底 `#1E9E5A` 深色字 `#0A1F12`，白字唔夠對比）。同一個號碼唔同地區係唔同路線，
+  所以路線 key = `地區-號碼`（`HKI-4A`、`KLN-25MS`、`NT-2`，網址 `/gmb/NT-2`，`SAFE_ROUTE` 認得）；站 ID 8 位數字（同運輸署 GTFS 一樣）。
+  **顯示號碼一律用 core `routeCode(co, route)`**（`NT-2` → `2`），地區 `routeRegion` + `GMB_REGION_NAME`（港島／九龍／新界），
+  分享、無障礙標籤用 `routeTitle`（「2（新界）」），`routeMode(co)` 分 `'minibus'`／`'bus'`，`vehicleNoun`（小巴／巴士）。
+  介面用 core `companyInfo(c)`（唔認得嘅公司灰色，唔會 throw）。
+- **舊版 App 兼容**（已安裝嘅 App 見到唔認得嘅公司會 throw）：`/api/routes`、`/api/nearby`、`/api/here`、`/api/stop-etas`（Vercel 同 tracker）
+  **要有 `gmb=1` 先包專線小巴**（core `GMB_OPT_IN`、`gmbOptIn`、`withGmbOptIn`；`createLiveClient` 自動加）；`/api/stop-search?mode=minibus` 只出小巴，
+  冇 `mode` 或者其他值只出巴士。新前端一律帶齊。舊 App 用嘅 `out/ctb/index.json`、`out/ctb/stops.json` 唔可以有小巴。
+- **Pipeline**（`pipeline/gmb.py`，`build.py` 呼叫；`import` 同 build 都喺 try 入面，出錯只跳過小巴，原因寫 `out/report/gmb_skipped.txt`）→ `out/gmb/<地區-號碼>.json`：
+  - 站序用 JSON_GMB（`static.data.gov.hk/td/routes-fares-geojson/JSON_GMB.json`，同 API 一致；GTFS 遲約一星期），GTFS（agency GMB）攞時間表、日曆、分段車費
+    （GTFS 站序經第一班車對返站 ID），CSDI `GMB_ROUTE_LINE` 按站投影切段，API `/route` 攞走法描述同起訖點。
+  - 走法：每個 (route_id, route_seq) 一個，id `<route_id>-<seq>`、`gmb: {routeId, routeSeq}`。主走法 seq1 = O、seq2 = I；其他 route_id 用 `dir_score`
+    （共同站 ×2 + 終點 300 米內 ×3 + 起點 ×1）定方向；主走法得一個方向就用其他走法嘅 I 或者主走法倒轉做參考；循環線一律 O。
+  - 特別班：描述唔係「正常…／循環線／經…／不經…／繞…」先算；主走法一定唔係（16X、22X 呢類號碼本身就係短程／特快）。描述放走法名尾括號，
+    入面括號改「，」（core `shortName` 只認最後一對），「特别」改「特別」；同方向同名特別班加「由 X 開出」／「往 X」／「經 X」。
+  - 重複站（循環線好多）：只留第一次，`expSeq` = 第一次嘅 stop_seq；行車時間、走線按真實站序計再併段；循環線返總站嗰段走線加喺尾（`lineAligned: false`）。
+    車費、`stops.json`：真實站序最後一個之前都當上車站；`stops.json` 往邊度：O 用路線 `destTc`、I 用 `origTc`。
+  - 走線兜路檢查：超過直線 3 倍 + 500 米都照用，除非實測車速 > 20 米/秒，或者冇實測而多咗 3 公里以上（小巴好多掉頭圈，例如 56A）。
+  - 車費：GTFS 加價跟得慢，`fares_for`：GTFS 最高分段車費低過 JSON_GMB `fullFare` 而且差距喺 `FARE_SCALE_MAX`（1.15）內，就全部分段按比例加
+    （捨入一毫，第一個站 = 全程車費）；差太遠（短程班，例如新界 55K）照用 GTFS。2026-11 調整咗 159 個走法。樂悠咭一律適用。
+  - `fetch.py`：JSON_GMB、CSDI、API 路線三個都係可選（失敗只警告）；`GMB_RPS`（預設 3）；`GMB_STATE_DIR`（VPS `/state/gmb`）記上次成功嘅檔，下載失敗用返；
+    `gmb_routes.json` 增量（`/last-update/route` 一次，只問改過嘅 route_id，加最舊 `GMB_ROUTE_REFRESH`（20）條）；冇 state 冇 cache 就全部問（約 575 個請求，3–4 分鐘；GitHub Actions 每次都係咁）。
+  - `check.py`：`gmb_skipped.txt` → 唔檢查小巴、全部站扣返上一版小巴站，照發佈；`gmb_missing.txt`（例如冇 CSDI）→ 唔比較受影響嗰項（withLine）；
+    上一版冇某間公司就唔比較嗰間；跳過咗嘅公司／項目寫 `stats.json` 時沿用上一版數量（`carry_forward`），唔好寫 0，否則第二日部分失敗都會照發佈。
+  - 2026-11-09：572 條（地區 + 號碼）、1164 個走法（238 個特別班）、4772 個站（`stops.json` 4712，成個檔 3.5MB）、有時間表 99%、有走線 96%；build 多約 6 秒。
+- **到站**（`https://data.etagmb.gov.hk`）：core `gmbEtas`，**一個站問一次** `/eta/stop/{id}`（所有路線一齊返），按 (route_id, route_seq) 對走法，重複站用 `expSeq`。
+  「未開出」= `scheduled`（「原定」，唔用嚟追蹤）；500「ETA unavailable」或者 404 = 冇服務，回傳空，**唔當 `failed`**（tracker `isSoftMiss` cache 10 秒、唔計錯誤率）。
+  冇 GPS、冇車牌；`computeBuses` 照用 `trackLine`，唔補時間表車。`/api/buses` 一條線每個站一個請求（同城巴一樣），tracker 有限流、Vercel 後備冇。
+- **介面**：「路線」分頁小巴分類只列 `routeMode === 'minibus'`（巴士分類唔出小巴），號碼同鍵盤用 `routeCode`；黃色區地區分段掣（全部／港島／九龍／新界，
+  網頁 sessionStorage、App AsyncStorage `hknt.gmbRegion`）；列表行標 `RegionTag` 唔標公司；轉分類清走號碼同地點；冇小巴數據寫「暫時冇專線小巴路線資料，請稍後再試」；
+  捷徑「附近小巴站」開附近車站頁 `only=gmb`（只列小巴站，唔出鐵路、電車）。
+  圖示：網頁 `VehicleIcon`（`MinibusIcon`）、App `VehicleGlyph`（`MinibusGlyph`），同一條路徑，公司標籤、時間線、地圖、喺度搭得掣按公司揀；全部係小巴站嘅站頭用小巴圖示。
+  路線頁標題列公司名後面加地區細框（`.route-bar-region`）；「往 X」用 core `routeHeadDest`（路線起訖點，非循環特別班用最後一個站）；
+  循環線最後一個站有車費 = 上得車（core `lastStopIsTerminus` 係 false）：車費、尾班車、收藏、「最近」都計。地圖「?」有小巴版本。
+- **附近、首頁**：`/api/nearby` 巴士站最多 15 個 + 小巴站另外最多 8 個，`/api/here` 巴士 6 + 小巴 3（core `capStopFamilies`），小巴唔會擠走巴士站；
+  首頁大卡站頭 core `nearCardHeads`：有巴士站嘅最多 8 個、淨係小巴嘅另外最多 3 個（`isGmbOnlyHead`）。「最近巴士站」唔計小巴站；
+  冇地區名嘅時候大字用最近站頭（小巴站都計，例如布袋澳），所以 `.hh-bar` 品牌唔縮唔斷行，膠囊文字（`.hh-pill-text`）截短（App `HomeHeader` 一樣）。
+
 ## PWA（網頁版加至主畫面）
 
 2026-11 用戶要求。網頁版可以安裝到主畫面，全螢幕開、離線都開到（實時資料照要上網）。App（Expo）係另一回事。
@@ -309,6 +353,7 @@ App `src/components/{TramView,TramMap,TramMapSkia,TramStationSheet}.tsx`（`(tab
 | 地圖走線 | CSDI「巴士路線」WFS（`FB_ROUTE_LINE`）；港鐵巴士用 OpenStreetMap |
 | 地圖底圖 | 網頁：OpenFreeMap 向量地圖（OpenStreetMap 數據）；App：iPhone Apple 地圖、Android Google 地圖 |
 | 地區名（首頁大字） | OpenStreetMap place 節點（Overpass，`fetch.py` 嘅 `fetch_osm_places`，幾個鏡像輪流試；全部失敗用 `pipeline/places_seed.json`）→ `places.py` 篩走深圳（離巴士站 > 800 米、簡體字、「社區」）→ `out/places.json` |
+| 專線小巴 | 站序 JSON_GMB、時間表／車費 GTFS（agency GMB）、走線 CSDI `GMB_ROUTE_LINE`、走法描述同實時到站 data.etagmb.gov.hk |
 | 站到站行車時間（實測平均） | [hk-bus-time-between-stops](https://github.com/HK-Bus-ETA/hk-bus-time-between-stops)（`timeinterval.hkbuseta.com/times/all.json`），第三方、實驗性質 |
 
 App 入面一律用**城巴站 ID**。政府站 ID 只喺 pipeline 內部用。
@@ -549,11 +594,13 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   `unknown`（「冇時間表資料」，灰色），唔好寫「今日沒有班次」；「班次」掣只計有時間表嘅走法。
 - 賽馬日改路等按事件嘅走法：政府數據冇。
 - ETA `seq` 規律只喺 38 號驗證過。
-- 小巴、渡輪、導航（點到點）未做（港鐵、輕鐵、電車做咗，見上面「港鐵」「輕鐵」「電車」）。介面已經預留（2026-11，用戶要求）：底部分頁「首頁／路線／導航／收藏／設定」，
+- 紅色小巴、渡輪、導航（點到點）未做（專線小巴、港鐵、輕鐵、電車做咗，見上面各節）。介面已經預留（2026-11，用戶要求）：底部分頁「首頁／路線／導航／收藏／設定」，
   導航顯示「功能即將推出」（將來做好，首頁「你想去邊？」直接用）；「路線」標題下面、搜尋欄上面一行交通工具分類（core `TRANSPORT_MODES`，`ready: false` 嘅揀咗就收埋搜尋欄同鍵盤，
   只顯示「功能即將推出」）。網頁 `components/home/{ComingSoon,Navigation,Settings}.tsx`，App `src/app/(tabs)/{navigation,settings}.tsx` + `ui.tsx` 嘅 `ComingSoon`。
   加新交通工具：喺 `TRANSPORT_MODES` 改 `ready: true` 再接返列表。附近同收藏將來包埋所有交通工具；首頁標題「下一程」。
   App 用 Expo Router typed routes：加／改路由檔之後要開一次 `expo start` 先會更新 `.expo/types`，否則 tsc 話路徑唔存在。
+- 專線小巴：API 先有、GTFS 未有嘅 route_id（2026-11 有 8 個）冇時間表；CSDI 未更新嘅改線（例如新界 78 延長到皇崗口岸）冇走線、用虛線；
+  地圖仲係將循環線最後一個站畫做終點（兩邊一樣，純外觀）；data.etagmb.gov.hk 上限未量。
 - 「附近」：聯營線只列喺城巴站下面（避免同一條線喺相鄰嘅九巴站同城巴站出兩次）。
 - App 未喺實機或者模擬器測試過：確認到 iOS／Android bundle 到（`npx expo export --platform ios --platform android`），
   介面用 Expo web 預覽截圖驗證過（巴士地圖除外；港鐵路綫圖有 web 預覽，雙指縮放未喺實機試過）。

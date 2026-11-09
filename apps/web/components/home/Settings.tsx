@@ -133,8 +133,8 @@ export default function Settings({ updated }: { updated: string | null }) {
             </div>
           )}
           <p className="settings-note muted">
-            資料來源：運輸署、城巴、九巴、新大嶼山巴士、港鐵（DATA.GOV.HK）；地圖 © OpenStreetMap 貢獻者、OpenFreeMap；
-            站與站之間行車時間參考 hk-bus-time-between-stops。巴士位置係推算，僅供參考。
+            資料來源：運輸署（包括專線小巴實時到站數據）、城巴、九巴、新大嶼山巴士、港鐵（DATA.GOV.HK）；地圖 © OpenStreetMap 貢獻者、OpenFreeMap；
+            站與站之間行車時間參考 hk-bus-time-between-stops。巴士、小巴位置係推算，僅供參考。
           </p>
         </Group>
         {done && (

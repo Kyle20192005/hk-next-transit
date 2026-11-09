@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createLiveClient, isCo, type Co, type Calendar, type Company, type Eta, type LrtPlatform, type MtrLineEtas, type NearMtr, type NewsItem, type RouteData, type RouteIndex, type StopRouteHit, type TramEta, type TramStopDest } from '@hknt/core';
+import { createLiveClient, GMB_OPT_IN, isCo, type Co, type Calendar, type Company, type Eta, type LrtPlatform, type MtrLineEtas, type NearMtr, type NewsItem, type RouteData, type RouteIndex, type StopRouteHit, type TramEta, type TramStopDest } from '@hknt/core';
 
 /**
  * 後端 = apps/web 嘅 API。預設用線上網站（手機連唔到電腦嘅 localhost）；
@@ -65,9 +65,16 @@ export interface LiveBus {
 
 const q = encodeURIComponent;
 
+/** 「路線」分頁嘅分類：巴士定專線小巴（/api/stop-search 嘅 mode） */
+export type RouteMode = 'bus' | 'minibus';
+
+/*
+ * 專線小巴兼容（core gmb.ts 嘅 GMB_OPT_IN）：舊版 App 唔識 GMB（CompanyTag 會 throw），所以伺服器要見到 gmb=1 先俾專線小巴。
+ * 呢個版本識：/api/routes、/api/nearby 一律加；/api/here、/api/stop-etas 由 createLiveClient 加；/api/stop-search 用 mode。
+ */
 export const api = {
-  /** 所有路線（四間公司；聯營線只出一次） */
-  routes: () => get<RouteIndex>('/api/routes'),
+  /** 所有路線（巴士公司同專線小巴；聯營線只出一次） */
+  routes: () => get<RouteIndex>(`/api/routes?${GMB_OPT_IN}`),
   calendar: () => get<Calendar>('/api/calendar'),
   route: (co: Co, route: string) => get<RouteData>(`/api/route/${co}/${q(route)}`),
   /** 成條線嘅巴士位置同同 ETA 一致嘅每段行車時間 */
@@ -77,9 +84,10 @@ export const api = {
   /** 喺度搭得：呢個位置可以搭嘅所有路線同下一兩班 */
   here: (lat: number, lng: number) => liveJson<{ routes: HereRoute[]; radius: number }>(live.here(lat, lng)),
   news: (pos: { lat: number; lng: number } | null) => get<{ items: NewsItem[] }>(`/api/news${pos ? `?lat=${pos.lat.toFixed(4)}&lng=${pos.lng.toFixed(4)}` : ''}`),
-  /** 地點搜尋：站名有 q 嘅站經過嘅路線（中途站都搵到） */
-  stopSearch: (query: string) => get<{ q: string; routes: StopRouteHit[] }>(`/api/stop-search?q=${encodeURIComponent(query)}`),
-  nearby: (lat: number, lng: number, r = 600) => get<{ stops: NearStop[]; area?: { n: string; en: string | null } | null; mtr?: NearMtr[] }>(`/api/nearby?lat=${lat}&lng=${lng}&r=${r}`),
+  /** 地點搜尋：站名有 q 嘅站經過嘅路線（中途站都搵到）；mode = 巴士定專線小巴（分開搵，小巴唔會逼走巴士結果） */
+  stopSearch: (query: string, mode: RouteMode) => get<{ q: string; routes: StopRouteHit[] }>(`/api/stop-search?q=${encodeURIComponent(query)}&mode=${mode}`),
+  /** 附近嘅站（巴士站最多 15 個、專線小巴站最多 8 個）、地區名、2 公里內港鐵站 */
+  nearby: (lat: number, lng: number, r = 600) => get<{ stops: NearStop[]; area?: { n: string; en: string | null } | null; mtr?: NearMtr[] }>(`/api/nearby?lat=${lat}&lng=${lng}&r=${r}&${GMB_OPT_IN}`),
   /** 一個站所有路線嘅下一班 */
   /** 港鐵站到站時間（tracker 優先）：每條綫兩個方向；failed = 攞唔到嘅綫 */
   mtr: (sta: string) => liveJson<{ sta: string; lines: MtrLineEtas[]; failed: string[] }>(live.mtr(sta)),
@@ -97,6 +105,7 @@ export const api = {
 
 const memRoute = new Map<string, RouteData>();
 let memCalendar: Promise<Calendar> | null = null;
+// 專線小巴路線檔名係「地區-號碼」（例如 hknt.route.v1.gmb.NT-2），唔會撞巴士號碼
 const routeKey = (co: Co, route: string) => `hknt.route.v1.${co}.${route.toUpperCase()}`;
 
 /** 手機入面上次嘅路線資料（冇就 null）；記憶體有就唔使讀儲存 */

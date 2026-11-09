@@ -129,7 +129,7 @@ export default function SettingsTab() {
             <Text style={{ fontSize: 15, color: t.muted, ...tabular }}>{APP_VERSION}</Text>
           </Row>
           <Text style={{ marginTop: 8, marginBottom: 4, fontSize: 13, lineHeight: 20, color: t.muted }}>
-            資料來源：運輸署、城巴、九巴、新大嶼山巴士、港鐵（DATA.GOV.HK）；站與站之間行車時間參考 hk-bus-time-between-stops。巴士位置係推算，僅供參考。
+            資料來源：運輸署（包括專線小巴實時到站數據）、城巴、九巴、新大嶼山巴士、港鐵（DATA.GOV.HK）；站與站之間行車時間參考 hk-bus-time-between-stops。巴士同小巴位置係推算，僅供參考。
           </Text>
         </Group>
       </ScrollView>

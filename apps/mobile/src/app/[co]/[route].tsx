@@ -28,6 +28,12 @@ import {
   lastBusEtaIndex,
   parseLiveBuses,
   pointOnPath,
+  routeCode,
+  routeRegion,
+  routeTitle,
+  routeHeadDest,
+  lastStopIsTerminus,
+  GMB_REGION_NAME,
   secondsFrom,
   serviceWindow,
   smoothLine,
@@ -108,7 +114,7 @@ export default function RouteScreen() {
   if (error || !data)
     return (
       <View style={{ flex: 1, backgroundColor: t.bg }}>
-        <RouteBar route={params.route} />
+        <RouteBar co={co} route={params.route} />
         {error ? (
           <Pressable onPress={load} style={{ alignItems: 'center', padding: 32 }}>
             <Text style={{ color: t.special, textAlign: 'center' }}>載入失敗：{error}</Text>
@@ -122,18 +128,29 @@ export default function RouteScreen() {
   return <RouteView key={`${co}-${data.route}`} co={co} data={data} calendar={calendar} initialDir={params.dir} initialVariant={params.v} initialStop={params.stop} />;
 }
 
-/** 黃色標題列：‹　38　往 北角碼頭　（右邊按鈕由 children 傳入） */
-function RouteBar({ route, companiesLabel, dest, note, children }: { route: string; companiesLabel?: string; dest?: string; note?: string | null; children?: React.ReactNode }) {
+/**
+ * 黃色標題列：‹　38　往 北角碼頭　（右邊按鈕由 children 傳入）。
+ * 專線小巴顯示號碼（NT-2 → 2），公司名後面加地區細框（同網頁 .route-bar-region 一樣）。
+ */
+function RouteBar({ co, route, companiesLabel, dest, note, children }: { co: Co; route: string; companiesLabel?: string; dest?: string; note?: string | null; children?: React.ReactNode }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const region = routeRegion(co, route);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: insets.top + 8, paddingBottom: 10, paddingLeft: 4, paddingRight: 10, minHeight: insets.top + 68, backgroundColor: t.brand, borderBottomLeftRadius: radius.bar, borderBottomRightRadius: radius.bar }}>
       <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel="返回" hitSlop={6} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="back" size={26} color={t.onBrand} />
       </Pressable>
       <View>
-        <Text style={{ fontSize: 11, fontWeight: '700', color: t.onBrand, opacity: 0.7 }}>{companiesLabel ?? ' '}</Text>
-        <Text style={{ fontSize: 32, fontWeight: '800', color: t.onBrand, letterSpacing: -0.6, lineHeight: 34, ...tabular }}>{route}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.7 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: t.onBrand }}>{companiesLabel ?? ' '}</Text>
+          {region && (
+            <View style={{ paddingHorizontal: 4, borderWidth: 1, borderColor: t.onBrand, borderRadius: 4 }}>
+              <Text style={{ fontSize: 11, lineHeight: 13, fontWeight: '700', color: t.onBrand }}>{GMB_REGION_NAME[region]}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={{ fontSize: 32, fontWeight: '800', color: t.onBrand, letterSpacing: -0.6, lineHeight: 34, ...tabular }}>{routeCode(co, route)}</Text>
       </View>
       <View style={{ flex: 1, marginLeft: 6 }}>
         {dest !== undefined && (
@@ -235,7 +252,11 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
       })),
     [selected, data, dir],
   );
-  const dest = stops[stops.length - 1]?.name ?? '';
+  // 標題「往 X」、收藏、最近睇過、分享：專線小巴用路線起訖點（循環線最後一個站唔係真正終點；同網頁 page.tsx 一樣）
+  const dest = routeHeadDest(co, data, dir, selected, stops[stops.length - 1]?.name) ?? '';
+  // 最後一個站係咪終點站：專線小巴循環線最後一個站有車費 = 上得車（有車費、尾班車、收藏，「最近」揀得）
+  const endIsTerminus = useMemo(() => lastStopIsTerminus(co, selected, stops[stops.length - 1]?.stopId), [co, selected, stops]);
+  const isEnd = (i: number) => i === stops.length - 1 && endIsTerminus;
   // 首頁「最近睇過」
   useEffect(() => {
     if (dest) addRecent({ co, route: data.route, dir, dest, companies });
@@ -244,7 +265,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
   }, [co, data.route, dir, dest]);
   const joyYou = data.joyYou !== false;
   const fares = stops.map((s, i) => {
-    const adult = i < stops.length - 1 ? selected?.fares?.[s.stopId] : undefined;
+    const adult = !isEnd(i) ? selected?.fares?.[s.stopId] : undefined;
     return adult === undefined ? null : { adult: formatFare(adult), joyYou: joyYou ? formatFare(joyYouFare(adult)) : null };
   });
 
@@ -374,7 +395,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
   const nextAtOpen = etas?.filter(isMine).map((e) => Date.parse(e.eta!)).filter((x) => x >= etaNow - 60_000).sort((a, b) => a - b)[0] ?? null;
 
   // 打開咗嘅站嘅尾班車（終點站唔使）
-  const lastBusStop = openIndex !== null && openIndex < stops.length - 1 ? stops[openIndex] : undefined;
+  const lastBusStop = openIndex !== null && !isEnd(openIndex) ? stops[openIndex] : undefined;
   // 時間表估計再用實測行車時間校正（夜晚車快，中途站估計會遲成十幾分鐘；同網頁 StopList 一樣）
   const openLastBus = useMemo(() => {
     if (!lastBusStop || openIndex === null) return null;
@@ -424,7 +445,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
 
   const colorOf = (b: TrackedBus) => {
     const c = multiCompany ? (b.company ?? data.company) : data.company;
-    return { color: companyColor(c) ?? color, ink: companyInk(c) };
+    return { color: companyColor(c) ?? color, ink: companyInk(c), company: c };
   };
   // 時間線上嘅巴士：兩站之間前半段畫喺上一行下半，後半段畫喺下一行上半
   const rowBuses = useMemo(() => {
@@ -476,7 +497,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
         const { latitude: la, longitude: lo } = pos.coords;
         let best: { index: number; metres: number } | null = null;
         stops.forEach((s, i) => {
-          if (s.lat === undefined || s.lng === undefined || i === stops.length - 1) return;
+          if (s.lat === undefined || s.lng === undefined || (i === stops.length - 1 && endIsTerminus)) return; // 終點站唔使
           const m = Math.hypot((s.lat - la) * 111320, (s.lng - lo) * 111320 * Math.cos((la * Math.PI) / 180));
           if (!best || m < best.metres) best = { index: i, metres: m };
         });
@@ -492,7 +513,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
         setLocating('error');
       }
     },
-    [stops, openStop],
+    [stops, endIsTerminus, openStop],
   );
   // 開頁：已經有權限就自動搵（由「附近」撳入嚟就唔使打開）；未問過就第一次問
   // 設定關咗「自動定位」就唔搵，等用戶自己撳「定位」
@@ -548,7 +569,8 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
     if (openIndex === null) return;
     const s = stops[openIndex]!;
     const url = `${API_BASE}/${co}/${data.route}?dir=${s.dir}&stop=${s.stopId}`;
-    const text = shareText({ company: companyNames(companies), route: data.route, dest, stop: s.name, nextAt: nextAtOpen, now: Date.now() });
+    // 專線小巴：「專線小巴 2（新界）往 …」，唔好出路線檔名 NT-2
+    const text = shareText({ company: companyNames(companies), route: routeTitle(co, data.route), dest, stop: s.name, nextAt: nextAtOpen, now: Date.now() });
     Share.share({ message: `${text}\n${url}` }).catch(() => {});
   };
   // 站名搜尋（長途線好多站）
@@ -565,10 +587,10 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <RouteBar route={data.route} companiesLabel={companyNames(companies)} dest={dest} note={joyYou ? null : '不設樂悠咭優惠'}>
+      <RouteBar co={co} route={data.route} companiesLabel={companyNames(companies)} dest={dest} note={joyYou ? null : '不設樂悠咭優惠'}>
         <BarButton icon={fav ? 'star-fill' : 'star'} on={fav} onPress={toggleFav} label={fav ? '取消收藏路線' : '收藏路線'} />
         {hasTimetable && <BarButton icon="clock" onPress={() => setTimetable(true)} label="詳細班次" />}
-        {other && <BarButton icon="swap" onPress={() => changeDir(other)} label={`轉方向：往 ${data.stops[data.directions[other]!.at(-1)!]?.nameTc}`} />}
+        {other && <BarButton icon="swap" onPress={() => changeDir(other)} label={`轉方向：往 ${(co === 'gmb' ? (other === 'O' ? data.destTc : data.origTc) : null) ?? data.stops[data.directions[other]!.at(-1)!]?.nameTc}`} />}
       </RouteBar>
 
       <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, gap: 10, zIndex: 10 }}>
@@ -672,7 +694,7 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
               <StopRow
                 index={i}
                 name={s.name}
-                terminus={i === 0 || i === stops.length - 1}
+                terminus={i === 0 || isEnd(i)}
                 first={i === 0}
                 last={i === stops.length - 1}
                 lineColor={color}
@@ -721,13 +743,15 @@ function RouteView({ co, data, calendar, initialDir, initialVariant, initialStop
                 nextArrival={after && tr !== null && nextAtOpen !== null ? nextAtOpen + tr * 1000 : null}
                 buses={rowBuses.get(i) ?? []}
                 here={s.lat !== undefined && s.lng !== undefined ? { lat: s.lat, lng: s.lng, name: s.name, current: { co, route: data.route, dir: s.dir } } : null}
-                fav={i < stops.length - 1 ? { co, route: data.route, dir: s.dir, dest, companies, stopId: s.stopId, stopName: s.name } : null}
+                fav={!isEnd(i) ? { co, route: data.route, dir: s.dir, dest, companies, stopId: s.stopId, stopName: s.name } : null}
               />
             );
           }}
           ListFooterComponent={
             <Text style={{ textAlign: 'center', fontSize: 12, color: t.muted, padding: 16 }}>
-              資料來源：運輸署、{companyNames(companies)}（DATA.GOV.HK）。行車時間：hk-bus-time-between-stops（實驗性質，僅供參考）
+              {co === 'gmb'
+                ? '資料來源：運輸署（專線小巴實時到站數據、GTFS、CSDI 走線，DATA.GOV.HK）。行車時間：hk-bus-time-between-stops（實驗性質，僅供參考）'
+                : `資料來源：運輸署、${companyNames(companies)}（DATA.GOV.HK）。行車時間：hk-bus-time-between-stops（實驗性質，僅供參考）`}
             </Text>
           }
         />

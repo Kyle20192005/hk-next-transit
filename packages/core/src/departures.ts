@@ -1,4 +1,5 @@
 import { COMPANIES } from './company';
+import { routeCode } from './gmb';
 import type { Company } from './types';
 
 /**
@@ -7,7 +8,7 @@ import type { Company } from './types';
  */
 export interface DepartureRow {
   key: string;
-  /** 左邊標籤：巴士 = 路線號碼（公司色）；港鐵將來 = 綫名（綫色） */
+  /** 左邊標籤：巴士 = 路線號碼（公司色；專線小巴拎走地區，NT-2 → 2）；港鐵 = 綫名（綫色） */
   badge: { text: string; bg: string; ink: string };
   dest: string;
   /** 到站時間（毫秒）；null = 冇時間（例如只收藏咗路線、冇收藏站） */
@@ -52,6 +53,22 @@ export function groupStopHeads<S extends { id: string; co: string; name: string;
   return heads;
 }
 
+/** 站頭入面全部係專線小巴站（首頁大卡用小巴圖示、另外計上限） */
+export const isGmbOnlyHead = (h: StopHead<{ co: string }>): boolean => h.stops.length > 0 && h.stops.every((s) => s.co === 'gmb');
+
+/**
+ * 首頁大卡「下班車」載入邊幾個站頭：有巴士站（任何非專線小巴站）嘅站頭最多 maxBus 個、淨係專線小巴嘅最多 maxGmb 個，
+ * 再按距離排。兩類分開計（同 /api/nearby、/api/here 一樣）：市區小巴站好密，一齊計會逼走附近嘅巴士站頭。
+ */
+export function nearCardHeads<S extends { id: string; co: string; name: string; lat: number; lng: number; distance: number }>(
+  stops: S[],
+  maxBus: number,
+  maxGmb: number,
+): StopHead<S>[] {
+  const heads = groupStopHeads(stops);
+  return [...heads.filter((h) => !isGmbOnlyHead(h)).slice(0, maxBus), ...heads.filter(isGmbOnlyHead).slice(0, maxGmb)].sort((a, b) => a.distance - b.distance);
+}
+
 /** `/api/here` 每條線嘅格式（巴士） */
 export interface HereRouteLike {
   co: string;
@@ -72,10 +89,11 @@ export function busDepartureRows(routes: HereRouteLike[], now: number, limit = 4
   for (const r of routes) {
     const e = r.etas.find((x) => Date.parse(x.eta) >= now - 30_000);
     if (!e) continue;
-    const c = COMPANIES[e.company] ?? COMPANIES[r.companies[0] ?? 'CTB'];
+    const c = COMPANIES[e.company] ?? COMPANIES[r.companies[0] ?? 'CTB'] ?? COMPANIES.CTB;
     rows.push({
       key: `${r.co}-${r.route}-${r.dir}`,
-      badge: { text: r.route, bg: c.bg, ink: c.ink },
+      // 顯示號碼（專線小巴拎走地區）；key、link 照用完整路線檔名
+      badge: { text: routeCode(r.co, r.route), bg: c.bg, ink: c.ink },
       dest: r.dest,
       at: Date.parse(e.eta),
       scheduled: e.scheduled,
@@ -145,7 +163,7 @@ export function favDepartureRows<F extends FavLike>(items: { fav: F; etas: { eta
       const c = COMPANIES[e?.company ?? fav.companies[0] ?? 'CTB'] ?? COMPANIES.CTB;
       return {
         key: `${fav.co}-${fav.route}-${fav.dir}-${fav.stopId ?? ''}`,
-        badge: { text: fav.route, bg: c.bg, ink: c.ink },
+        badge: { text: routeCode(fav.co, fav.route), bg: c.bg, ink: c.ink },
         dest: fav.dest,
         at: e?.eta ? Date.parse(e.eta) : null,
         scheduled: e?.scheduled,

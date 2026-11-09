@@ -2,6 +2,8 @@
 # 跑一次每日數據更新：clone → fetch → build → check → 推去 data 分支（同 .github/workflows/data.yml 一樣）。
 # 人手跑：docker exec -it <容器> /opt/pipeline/run.sh          （大跌照發佈：加 --force）
 # 要嘅環境變數：GITHUB_TOKEN（fine-grained，只限呢個 repo，Contents: Read and write）、DATA_REPO（owner/repo）
+# 可選：RT_RPS（rt.data.gov.hk 每秒請求，預設 8）、GMB_RPS（專線小巴 API，預設 3）、
+#       GMB_STATE_DIR（專線小巴上次成功嘅檔，預設 /state/gmb：路線資料每日只問改過嘅，下載失敗用返上次）
 set -eu
 : "${GITHUB_TOKEN:?要設定 GITHUB_TOKEN}"
 : "${DATA_REPO:?要設定 DATA_REPO，例如 Kyle20192005/hk-next-transit}"
@@ -20,7 +22,11 @@ cd src
 
 echo "[pipeline] 下載原始數據"
 # 城巴站資料存喺 /state（掛 volume 先會跨重新部署保留），每次只問新站同一部分舊站
-CTB_STOP_CACHE="${CTB_STOP_CACHE:-/state/ctb-stops.json}" python3 pipeline/fetch.py
+# 專線小巴：/state/gmb 記住上次成功嘅檔（下載失敗就用返；路線資料只問改過嘅），API 同 tracker 同一個 IP，限速 GMB_RPS
+GMB_STATE_DIR="${GMB_STATE_DIR:-/state/gmb}"
+mkdir -p "$GMB_STATE_DIR" 2>/dev/null || echo "[pipeline] ⚠️ 開唔到 $GMB_STATE_DIR，專線小巴今次冇上次嘅檔可以用"
+CTB_STOP_CACHE="${CTB_STOP_CACHE:-/state/ctb-stops.json}" GMB_STATE_DIR="$GMB_STATE_DIR" GMB_RPS="${GMB_RPS:-3}" \
+  python3 pipeline/fetch.py
 echo "[pipeline] 生成數據"
 python3 pipeline/build.py
 

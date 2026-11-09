@@ -1,14 +1,14 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { LRT_BRAND, lrtDepartureRows, lrtRoute, lrtStopRoutes, minutesLabel, mtrDepartureRows, mtrLine, mtrStationLines, type DepartureRow, type Eta, type FavGroupDef, type FavRouteGroup } from '@hknt/core';
+import { LRT_BRAND, lrtDepartureRows, lrtRoute, lrtStopRoutes, minutesLabel, routeCode, routeTitle, mtrDepartureRows, mtrLine, mtrStationLines, type DepartureRow, type Eta, type FavGroupDef, type FavRouteGroup } from '@hknt/core';
 import { api, type Co } from '@/lib/api';
 import { isLrtFav, isMtrFav, removeFavorite, type Favorite } from '@/lib/favorites';
 import { openLrt, openMtr } from '@/lib/open-mtr';
 import { usePrefs } from '@/lib/prefs';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { warmRoute } from '@/lib/prefetch';
-import { CompanyTag, ScheduledTag } from './ui';
+import { CompanyTag, RegionTag, ScheduledTag } from './ui';
 import { Icon } from './Icon';
 import { EtaInline } from './EtaInline';
 
@@ -45,8 +45,13 @@ export function FavRouteCard({ g, groups, onPickGroup }: { g: FavRouteGroup<Favo
           accessibilityRole="link"
           style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: t.line, backgroundColor: pressed ? t.surface2 : 'transparent' })}
         >
-          <Text style={{ fontSize: 22, fontWeight: '800', color: t.text, ...tabular }}>{f0.route}</Text>
-          <CompanyTag companies={f0.companies} />
+          <Text style={{ fontSize: 22, fontWeight: '800', color: t.text, ...tabular }}>{routeCode(co, f0.route)}</Text>
+          {/* 專線小巴：同一個號碼三個地區都可以有，標地區（號碼 → 地區 → 公司，同網頁一樣） */}
+          <RegionTag co={co} route={f0.route} inline />
+          {/* CompanyTag 自己 alignSelf flex-start：包一層先會同號碼、地區標籤置中對齊 */}
+          <View>
+            <CompanyTag companies={f0.companies} />
+          </View>
           <View style={{ flex: 1 }} />
           <Icon name="chevron-right" size={18} color={t.muted} />
         </Pressable>
@@ -156,11 +161,11 @@ function BusFavItem({ f, groups, onPickGroup }: { f: Favorite; groups: FavGroupD
           </View>
           {f.stopId ? <FavEtas f={f} /> : <Icon name="chevron-right" size={20} color={t.muted} />}
         </Pressable>
-        <Pressable onPress={() => removeFavorite(f)} accessibilityLabel={`取消收藏 ${f.route}${f.stopName ? ` ${f.stopName}` : ''}`} hitSlop={6} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
+        <Pressable onPress={() => removeFavorite(f)} accessibilityLabel={`取消收藏 ${routeTitle(co, f.route)}${f.stopName ? ` ${f.stopName}` : ''}`} hitSlop={6} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
           <Icon name="star-fill" size={20} color={t.brand} />
         </Pressable>
       </View>
-      <GroupPick f={f} groups={groups} label={f.route} onPickGroup={onPickGroup} />
+      <GroupPick f={f} groups={groups} label={routeTitle(co, f.route)} onPickGroup={onPickGroup} />
     </View>
   );
 }

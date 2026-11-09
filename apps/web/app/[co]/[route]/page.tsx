@@ -19,10 +19,15 @@ import {
   variantLabel,
   variantStops,
   variantsForDir,
+  routeCode,
+  routeRegion,
+  routeHeadDest,
+  lastStopIsTerminus,
+  GMB_REGION_NAME,
   type Dir,
 } from '@hknt/core';
 import { getCalendar, getRoute, isCo, type Co } from '@/lib/data';
-import { COMPANIES } from '@/lib/company';
+import { companyNames } from '@/lib/company';
 import StopList from '@/components/StopList';
 import SwapLink from '@/components/SwapLink';
 import TimetableDrawer from '@/components/TimetableDrawer';
@@ -33,7 +38,7 @@ import VariantPicker, { type VariantItem } from '@/components/VariantPicker';
 import RouteMap, { type MapLine, type MapStop } from '@/components/RouteMapLazy';
 
 type Props = {
-  /** co：ctb（城巴同聯營線）或 kmb（九巴、龍運） */
+  /** co：ctb（城巴同聯營線）、kmb（九巴、龍運）、nlb、mtrb、gmb（專線小巴，route = 地區-號碼，例如 NT-2） */
   params: Promise<{ co: string; route: string }>;
   /** dir：方向；v：走法；stop：打開時自動打開嘅站（由「附近」撳入嚟） */
   searchParams: Promise<{ dir?: string; v?: string; stop?: string }>;
@@ -44,9 +49,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = isCo(co) ? await getRoute(co, route) : null;
   if (!data) return { title: '搵唔到路線' };
   const names = companyNames(data.companies ?? [data.company]);
+  // 專線小巴：號碼唔連地區，地區另外寫（「專線小巴 新界 2」）
+  const region = routeRegion(co, data.route);
+  const num = `${region ? `${GMB_REGION_NAME[region]} ` : ''}${routeCode(co, data.route)}`;
   return {
-    title: `${names} ${data.route} 到站時間`,
-    description: `${names} ${data.route} ${data.origTc} ⇄ ${data.destTc} 實時到站時間、特別班次走法及服務時間。`,
+    title: `${names} ${num} 到站時間`,
+    description: `${names} ${num} ${data.origTc} ⇄ ${data.destTc} 實時到站時間、特別班次走法及服務時間。`,
   };
 }
 
@@ -96,10 +104,14 @@ export default async function RoutePage({ params, searchParams }: Props) {
     lat: data.stops[s.stopId]?.lat,
     lng: data.stops[s.stopId]?.lng,
   }));
+  // 最後一個站係咪終點站：專線小巴循環線重複嘅站只留第一次，最後一個站之後仲要返總站（上得車，pipeline 有車費），
+  // 所以有車費就唔當終點站（可以收藏、有尾班車）；其他公司一律係
+  const endIsTerminus = lastStopIsTerminus(co, selected, stops[stops.length - 1]?.stopId);
+  const isEnd = (i: number) => i === stops.length - 1 && endIsTerminus;
   // 車費：每個站上車嘅成人車費；終點站唔使（唔會喺度上車）
   const joyYou = data.joyYou !== false;
   const fares = stops.map((s, i) => {
-    const adult = i < stops.length - 1 ? selected?.fares?.[s.stopId] : undefined;
+    const adult = !isEnd(i) ? selected?.fares?.[s.stopId] : undefined;
     return adult === undefined ? null : { adult: formatFare(adult), joyYou: joyYou ? formatFare(joyYouFare(adult)) : null };
   });
   // 標題列第二行：只喺唔適用樂悠咭時提示；詳細班次放喺右邊 drawer
@@ -111,7 +123,8 @@ export default async function RoutePage({ params, searchParams }: Props) {
     .map(({ variant: x }) => ({ id: x.id, label: variantLabel(x), special: x.special, schedules: x.schedules, runMin: runMinutes(x) }));
   const usedServices = new Set(drawerVariants.flatMap((x) => x.schedules.map((sc) => sc.serviceId)));
   const drawerCalendar = Object.fromEntries(Object.entries(calendar).filter(([id]) => usedServices.has(id)));
-  const dest = stops[stops.length - 1]?.name;
+  const dest = routeHeadDest(co, data, dir, selected, stops[stops.length - 1]?.name);
+  const region = routeRegion(co, data.route);
   // 平均行車時間：攞到即時數據之前先用
   const segSeconds = selected?.segSeconds ?? null;
   const other = dirs.find((d) => d !== dir);
@@ -125,7 +138,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
   const initialOpen = stopParam ? stops.findIndex((s) => s.stopId === stopParam) : -1;
   // 尾班車：呢個方向所有走法（經過呢個站嘅）一齊計；終點站唔使（唔會喺度上車）
   const dirVariants = variantsForDir(data, dir);
-  const lastBus = stops.map((s, i) => (i === stops.length - 1 ? null : lastBusAt(dirVariants, s.stopId, s.dir, calendar, now.getTime())));
+  const lastBus = stops.map((s, i) => (isEnd(i) ? null : lastBusAt(dirVariants, s.stopId, s.dir, calendar, now.getTime())));
 
   const mapStops: MapStop[] = stops.flatMap((s, i) => {
     const info = data.stops[s.stopId];
@@ -159,8 +172,12 @@ export default async function RoutePage({ params, searchParams }: Props) {
             <Icon name="back" size={26} />
           </Link>
           <h1>
-            <small>{companyNames(companies)}</small>
-            {data.route}
+            {/* 專線小巴：公司名後面加地區（同一個號碼三個地區都可以有） */}
+            <small>
+              {companyNames(companies)}
+              {region && <span className="route-bar-region">{GMB_REGION_NAME[region]}</span>}
+            </small>
+            {routeCode(co, data.route)}
           </h1>
           <span className="route-dest">
             <span className="route-dest-to">
@@ -180,7 +197,7 @@ export default async function RoutePage({ params, searchParams }: Props) {
           {other && (
             <SwapLink
               other={other}
-              label={`轉方向：往 ${data.stops[data.directions[other]!.at(-1)!]?.nameTc}`}
+              label={`轉方向：往 ${(co === 'gmb' ? (other === 'O' ? data.destTc : data.origTc) : null) ?? data.stops[data.directions[other]!.at(-1)!]?.nameTc}`}
               stops={stops.map(({ lat, lng }) => ({ lat, lng }))}
               otherStops={otherStops}
             />
@@ -202,6 +219,8 @@ export default async function RoutePage({ params, searchParams }: Props) {
           stops={stops}
           selectedVariantId={selected?.id ?? null}
           company={data.company}
+          dest={dest ?? ''}
+          endIsTerminus={endIsTerminus}
           fares={fares}
           lastBus={lastBus}
           segSeconds={segSeconds}
@@ -209,15 +228,11 @@ export default async function RoutePage({ params, searchParams }: Props) {
           initialOpen={initialOpen >= 0 ? initialOpen : null}
         >
           <p className="muted source">
-            資料來源：運輸署、{companyNames(companies)}（DATA.GOV.HK）。行車時間：
+            {co === 'gmb' ? '資料來源：運輸署（專線小巴實時到站數據、GTFS、CSDI 走線，DATA.GOV.HK）。行車時間：' : `資料來源：運輸署、${companyNames(companies)}（DATA.GOV.HK）。行車時間：`}
             <a href="https://github.com/HK-Bus-ETA/hk-bus-time-between-stops" target="_blank" rel="noopener">hk-bus-time-between-stops</a>（實驗性質，僅供參考）
           </p>
         </StopList>
       </div>
     </main>
   );
-}
-
-function companyNames(cos: readonly string[]): string {
-  return cos.map((c) => COMPANIES[c as keyof typeof COMPANIES]?.name ?? c).join('・');
 }

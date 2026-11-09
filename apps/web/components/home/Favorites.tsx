@@ -14,6 +14,8 @@ import {
   lrtStopRoutes,
   minutesLabel,
   mtrDepartureRows,
+  routeCode,
+  routeTitle,
   mtrLine,
   mtrStationLines,
   newFavGroupId,
@@ -25,6 +27,7 @@ import {
   type MtrLineEtas,
 } from '@hknt/core';
 import CompanyTag from '@/components/CompanyTag';
+import RegionTag from '@/components/RegionTag';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import { favKey, isLrtFav, isMtrFav, removeFavorite, setFavoriteGroup, useFavorites, type Favorite } from '@/lib/favorites';
@@ -68,7 +71,7 @@ export default function Favorites({ onBrowse, onMtr }: { onBrowse: () => void; o
             <Icon name="star" size={32} />
           </span>
           <p>
-            喺路線頁撳標題列嘅 <Icon name="star" size={16} /> 收藏路線，
+            喺巴士或小巴路線頁撳標題列嘅 <Icon name="star" size={16} /> 收藏路線，
             <br />
             或者打開一個站撳「收藏呢個站」；港鐵站、輕鐵站喺路綫圖撳站再撳 <Icon name="star" size={16} />。
           </p>
@@ -157,7 +160,8 @@ function FavRouteCard({ g, groups, onMtr }: { g: FavRouteGroup<Favorite>; groups
         </header>
       ) : (
         <Link href={`/${f0.co}/${f0.route}?dir=${f0.dir}`} className="fav-route-head" onPointerDown={() => warmRoute(f0.co as Co, f0.route, { dir: f0.dir })}>
-          <span className="route-num">{f0.route}</span>
+          <span className="route-num">{routeCode(f0.co, f0.route)}</span>
+          <RegionTag co={f0.co} route={f0.route} />
           <CompanyTag companies={f0.companies} />
           <Icon name="chevron-right" size={18} className="muted fav-route-go" />
         </Link>
@@ -194,10 +198,10 @@ export function FavItem({ f, groups = [], onMtr }: { f: Favorite; groups?: FavGr
         </span>
         {f.stopId ? <FavEtas f={f} /> : <Icon name="chevron-right" className="fav-go" />}
       </Link>
-      <button className="fav-remove" onClick={() => removeFavorite(f)} aria-label={`取消收藏 ${f.route}${f.stopName ? ` ${f.stopName}` : ''}`}>
+      <button className="fav-remove" onClick={() => removeFavorite(f)} aria-label={`取消收藏 ${routeTitle(f.co, f.route)}${f.stopName ? ` ${f.stopName}` : ''}`}>
         <Icon name="star-fill" size={20} />
       </button>
-      <GroupPick f={f} groups={groups} label={f.route} />
+      <GroupPick f={f} groups={groups} label={routeTitle(f.co, f.route)} />
     </li>
   );
 }

@@ -23,6 +23,22 @@ describe('searchStopRoutes', () => {
   });
 });
 
+describe('searchStopRoutes keep（巴士、專線小巴分開搵）', () => {
+  const mixed: AnyStopEntry[] = [
+    { id: '20000001', co: 'gmb', n: '北角道', lat: 0, lng: 0, r: [['gmb', 'HKI-21M', 'O', '寶馬山'], ['gmb', 'HKI-36', 'O', '大坑']] },
+    ...stops,
+  ];
+  it('淨係專線小巴', () => {
+    expect(searchStopRoutes(mixed, '北角', 400, (co) => co === 'gmb').map((h) => h.route)).toEqual(['HKI-21M', 'HKI-36']);
+  });
+  it('淨係巴士：小巴唔佔 limit', () => {
+    expect(searchStopRoutes(mixed, '北角', 2, (co) => co !== 'gmb').map((h) => `${h.co}/${h.route}${h.dir}`)).toEqual(['ctb/2O', 'ctb/2I']);
+  });
+  it('冇 keep = 全部', () => {
+    expect(searchStopRoutes(mixed, '北角')).toHaveLength(5);
+  });
+});
+
 describe('placeMatches', () => {
   const routes = [
     { co: 'ctb' as const, route: '8', origTc: '灣仔', destTc: '小西灣' },
@@ -41,6 +57,14 @@ describe('placeMatches', () => {
     const m = placeMatches(r, '北角', searchStopRoutes(stops, '北角'));
     expect(m[0]!.via.O?.stopId).toBe('A');
     expect(m[0]!.via.I).toBeUndefined();
+  });
+  it('專線小巴號碼用顯示號碼比較（打地區唔會撞中）', () => {
+    const r = [
+      { co: 'gmb' as const, route: 'NT-2', origTc: '大埔', destTc: '富亨' },
+      { co: 'gmb' as const, route: 'KLN-25MS', origTc: '彩虹', destTc: '牛池灣' },
+    ];
+    expect(placeMatches(r, 'nt', [])).toEqual([]);
+    expect(placeMatches(r, '25ms', []).map((x) => x.r.route)).toEqual(['KLN-25MS']);
   });
   it('without hits behaves like before', () => {
     expect(placeMatches(routes, '北角', []).map((x) => x.r.route)).toEqual(['18']);

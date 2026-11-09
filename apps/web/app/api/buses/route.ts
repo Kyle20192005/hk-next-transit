@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { computeBuses, variantStops } from '@hknt/core';
+import { CO_LIST, computeBuses, variantStops } from '@hknt/core';
 import { getCalendar, getRoute } from '@/lib/data';
 import { coParam, SAFE_ROUTE } from '@/lib/params';
 import { hourlyTimesFor } from '@/lib/journey';
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const route = q.get('route') ?? '';
   const variantId = q.get('v') ?? '';
   const co = coParam(req);
-  if (!co) return err(400, 'co 要係 ctb、kmb、nlb 或 mtrb');
+  if (!co) return err(400, `co 要係 ${CO_LIST.join('、')}`);
   if (!SAFE_ROUTE.test(route) || !/^[A-Za-z0-9-]{1,20}$/.test(variantId)) return err(400, 'route 或 v 格式唔啱');
 
   const [data, calendar] = await Promise.all([getRoute(co, route), getCalendar()]);

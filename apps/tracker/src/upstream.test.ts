@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BusyError, createUpstream, TokenBucket } from './upstream';
+import { BusyError, companyOf, createUpstream, isSoftMiss, TokenBucket } from './upstream';
 
 describe('upstream fetch', () => {
   it('caches, merges concurrent requests and keeps errors out of cache', async () => {
@@ -82,5 +82,44 @@ describe('per-host limits', () => {
     void up.fetch('https://data.etabus.gov.hk/x');
     void up.fetch('https://rt.data.gov.hk/y');
     expect(up.limits()).toEqual({ 'data.etabus.gov.hk': 3, 'rt.data.gov.hk': 10 });
+  });
+});
+
+describe('專線小巴（data.etagmb.gov.hk）', () => {
+  const GMB = 'https://data.etagmb.gov.hk/eta/stop/20000024';
+
+  it('companyOf', () => {
+    expect(companyOf(GMB)).toBe('GMB');
+    expect(companyOf('https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/001152/101')).toBe('CTB');
+    expect(companyOf('https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/X')).toBe('KMB');
+  });
+
+  it('isSoftMiss：淨係專線小巴嘅 500「ETA unavailable」同 404', () => {
+    expect(isSoftMiss(GMB, 500, '{"code":500,"message":"ETA unavailable"}')).toBe(true);
+    expect(isSoftMiss(GMB, 404, '')).toBe(true);
+    expect(isSoftMiss(GMB, 500, '{"message":"Internal"}')).toBe(false);
+    expect(isSoftMiss(GMB, 502, 'ETA unavailable')).toBe(false);
+    expect(isSoftMiss('https://rt.data.gov.hk/x', 500, 'ETA unavailable')).toBe(false);
+  });
+
+  it('「ETA unavailable」照 cache、唔計出錯；真出錯照計、唔 cache', async () => {
+    let calls = 0;
+    const status = 500;
+    let body = '{"code":500,"message":"ETA unavailable"}';
+    const fake: typeof fetch = async () => (calls++, new Response(body, { status }));
+    const up = createUpstream({ ttlMs: 10_000, rps: 100, fetchImpl: fake, now: () => 0 });
+    const a = await up.fetch(GMB);
+    expect(a.status).toBe(500);
+    expect(await a.text()).toContain('ETA unavailable');
+    await up.fetch(GMB);
+    expect(calls).toBe(1); // cache 命中
+    expect(up.stats.get('GMB')).toMatchObject({ requests: 1, cacheHits: 1, errors: 0, lastError: null });
+
+    const other = 'https://data.etagmb.gov.hk/eta/stop/20000093';
+    body = '{"message":"Internal"}';
+    await up.fetch(other);
+    await up.fetch(other);
+    expect(calls).toBe(3); // 真出錯冇 cache
+    expect(up.stats.get('GMB')).toMatchObject({ requests: 3, errors: 2, lastError: 'HTTP 500' });
   });
 });

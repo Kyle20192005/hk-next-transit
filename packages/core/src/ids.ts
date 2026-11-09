@@ -2,15 +2,21 @@
  * 網頁、App、tracker 共用嘅 ID 同格式（以前三邊各抄一份）。
  */
 
-/** 路線檔位置：ctb（城巴同聯營線）、kmb（九巴、龍運）、nlb（新大嶼山巴士）、mtrb（港鐵巴士） */
-export type Co = 'ctb' | 'kmb' | 'nlb' | 'mtrb';
-export const CO_LIST: readonly Co[] = ['ctb', 'kmb', 'nlb', 'mtrb'];
+/**
+ * 路線檔位置：ctb（城巴同聯營線）、kmb（九巴、龍運）、nlb（新大嶼山巴士）、mtrb（港鐵巴士）、
+ * gmb（專線小巴；路線 = 「地區-號碼」例如 NT-2，因為唔同地區有同號碼，見 gmb.ts）
+ */
+export type Co = 'ctb' | 'kmb' | 'nlb' | 'mtrb' | 'gmb';
+export const CO_LIST: readonly Co[] = ['ctb', 'kmb', 'nlb', 'mtrb', 'gmb'];
 export const isCo = (x: unknown): x is Co => CO_LIST.includes(x as Co);
 
-/** 路線號碼（例如 101、A11、N8P） */
-export const SAFE_ROUTE = /^[A-Za-z0-9]{1,6}$/;
-/** 站 ID：城巴 6 位數字、九巴 16 位十六進制、新大嶼山巴士數字、港鐵巴士（例如 K76-U010） */
-export const SAFE_STOP = /^(\d{1,6}|[0-9A-F]{16}|[A-Z0-9]{1,6}(-[A-Z0-9]{1,3})?-[a-z]?[UD]\d{3}[A-Z]?)$/;
+/**
+ * 路線號碼（例如 101、A11、N8P）；專線小巴前面加地區（HKI-4A、KLN-25MS、NT-2）。
+ * 巴士號碼冇「-」，所以兩樣唔會撞。
+ */
+export const SAFE_ROUTE = /^(?:[A-Z0-9]{1,6}|(?:HKI|KLN|NT)-[A-Z0-9]{1,5})$/i;
+/** 站 ID：城巴 6 位數字、九巴 16 位十六進制、新大嶼山巴士數字、專線小巴 8 位數字、港鐵巴士（例如 K76-U010） */
+export const SAFE_STOP = /^(\d{1,6}|\d{8}|[0-9A-F]{16}|[A-Z0-9]{1,6}(-[A-Z0-9]{1,3})?-[a-z]?[UD]\d{3}[A-Z]?)$/;
 /** 走法 ID */
 export const SAFE_VARIANT = /^[A-Za-z0-9-]{1,20}$/;
 

@@ -1,5 +1,6 @@
 import type { AnyStopEntry } from './stop-live';
 import type { Co } from './ids';
+import { routeCode } from './gmb';
 
 /** 經過某個站嘅路線（地點搜尋：中途站都搵到） */
 export interface StopRouteHit {
@@ -18,15 +19,18 @@ export function normalizePlace(s: string): string {
 /**
  * 站名有 q 嘅站，經過嘅路線（每條線每個方向一個，用第一個撞中嘅站）。
  * 站點索引唔包終點站，起點終點由路線索引嘅 origTc／destTc 搵。最多 limit 個。
+ * `keep`：只要邊啲公司（/api/stop-search 嘅 mode：巴士、專線小巴分開搵，小巴唔會逼走巴士結果）。
  */
-export function searchStopRoutes(stops: readonly AnyStopEntry[], q: string, limit = 400): StopRouteHit[] {
+export function searchStopRoutes(stops: readonly AnyStopEntry[], q: string, limit = 400, keep?: (co: Co) => boolean): StopRouteHit[] {
   const nq = normalizePlace(q);
   if (!nq) return [];
   const out: StopRouteHit[] = [];
   const seen = new Set<string>();
   for (const s of stops) {
+    if (keep && !s.r.some(([co]) => keep(co))) continue;
     if (!normalizePlace(s.n).includes(nq)) continue;
     for (const [co, route, dir] of s.r) {
+      if (keep && !keep(co)) continue;
       const key = `${co}/${route}/${dir}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -65,7 +69,8 @@ export function placeMatches<R extends { co?: Co; route: string; origTc?: string
     const destHit = normalizePlace(r.destTc ?? '').includes(nq);
     // 撞中嘅站就係嗰個方向嘅起點（O 由 origTc、I 由 destTc 開出）：唔使再講「經」
     const v = found && { ...(found.O && !origHit ? { O: found.O } : {}), ...(found.I && !destHit ? { I: found.I } : {}) };
-    if (origHit || destHit || normalizePlace(r.route).includes(nq)) direct.push({ r, via: v || {} });
+    // 號碼用顯示號碼（專線小巴 NT-2 → 2：打「nt」唔好成個新界撞中）
+    if (origHit || destHit || normalizePlace(routeCode(r.co, r.route)).includes(nq)) direct.push({ r, via: v || {} });
     else if (v) passing.push({ r, via: v });
   }
   return [...direct, ...passing];

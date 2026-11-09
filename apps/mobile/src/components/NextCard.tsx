@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { busDepartureRows, favDepartureRows, favsForNow, formatDistance, groupFavorites, groupStopHeads, LRT_BRAND, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrCardStations, mtrStationName, orderNearCards, radiusLabel, railCardStations, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
+import { busDepartureRows, favDepartureRows, favsForNow, formatDistance, groupFavorites, isGmbOnlyHead, LRT_BRAND, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrCardStations, mtrStationName, nearCardHeads, orderNearCards, radiusLabel, railCardStations, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
 import { api, type Co, type NearStop } from '@/lib/api';
 import { isLrtFav, isMtrFav, useFavorites, type Favorite } from '@/lib/favorites';
 import { openLrt, openMtr } from '@/lib/open-mtr';
@@ -16,8 +16,9 @@ import { ScheduledTag } from './ui';
 import { usePrefs } from '@/lib/prefs';
 
 const MAX_CARDS = 5;
-/** 載入幾多個站頭（有啲冇車，要多攞幾個先夠 5 張） */
+/** 載入幾多個站頭（有啲冇車，要多攞幾個先夠 5 張）：有巴士站嘅站頭、淨係專線小巴嘅站頭分開計，小巴唔會逼走巴士（同網頁一樣） */
 const LOAD_HEADS = 8;
+const LOAD_GMB_HEADS = 3;
 const ROWS = 4;
 const REFRESH_MS = 30_000;
 const GAP = 10;
@@ -27,7 +28,7 @@ type Tab = 'next' | 'favs';
 const MTR_CARD_M = 800;
 const MTR_CARDS = 2;
 const RAIL_CARDS = 3;
-/** 下班車分頁一張卡：港鐵站、輕鐵站或者巴士站頭 */
+/** 下班車分頁一張卡：港鐵站、輕鐵站或者巴士站頭（專線小巴站都當巴士站頭，/api/here 一齊攞） */
 type NearItem = { key: string; name: string; distance: number } & ({ kind: 'mtr' | 'lrt'; sta: string } | { kind: 'bus'; head: StopHead<NearStop> });
 /** 打開路綫圖嗰個站（輕鐵定港鐵） */
 const openRail = (sta: string, lrt: boolean) => (lrt ? openLrt(sta) : openMtr(sta));
@@ -110,9 +111,7 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
             name: m.kind === 'lrt' ? lrtStopName(m.sta) : mtrStationName(m.sta),
             distance: m.distance,
           })),
-          ...groupStopHeads(state.stops)
-            .slice(0, LOAD_HEADS)
-            .map((h) => ({ key: h.key, kind: 'bus' as const, head: h, name: h.name, distance: h.distance })),
+          ...nearCardHeads(state.stops, LOAD_HEADS, LOAD_GMB_HEADS).map((h) => ({ key: h.key, kind: 'bus' as const, head: h, name: h.name, distance: h.distance })),
         ]
       : [];
   const data = useHeadRows(heads);
@@ -127,7 +126,7 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
       />
     );
   }
-  if (!heads.length) return <Message text={`${radiusLabel(nearbyRadius)}內冇巴士站`} />;
+  if (!heads.length) return <Message text={`${radiusLabel(nearbyRadius)}內冇巴士或小巴站`} />;
   // 冇班次嘅站頭唔出卡。全部載入完先出（逐張加會推走畫面）；出咗嘅卡之後冇車都保留（同網頁一樣）
   const ready = heads.every((h) => data[h.key]);
   if (!ready && !shown.size) return <Message text="載入中…" />;
@@ -146,7 +145,8 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
       items={cards}
       header={(h) => (
         <>
-          <Icon name={h.kind === 'mtr' ? 'train' : h.kind === 'lrt' ? 'lrt' : 'navigate'} size={18} color="#2f6fd6" />
+          {/* 站頭全部係專線小巴站就用小巴圖示（同網頁一樣） */}
+          <Icon name={h.kind === 'mtr' ? 'train' : h.kind === 'lrt' ? 'lrt' : h.kind === 'bus' && isGmbOnlyHead(h.head) ? 'minibus' : 'navigate'} size={18} color="#2f6fd6" />
           <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 17, fontWeight: '700', color: t.text }}>
             {h.kind === 'mtr' ? `港鐵${h.name}站` : h.kind === 'lrt' ? `輕鐵${h.name}站` : h.name}
           </Text>

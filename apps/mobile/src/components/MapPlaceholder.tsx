@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { vehicleNoun } from '@hknt/core';
 import { radius, useTheme } from '@/lib/theme';
 import { MapHelpButton } from './mapHelp';
 import type { RouteMapProps } from './mapTypes';
@@ -10,7 +11,7 @@ export function MapPlaceholder({ stops, buses, company, multiCompany, height, no
     <View style={{ height, borderRadius: radius.l, overflow: 'hidden', backgroundColor: t.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 }}>
       <Text style={{ color: t.muted, textAlign: 'center' }}>{note}</Text>
       <Text style={{ color: t.muted, fontSize: 12 }}>
-        {stops.length} 個站 · {buses.length} 架巴士
+        {stops.length} 個站 · {buses.length} 架{vehicleNoun(company)}
       </Text>
       <MapHelpButton company={company} multiCompany={multiCompany} />
     </View>

@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { activeFavGroup, FAV_GROUP_PRESETS, FAV_GROUP_WINDOWS, favGroupWindowLabel, favsInGroup, groupFavsByRoute, newFavGroupId, type FavGroupDef } from '@hknt/core';
+import { activeFavGroup, FAV_GROUP_PRESETS, FAV_GROUP_WINDOWS, favGroupWindowLabel, favsInGroup, groupFavsByRoute, newFavGroupId, routeTitle, type FavGroupDef } from '@hknt/core';
 import { setFavoriteGroup, useFavorites, type Favorite } from '@/lib/favorites';
 import { deleteFavGroup, saveFavGroup, useFavGroups } from '@/lib/fav-groups';
 import { FavRouteCard } from '@/components/FavItem';
@@ -40,7 +40,7 @@ export default function FavoritesTab() {
       </AppBar>
       {list.length === 0 ? (
         <EmptyState icon="star" action={{ label: '去路線列表', onPress: () => router.navigate('/routes') }}>
-          <Text style={{ color: t.muted, textAlign: 'center', lineHeight: 22 }}>喺路線頁撳標題列嘅星號收藏路線，{'\n'}或者打開一個站撳「收藏呢個站」；{'\n'}港鐵站喺路綫圖撳站再撳星號。</Text>
+          <Text style={{ color: t.muted, textAlign: 'center', lineHeight: 22 }}>喺巴士、小巴路線頁撳標題列嘅星號收藏路線，{'\n'}或者打開一個站撳「收藏呢個站」；{'\n'}港鐵站喺路綫圖撳站再撳星號。</Text>
           <Text style={{ color: t.muted, textAlign: 'center', fontSize: 13 }}>收藏咗嘅站會喺度直接顯示下一班車（只儲存喺呢部機）</Text>
         </EmptyState>
       ) : (
@@ -223,7 +223,7 @@ function GroupPicker({ f, groups, onClose }: { f: Favorite; groups: FavGroupDef[
   const cur = f.group && groups.some((g) => g.id === f.group) ? f.group : '';
   const opts = [{ id: '', name: '未分組' }, ...groups];
   return (
-    <Sheet title={`${f.route}${f.stopName ? ` · ${f.stopName}` : ''} 放入分組`} onClose={onClose}>
+    <Sheet title={`${routeTitle(f.co, f.route)}${f.stopName ? ` · ${f.stopName}` : ''} 放入分組`} onClose={onClose}>
       <View>
         {opts.map((g) => (
           <Pressable

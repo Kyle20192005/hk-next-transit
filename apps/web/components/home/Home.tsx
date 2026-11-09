@@ -35,8 +35,8 @@ const MODE_KEY = 'hknt.mode';
  */
 export default function Home({ routes, updated }: { routes: RouteIndex['routes']; updated: string | null }) {
   const [tab, setTab] = useState<Tab>('home');
-  // 唔係分頁嘅頁：附近車站、交通消息（有返回掣）
-  const [view, setView] = useState<null | { kind: 'nearby' } | { kind: 'tools' } | { kind: 'news'; pos: { lat: number; lng: number } | null }>(null);
+  // 唔係分頁嘅頁：附近車站（only = 'gmb'：路線分頁揀小巴時嘅「附近小巴站」）、交通消息（有返回掣）
+  const [view, setView] = useState<null | { kind: 'nearby'; only?: 'gmb' } | { kind: 'tools' } | { kind: 'news'; pos: { lat: number; lng: number } | null }>(null);
   const [mode, setModeState] = useState<TransportMode>('bus');
   // 設定「交通工具優先」：路線分頁預設揀邊款
   const { priority } = usePrefs();
@@ -107,7 +107,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
     <main className={`home tab-${view ? view.kind : tab}`}>
       <div className="home-body">
         {view?.kind === 'nearby' ? (
-          <Nearby onBack={() => setView(null)} onRail={openMtr} onTram={openTram} />
+          <Nearby only={view.only} onBack={() => setView(null)} onRail={openMtr} onTram={openTram} />
         ) : view?.kind === 'news' ? (
           <News pos={view.pos} onBack={() => setView(null)} />
         ) : view?.kind === 'tools' ? (
@@ -131,7 +131,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
                 }}
               />
             )}
-            {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} mode={mode} onMode={setMode} onNearby={() => setView({ kind: 'nearby' })} railPick={railPick} onRailPick={(sta, lrt) => setRailPick({ sta, lrt })} tramPick={tramPick} onTramPick={(sta) => setTramPick({ sta, n: Date.now() })} />}
+            {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} mode={mode} onMode={setMode} onNearby={(only) => setView({ kind: 'nearby', only })} railPick={railPick} onRailPick={(sta, lrt) => setRailPick({ sta, lrt })} tramPick={tramPick} onTramPick={(sta) => setTramPick({ sta, n: Date.now() })} />}
             {tab === 'nav' && <Navigation />}
             {tab === 'favs' && <Favorites onBrowse={() => pick('routes')} onMtr={openMtr} />}
             {tab === 'settings' && <Settings updated={updated} />}

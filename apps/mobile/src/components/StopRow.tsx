@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { COMPANIES, formatDistance, lastBusText, updatedAgo, shortName, type Company, type Eta, type LastBus } from '@hknt/core';
 import { tabular, useTheme } from '@/lib/theme';
 import { useFavorite, type Favorite } from '@/lib/favorites';
-import { BusGlyph, Icon, type IconName } from './Icon';
+import { Icon, VehicleGlyph, type IconName } from './Icon';
 import { CompanyTag, Pill, ScheduledTag } from './ui';
 import { HereButton, type HereTarget } from './HereSheet';
 import { usePrefs } from '@/lib/prefs';
@@ -15,6 +15,8 @@ export interface RowBus {
   t: number;
   color: string;
   ink: string;
+  /** 架車屬邊間公司：專線小巴畫小巴圖示 */
+  company?: string;
   schedule?: boolean;
   /** 尾班車（追蹤緊）：下面標「尾班」 */
   last?: boolean;
@@ -123,7 +125,7 @@ export const StopRow = memo(function StopRow(p: Props) {
             opacity: b.schedule ? 0.5 : 1,
           }}
         >
-          <BusGlyph size={14} color={b.ink} />
+          <VehicleGlyph company={b.company} size={14} color={b.ink} />
           {b.last && (
             <View style={{ position: 'absolute', top: 26, paddingHorizontal: 5, borderRadius: 6, backgroundColor: '#c62828' }}>
               <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800', lineHeight: 15 }}>尾班</Text>

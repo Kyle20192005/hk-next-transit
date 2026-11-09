@@ -4,7 +4,7 @@ import MapView, { Marker, Polyline } from 'react-native-maps';
 import Svg, { Path } from 'react-native-svg';
 import { companyInk, googleMapStyle, lineArrows } from '@hknt/core';
 import { radius, tabular, useTheme } from '@/lib/theme';
-import { BusGlyph } from './Icon';
+import { VehicleGlyph } from './Icon';
 import { MapHelpButton } from './mapHelp';
 import type { RouteMapProps } from './mapTypes';
 
@@ -117,7 +117,7 @@ export function RouteMap({ lines, stops, buses, color, company, multiCompany, fo
           <Marker key={`bus-${b.key}${b.last ? '-last' : ''}`} coordinate={{ latitude: b.latitude, longitude: b.longitude }} anchor={{ x: 0.5, y: b.last ? 14 / 46 : 0.5 }} tappable={false} zIndex={b.last ? 7 : 6}>
             <View accessibilityLabel={b.label} style={{ width: b.last ? 40 : 28, alignItems: 'center', gap: 2 }}>
               <View style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#fff', backgroundColor: b.color, alignItems: 'center', justifyContent: 'center', opacity: b.schedule ? 0.5 : 1 }}>
-                <BusGlyph size={15} color={b.ink} />
+                <VehicleGlyph company={b.company ?? company} size={15} color={b.ink} />
               </View>
               {b.last && (
                 <View style={{ height: 16, paddingHorizontal: 5, borderRadius: 6, backgroundColor: '#c62828', justifyContent: 'center' }}>
