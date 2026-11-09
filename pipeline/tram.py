@@ -174,7 +174,17 @@ def load_routes(gtfs, stations, order):
                     while x <= end:
                         sched[t['service_id']].add(x)
                         x += step
-            # GTFS 冇嘅站（電車廠）：路線喺同方向連續經過佢前後兩個站，就插返入去（時間取中間）
+            r['dirs'][d] = {
+                'stops': sids, 'offsets': offsets, 'minutes': minutes,
+                'schedules': [{'serviceId': k, 'departures': sorted(v)} for k, v in sorted(sched.items())],
+            }
+        out.append(r)
+    # GTFS 冇嘅站（電車廠：屈地街 94W、西灣河 97E）：路線喺同方向連續經過佢前後兩個站，就插返入去（時間取中間）。
+    # 只限冇任何路線經過嘅站：春秧街、北角總站呢啲支綫站喺次序入面都夾喺兩個站中間，但直通車唔經（唔好插）
+    used = {s for r in out for x in r['dirs'].values() for s in x['stops']}
+    for r in out:
+        for x in r['dirs'].values():
+            sids, offsets = x['stops'], x['offsets']
             i = 0
             while i + 1 < len(sids):
                 a, b = stations[sids[i]], stations[sids[i + 1]]
@@ -182,15 +192,10 @@ def load_routes(gtfs, stations, order):
                 ids = order.get(da, [])
                 if sids[i] in ids and sids[i + 1] in ids:
                     ia, ib = ids.index(sids[i]), ids.index(sids[i + 1])
-                    if ib == ia + 2:
+                    if ib == ia + 2 and ids[ia + 1] not in used:
                         sids.insert(i + 1, ids[ia + 1])
                         offsets.insert(i + 1, round((offsets[i] + offsets[i + 1]) / 2))
                 i += 1
-            r['dirs'][d] = {
-                'stops': sids, 'offsets': offsets, 'minutes': minutes,
-                'schedules': [{'serviceId': k, 'departures': sorted(v)} for k, v in sorted(sched.items())],
-            }
-        out.append(r)
     # GTFS 冇嘅站（電車廠）：用同方向前後兩個站中間
     for d, ids in order.items():
         for i, sid in enumerate(ids):

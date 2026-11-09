@@ -1,12 +1,15 @@
 """電車示意圖排版（src/tram-map.ts）：由 src/tram-data.ts 嘅站同座標計位置，檢查晒先輸出。
 
 用法：python3 packages/core/tools/tram-layout.py [--svg 預覽.svg] [--write]
+（喺「設計方向」打橫排，輸出轉 90° 打直；預覽同 tram-map.ts 都係直版）
 畫法（2026-11 第一版，用戶揀咗自己畫電車路綫圖；唔好照抄電車公司官方路綫圖）：
 - 打橫：左邊堅尼地城、右邊筲箕灣。雙軌：上面東行、下面西行，各自有自己嘅站（電車兩個方向嘅站唔一定對正）。
 - 站嘅左右位置跟真實位置（投影落主綫嘅里數），太密就推開（成段一齊推，東西行唔會錯開）。
 - 站名直排中文：東行喺上面、西行喺下面（似電車站牌）。
 - 總站：膠囊橫跨雙軌，粗體站名。
 - 跑馬地環綫：喺灣仔（天樂里接返軒尼詩道）同銅鑼灣（波斯富街）之間向下吊一個圈，單向（東邊落、西邊上），有箭咀。
+- 總站分支（BRANCH）：銅鑼灣、北角（連春秧街）、石塘咀由主綫分出去（直版向右），伸過附近東行站名先放站同總站膠囊；
+  上環（西港城）西行直通車有停，留喺主綫。
 """
 import json, math, os, re, sys
 
@@ -33,6 +36,15 @@ TERM_ZH = 0.3
 COLOR = '#007a4d'  # 電車綠（自己揀，唔用官方色板）
 INK = '#1d1d1f'
 LOOP_W = 1.6      # 跑馬地環綫兩條直綫距離
+# 總站分支（2026-11 用戶：銅鑼灣、北角（連春秧街）、石塘咀係由主綫分出去嘅掉頭位，唔係主綫上面嘅站）：
+# 東行車喺度入去、掉頭再出返西行；只有去呢個總站嘅車先經支綫上面嘅站（春秧街）。上環（西港城）西行直通車有停，留喺主綫。
+BRANCH = {'CBT': [], 'NPT': ['67E'], 'WST': []}
+# 北角：入同出唔喺同一度——東行喺炮台山之後入（經春秧街，唔經主綫北角道），掉頭後喺北角道同書局街之間返西行。
+# 所以畫做單向細環：入口喺呢兩個東行站中間
+BRANCH_LOOP = {'NPT': ('65E', '69E')}
+STUB = {s: t for t, ss in BRANCH.items() for s in ss}
+BR_GAP = 0.5      # 支綫第一樣嘢離附近東行站名幾遠
+BR_STEP = 0.7     # 支綫上面站同站（總站）距離
 LOOP_STEP = 0.5   # 環綫站距
 
 
@@ -79,7 +91,7 @@ chain = {}
 for s in ORDER['W']:
     chain[s] = TOTAL - cum[main_w.index(s)]
 for s in ORDER['E']:
-    if s not in chain:
+    if s not in chain and s not in STUB:
         chain[s] = project(ll(s))
 chain['KTT'] = 0.0
 
@@ -110,9 +122,9 @@ for s, c in events:
         # 總站、接駁點：兩條軌都要讓位
         for t in ('W', 'E'):
             if t in last:
-                need.append(last[t] + MIN * 0.9)
+                need.append(last[t] + MIN)
     if tr in ('W', 'E') and 'T' in last:
-        need.append(last['T'] + MIN * 0.9)
+        need.append(last['T'] + MIN)
     if tr in ('W', 'E') and 'J' in last:
         need.append(last['J'] + MIN * 0.6)
     if need and max(need) > x:
@@ -156,14 +168,13 @@ for i, s in enumerate(ORDER['N']):
     loop[s] = (xu, bottom - i * LOOP_STEP)
 
 # ---------------------------------------------------------------------------
-# 輸出（設計方向 = 打橫；直版 = 轉 90°：堅尼地城喺頂、東行喺右邊、跑馬地環綫喺左邊）
+# 輸出（設計方向 = 打橫，最後轉 90° 做直版：堅尼地城喺頂、東行喺右邊、跑馬地環綫喺左邊）
 POS = {}
 for s in ST:
     if s in loop:
         POS[s] = loop[s]
     elif s in X:
         POS[s] = (X[s], y_of(s))
-# 站名：(x, y) 錨點、v 直排、flow：直排 up（字向上排，最尾一個字貼錨點）／down；打橫 start／end／middle
 LABELS = {}
 for s, (x, y) in POS.items():
     d = ST[s]['dir']
@@ -180,6 +191,38 @@ for s, (x, y) in POS.items():
     elif d == 'T':
         LABELS[s] = {'x': x, 'y': YE - 0.28, 'v': True, 'flow': 'up', 'bold': True}
 
+# 總站分支：直版向右（東行嗰邊）伸出去，伸過附近東行站名先放站同總站；設計方向即係向上（-y）
+E_LABEL_X = -(YE - LABEL_GAP)       # 直版東行站名由呢度開始（打橫寫）
+VLABEL = {}                         # 直版站名（覆蓋上面嘅）：x, y, flow, bold
+BR_END = {}
+LOOP_BR = {}                        # 單向環：y_in, y_out, 站 x, 右邊直綫 x（直版座標）
+for T, stubs in BRANCH.items():
+    xT = X[T]
+    ext = max([E_LABEL_X + len(ST[s]['zh']) * ZH for s in X if TRACK.get(s) == 'E' and abs(X[s] - xT) < 0.8] or [E_LABEL_X])
+    xv = ext + BR_GAP
+    for s in stubs:
+        POS[s] = (xT, -xv)
+        LABELS[s] = {'x': 0, 'y': 0, 'v': False, 'flow': 'middle'}   # 位置用 VLABEL
+        VLABEL[s] = (xv, xT - 0.3, 'middle', False)
+        xv += BR_STEP
+    if T in BRANCH_LOOP:
+        # 環：入口（y_in）喺兩個東行站中間，春秧街喺入口橫綫上，右邊直綫係總站（膠囊打直），出口（y_out = 總站位置）返西行
+        a, b = BRANCH_LOOP[T]
+        y_in, y_out = (X[a] + X[b]) / 2, xT
+        xs_ = ext + BR_GAP
+        for s in stubs:
+            POS[s] = (y_in, -xs_)
+            VLABEL[s] = (xs_, y_in - 0.3, 'middle', False)
+        xc = xs_ + 0.6
+        POS[T] = ((y_in + y_out) / 2, -xc)
+        VLABEL[T] = (xc + 0.25, (y_in + y_out) / 2, 'start', True)
+        LOOP_BR[T] = (y_in, y_out, xs_, xc)
+        continue
+    xv += 0.31   # 總站膠囊中心（膠囊闊 0.62）
+    POS[T] = (xT, -xv)
+    VLABEL[T] = (xv + 0.31 + 0.12, xT, 'start', True)
+    BR_END[T] = xv
+
 R = 0.35
 x0, x1 = 0.0, W_
 hb = bottom + 0.35
@@ -188,14 +231,23 @@ LINES = [
     [('M', x0, YW), ('L', x1, YW)],
     [('M', xd, YW), ('L', xd, hb - R), ('A', R, xd - R, hb), ('L', xu + R, hb), ('A', R, xu, hb - R), ('L', xu, YW)],
 ]
+# 支綫：由西行軌（橫過東行軌）伸去總站
+for T, xe in BR_END.items():
+    LINES.append([('M', X[T], YW), ('L', X[T], -xe)])
 ARROWS = [(xd, (YW + LOOP_TOP) / 2 + 0.2, 90), ((xd + xu) / 2, hb, 180), (xu, (YW + LOOP_TOP) / 2 + 0.2, -90)]
 TERMS = [s for s in ST if ST[s].get('terminus')]
 
 
 def term_box(s):
+    """總站膠囊（設計方向；直版會對調闊高）"""
     x, y = POS[s]
     if s == 'HVT':
         return (x, y, 0.62, 0.26)
+    if s in LOOP_BR:
+        y_in, y_out, _, _ = LOOP_BR[s]
+        return (x, y, max(0.5, y_out - y_in + 0.1), 0.26)
+    if s in BRANCH:
+        return (x, y, 0.26, 0.62)
     return (x, (YE + YW) / 2, 0.26, GAP + 0.32)
 
 
@@ -203,9 +255,18 @@ def size_of(L):
     return TERM_ZH if L.get('bold') else ZH
 
 
-def label_box(s, L):
-    """站名佔嘅長方形（x0, y0, x1, y1），用嚟檢查撞字"""
-    n, sz = len(ST[s]['zh']), size_of(L)
+def rot(p):
+    """設計方向 → 直版"""
+    return (-p[1], p[0])
+
+
+FLOW_V = {'up': 'start', 'down': 'end', 'start': 'down', 'end': 'up', 'middle': 'middle'}
+r3 = lambda v: round(v, 3)
+
+
+def label_box_v(L):
+    """直版站名佔嘅長方形（x0, y0, x1, y1）"""
+    n, sz = len(ST[L['id']]['zh']), size_of(L)
     if L['v']:
         h = n * sz * 1.02
         y0 = L['y'] - h if L['flow'] == 'up' else L['y']
@@ -213,6 +274,74 @@ def label_box(s, L):
     w = n * sz
     x0 = {'start': L['x'], 'end': L['x'] - w, 'middle': L['x'] - w / 2}[L['flow']]
     return (x0, L['y'] - sz / 2, x0 + w, L['y'] + sz / 2)
+
+
+def build():
+    def path(segs):
+        out = []
+        for seg in segs:
+            if seg[0] == 'A':
+                _, rad, x, y = seg
+                X2, Y2 = rot((x, y))
+                out.append(f'A{rad} {rad} 0 0 1 {r3(X2)} {r3(Y2)}')
+            else:
+                X2, Y2 = rot((seg[1], seg[2]))
+                out.append(f'{seg[0]}{r3(X2)} {r3(Y2)}')
+        return ''.join(out)
+    labels = []
+    for s, L in LABELS.items():
+        if s in VLABEL:
+            x2, y2, flow, bold = VLABEL[s]
+            item = {'id': s, 'x': r3(x2), 'y': r3(y2), 'v': False, 'flow': flow}
+            if bold:
+                item['bold'] = True
+            labels.append(item)
+            continue
+        X2, Y2 = rot((L['x'], L['y']))
+        v, flow = not L['v'], FLOW_V[L['flow']]
+        if s == 'HVT':
+            X2, Y2 = rot(POS[s])
+            X2 -= 0.45
+            v, flow = False, 'end'
+        item = {'id': s, 'x': r3(X2), 'y': r3(Y2), 'v': v, 'flow': flow}
+        if L.get('bold'):
+            item['bold'] = True
+        labels.append(item)
+    stops = [{'id': s, 'x': r3(rot(p)[0]), 'y': r3(rot(p)[1])} for s, p in POS.items() if not ST[s].get('terminus')]
+    terms = []
+    for s in TERMS:
+        x, y, w, h = term_box(s)
+        X2, Y2 = rot((x, y))
+        terms.append({'id': s, 'x': r3(X2), 'y': r3(Y2), 'w': r3(h), 'h': r3(w)})
+    arrows = [{'x': r3(rot((x, y))[0]), 'y': r3(rot((x, y))[1]), 'rot': (a + 90) % 360} for x, y, a in ARROWS]
+    pts = [rot(p) for p in POS.values()]
+    for L in labels:
+        b = label_box_v(L)
+        pts += [(b[0], b[1]), (b[2], b[3])]
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    pad = 0.4
+    box = [r3(min(xs) - pad), r3(min(ys) - pad), r3(max(xs) - min(xs) + 2 * pad), r3(max(ys) - min(ys) + 2 * pad)]
+    # 直版嘅橫綫（環綫兩條、支綫），檢查站名撞綫用：(y, x0, x1)
+    hsegs = []
+    for segs in LINES[2:]:
+        pts2 = [rot((sg[-2], sg[-1])) for sg in segs]
+        for a, b in zip(pts2, pts2[1:]):
+            if abs(a[1] - b[1]) < 1e-6:
+                hsegs.append((a[1], min(a[0], b[0]), max(a[0], b[0])))
+    lines = [path(l) for l in LINES]
+    RR = 0.2
+    for T, (y_in, y_out, xs_, xc) in LOOP_BR.items():
+        # 入：東行軌 → 右 → 落 → 出：返左橫過東行軌去西行軌（直版座標）
+        lines.append(f'M{r3(GAP / 2)} {r3(y_in)}L{r3(xc - RR)} {r3(y_in)}A{RR} {RR} 0 0 1 {r3(xc)} {r3(y_in + RR)}'
+                     f'L{r3(xc)} {r3(y_out - RR)}A{RR} {RR} 0 0 1 {r3(xc - RR)} {r3(y_out)}L{r3(-GAP / 2)} {r3(y_out)}')
+        arrows.append({'x': r3((xs_ + xc - RR) / 2 + 0.05), 'y': r3(y_in), 'rot': 0})
+        arrows.append({'x': r3(xs_), 'y': r3(y_out), 'rot': 180})
+        hsegs.append((y_in, GAP / 2, xc))
+        hsegs.append((y_out, -GAP / 2, xc))
+    return {'box': box, 'lines': lines, 'arrows': arrows, 'stops': stops, 'terms': terms, 'labels': labels}, hsegs
+
+
+V_MAP, HSEGS = build()
 
 
 def overlap(a, b, m=0.03):
@@ -225,91 +354,21 @@ for tr in ('W', 'E'):
     for a, b in zip(xs, xs[1:]):
         if b - a < MIN - 1e-6:
             problems.append(f'{tr} 站太近 {a} {b}')
-boxes = {s: label_box(s, L) for s, L in LABELS.items()}
-ids = sorted(boxes)
-for i, a in enumerate(ids):
-    for b in ids[i + 1:]:
-        if overlap(boxes[a], boxes[b]):
+boxes = [(L['id'], label_box_v(L)) for L in V_MAP['labels']]
+for i, (a, ba) in enumerate(boxes):
+    for b, bb in boxes[i + 1:]:
+        if overlap(ba, bb):
             problems.append(f'站名撞：{ST[a]["zh"]} {ST[b]["zh"]}')
-# 站名唔好撞環綫
-for s, bx in boxes.items():
-    if ST[s]['dir'] in ('W', 'T'):
-        for lx in (xd, xu):
-            if bx[0] - 0.02 < lx < bx[2] + 0.02 and bx[3] > YW + 0.1:
-                problems.append(f'站名撞跑馬地環綫：{ST[s]["zh"]}')
-print('寬', round(W_, 2), '單位；問題', len(problems), *problems[:20], sep='\n  ')
-
-
-def rot(p):
-    """設計方向 → 直版"""
-    return (-p[1], p[0])
-
-
-FLOW_V = {'up': 'start', 'down': 'end', 'start': 'down', 'end': 'up', 'middle': 'middle'}
-
-
-def build(vertical):
-    tf = rot if vertical else (lambda p: p)
-    r = lambda v: round(v, 3)
-
-    def path(segs):
-        out = []
-        for seg in segs:
-            if seg[0] == 'A':
-                _, rad, x, y = seg
-                X2, Y2 = tf((x, y))
-                # 轉 90° 唔改圓弧方向（順時針轉，sweep 照舊）
-                out.append(f'A{rad} {rad} 0 0 1 {r(X2)} {r(Y2)}')
-            else:
-                X2, Y2 = tf((seg[1], seg[2]))
-                out.append(f'{seg[0]}{r(X2)} {r(Y2)}')
-        return ''.join(out)
-    labels = []
-    for s, L in LABELS.items():
-        X2, Y2 = tf((L['x'], L['y']))
-        v, flow = L['v'], L['flow']
-        if vertical:
-            v, flow = not v, FLOW_V[flow]
-            if s == 'HVT':
-                X2, Y2 = tf(POS[s])
-                X2 -= 0.45
-                v, flow = False, 'end'
-        item = {'id': s, 'x': r(X2), 'y': r(Y2), 'v': v, 'flow': flow}
-        if L.get('bold'):
-            item['bold'] = True
-        labels.append(item)
-    stops = []
-    for s, p in POS.items():
-        if ST[s].get('terminus'):
-            continue
-        X2, Y2 = tf(p)
-        stops.append({'id': s, 'x': r(X2), 'y': r(Y2)})
-    terms = []
-    for s in TERMS:
-        x, y, w, h = term_box(s)
-        X2, Y2 = tf((x, y))
-        if vertical:
-            w, h = h, w
-        terms.append({'id': s, 'x': r(X2), 'y': r(Y2), 'w': r(w), 'h': r(h)})
-    arrows = []
-    for x, y, a in ARROWS:
-        X2, Y2 = tf((x, y))
-        arrows.append({'x': r(X2), 'y': r(Y2), 'rot': (a + 90) % 360 if vertical else a})
-    # 範圍：所有點、站名
-    pts = [tf((x, y)) for x, y in POS.values()]
-    for s, L in LABELS.items():
-        b = label_box(s, L)
-        pts += [tf((b[0], b[1])), tf((b[2], b[3]))]
-    if vertical:
-        hb_ = term_box('HVT')
-        pts.append((tf(POS['HVT'])[0] - 0.45 - len(ST['HVT']['zh']) * TERM_ZH, tf(POS['HVT'])[1]))
-    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-    pad = 0.4
-    box = [r(min(xs) - pad), r(min(ys) - pad), r(max(xs) - min(xs) + 2 * pad), r(max(ys) - min(ys) + 2 * pad)]
-    return {'box': box, 'lines': [path(l) for l in LINES], 'arrows': arrows, 'stops': stops, 'terms': terms, 'labels': labels}
-
-
-MAPS = {'h': build(False), 'v': build(True)}
+    for (y, sx0, sx1) in HSEGS:
+        if ba[1] - LW / 2 < y < ba[3] + LW / 2 and ba[0] < sx1 and sx0 < ba[2]:
+            problems.append(f'站名撞綫：{ST[a]["zh"]}')
+# 總站膠囊、站點唔好撞站名
+for tt in V_MAP['terms']:
+    tb = (tt['x'] - tt['w'] / 2, tt['y'] - tt['h'] / 2, tt['x'] + tt['w'] / 2, tt['y'] + tt['h'] / 2)
+    for a, ba in boxes:
+        if a != tt['id'] and overlap(tb, ba):
+            problems.append(f'總站撞站名：{ST[tt["id"]]["zh"]} {ST[a]["zh"]}')
+print('高', round(W_, 2), '單位；問題', len(problems), *problems[:20], sep='\n  ')
 
 
 def svg(m):
@@ -344,12 +403,11 @@ def svg(m):
 
 if '--svg' in sys.argv:
     p = sys.argv[sys.argv.index('--svg') + 1]
-    open(p, 'w', encoding='utf-8').write(svg(MAPS['h']))
-    open(p.replace('.svg', '-v.svg'), 'w', encoding='utf-8').write(svg(MAPS['v']))
-    print('預覽', p, p.replace('.svg', '-v.svg'))
+    open(p, 'w', encoding='utf-8').write(svg(V_MAP))
+    print('預覽', p)
 
 if '--write' in sys.argv:
-    m = MAPS['v']
+    m = V_MAP
     def rows(xs):
         return '[\n  ' + ',\n  '.join(json.dumps(x, ensure_ascii=False, separators=(', ', ': ')) for x in xs) + ',\n]'
     ts = f"""// 由 tools/tram-layout.py 生成（打直：堅尼地城喺頂、筲箕灣喺底；右邊東行、左邊西行；跑馬地環綫喺左邊），唔好人手改
@@ -368,7 +426,7 @@ export interface TramMapLabel {{
 
 /** 地圖範圍 [x, y, 闊, 高]（地圖單位） */
 export const TRAM_MAP_BOX: [number, number, number, number] = {json.dumps(m['box'])};
-/** 路軌（SVG path，東行、西行、跑馬地環綫） */
+/** 路軌（SVG path，東行、西行、跑馬地環綫、總站分支） */
 export const TRAM_MAP_LINES: string[] = {json.dumps(m['lines'])};
 /** 單向路軌（跑馬地環綫）白色箭咀：位置同方向（度，0 = 向右） */
 export const TRAM_MAP_ARROWS: {{ x: number; y: number; rot: number }}[] = {json.dumps(m['arrows'])};

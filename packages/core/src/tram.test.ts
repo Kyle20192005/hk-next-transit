@@ -26,6 +26,15 @@ describe('電車數據', () => {
     expect(TRAM_ORDER.W[0]).toBe('SKT');
     expect(TRAM_ORDER.E[0]).toBe('KTT');
   });
+  it('支綫站同總站：直通車唔經（春秧街只有去北角嘅車、北角總站只有開去石塘咀）', () => {
+    for (const r of TRAM_ROUTES)
+      for (const seq of Object.values(r.dirs)) {
+        if (seq.includes('67E')) expect(seq[seq.length - 1]).toBe('NPT');
+        if (seq.slice(1, -1).includes('NPT') || seq.slice(1, -1).includes('CBT')) throw new Error(`${r.id} 經過總站`);
+      }
+    // 電車廠站只插入直通車
+    expect(TRAM_ROUTES.some((r) => Object.values(r.dirs).some((s) => s.includes('94W')))).toBe(true);
+  });
   it('總站有兩個到站代號', () => {
     expect(tramStationByCode('HVT_K')?.id).toBe('HVT');
     expect(tramStationByCode('HVT_B')?.id).toBe('HVT');
