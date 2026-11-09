@@ -10,6 +10,7 @@ import {
   groupStopHeads,
   minutesLabel,
   mtrDepartureRows,
+  mtrCardStations,
   mtrStationName,
   orderNearCards,
   radiusLabel,
@@ -37,7 +38,7 @@ const ROWS = 4;
 const REFRESH_MS = 30_000;
 const TAB_KEY = 'hknt.nextTab';
 type Tab = 'next' | 'favs';
-/** 港鐵站卡：幾多米內、最多幾張（排最前） */
+/** 港鐵站卡：幾多米內、最多幾張（冇就出 2 公里內最近一個，core mtrCardStations） */
 const MTR_CARD_M = 800;
 const MTR_CARDS = 2;
 /** 下班車分頁一張卡：港鐵站或者巴士站頭 */
@@ -126,10 +127,7 @@ function NearbyPane({ state, onLocate, onMore, onMtr }: { state: NearbyState; on
   const items: NearItem[] =
     state.kind === 'ok'
       ? [
-          ...state.mtr
-            .filter((m) => m.distance <= MTR_CARD_M)
-            .slice(0, MTR_CARDS)
-            .map((m) => ({ key: `mtr-${m.sta}`, kind: 'mtr' as const, sta: m.sta, name: mtrStationName(m.sta), distance: m.distance })),
+          ...mtrCardStations(state.mtr, MTR_CARD_M, MTR_CARDS).map((m) => ({ key: `mtr-${m.sta}`, kind: 'mtr' as const, sta: m.sta, name: mtrStationName(m.sta), distance: m.distance })),
           ...groupStopHeads(state.stops)
             .slice(0, LOAD_HEADS)
             .map((h) => ({ key: h.key, kind: 'bus' as const, head: h, name: h.name, distance: h.distance })),

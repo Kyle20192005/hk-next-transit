@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { busDepartureRows, favDepartureRows, favsForNow, formatDistance, groupFavorites, groupStopHeads, minutesLabel, mtrDepartureRows, mtrStationName, orderNearCards, radiusLabel, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
+import { busDepartureRows, favDepartureRows, favsForNow, formatDistance, groupFavorites, groupStopHeads, minutesLabel, mtrDepartureRows, mtrCardStations, mtrStationName, orderNearCards, radiusLabel, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
 import { api, type Co, type NearStop } from '@/lib/api';
 import { isMtrFav, useFavorites, type Favorite } from '@/lib/favorites';
 import { openMtr } from '@/lib/open-mtr';
@@ -23,7 +23,7 @@ const REFRESH_MS = 30_000;
 const GAP = 10;
 const TAB_KEY = 'hknt.nextTab';
 type Tab = 'next' | 'favs';
-/** 港鐵站卡：幾多米內、最多幾張（排最前） */
+/** 港鐵站卡：幾多米內、最多幾張（冇就出 2 公里內最近一個，core mtrCardStations） */
 const MTR_CARD_M = 800;
 const MTR_CARDS = 2;
 /** 下班車分頁一張卡：港鐵站或者巴士站頭 */
@@ -100,10 +100,7 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
   const heads: NearItem[] =
     state.kind === 'ok'
       ? [
-          ...state.mtr
-            .filter((m) => m.distance <= MTR_CARD_M)
-            .slice(0, MTR_CARDS)
-            .map((m) => ({ key: `mtr-${m.sta}`, kind: 'mtr' as const, sta: m.sta, name: mtrStationName(m.sta), distance: m.distance })),
+          ...mtrCardStations(state.mtr, MTR_CARD_M, MTR_CARDS).map((m) => ({ key: `mtr-${m.sta}`, kind: 'mtr' as const, sta: m.sta, name: mtrStationName(m.sta), distance: m.distance })),
           ...groupStopHeads(state.stops)
             .slice(0, LOAD_HEADS)
             .map((h) => ({ key: h.key, kind: 'bus' as const, head: h, name: h.name, distance: h.distance })),

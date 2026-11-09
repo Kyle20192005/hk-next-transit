@@ -6,6 +6,7 @@ import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
 import { usePrefs } from '@/lib/prefs';
+import type { Co } from '@/lib/data';
 import { loadTools, useNews } from '@/lib/news';
 import { ToolIcon } from './ToolEditor';
 import { useNearbyStops } from './Nearby';
@@ -105,17 +106,37 @@ export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, p
           onFavs={() => go('favs')}
           notice={nearNews[0] ? { text: nearNews[0].title, onClick: () => go('news', pos) } : undefined}
         />
-        {recent.length > 0 && (
-          <section className="feed-section feed-recent">
-            <div className="feed-head">
-              <h2>最近睇過</h2>
-            </div>
+        {/* 最近睇過：巴士路線同港鐵站；未有記錄都出，話俾人知點樣先會記低 */}
+        <section className="feed-section feed-recent">
+          <div className="feed-head">
+            <h2>最近睇過</h2>
+          </div>
+          {recent.length === 0 ? (
+            <p className="feed-hint card">未有記錄：打開巴士路線或者港鐵站就會喺度見到，方便再開。</p>
+          ) : (
             <ul className="recent-list card">
               {recent.slice(0, RECENT_SHOWN).map((r) => {
+                if (r.co === 'mtr')
+                  return (
+                    <li key={`mtr-${r.route}`}>
+                      <button className="recent-row" onClick={() => onMtr(r.route)}>
+                        <span className="nc-badge recent-mtr">港鐵</span>
+                        <span className="route-to recent-sta">
+                          {r.dest}站
+                          <span className="hero-mtr-dots" aria-hidden="true">
+                            {mtrStationLines(r.route).map((l) => (
+                              <i key={l} style={{ background: mtrLine(l)?.color }} />
+                            ))}
+                          </span>
+                        </span>
+                        <Icon name="chevron-right" size={18} className="muted" />
+                      </button>
+                    </li>
+                  );
                 const c = COMPANIES[r.companies[0] ?? 'CTB'];
                 return (
                   <li key={`${r.co}-${r.route}-${r.dir}`}>
-                    <Link href={`/${r.co}/${r.route}?dir=${r.dir}`} className="recent-row" onPointerDown={() => warmRoute(r.co, r.route, { dir: r.dir })}>
+                    <Link href={`/${r.co}/${r.route}?dir=${r.dir}`} className="recent-row" onPointerDown={() => warmRoute(r.co as Co, r.route, { dir: r.dir })}>
                       <span className="nc-badge" style={{ background: c.bg, color: c.ink }}>
                         {r.route}
                       </span>
@@ -128,8 +149,8 @@ export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, p
                 );
               })}
             </ul>
-          </section>
-        )}
+          )}
+        </section>
         </div>
         <div className="home-col home-col-side">
         <section className="feed-section feed-tools">

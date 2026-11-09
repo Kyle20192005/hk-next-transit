@@ -263,3 +263,12 @@ describe('mtr nearby + departure rows', () => {
     ).toEqual(['荃灣']);
   });
 });
+
+describe('mtrCardStations', () => {
+  it('keeps up to 2 within 800 m, else falls back to the nearest one', async () => {
+    const { mtrCardStations } = await import('./mtr');
+    expect(mtrCardStations([{ sta: 'MOK', distance: 100 }, { sta: 'MKK', distance: 500 }, { sta: 'PRE', distance: 600 }]).map((m) => m.sta)).toEqual(['MOK', 'MKK']);
+    expect(mtrCardStations([{ sta: 'TSY', distance: 1900 }, { sta: 'KWH', distance: 1990 }]).map((m) => m.sta)).toEqual(['TSY']);
+    expect(mtrCardStations([])).toEqual([]);
+  });
+});

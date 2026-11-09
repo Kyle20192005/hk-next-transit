@@ -7,7 +7,8 @@ import type { Co } from './api';
  * 最近睇過嘅路線（首頁「最近睇過」，同網頁 lib/recent.ts 一樣格式）：AsyncStorage，最多 8 條，同一條線同方向只留最新。
  */
 export interface RecentRoute {
-  co: Co;
+  /** 'mtr' = 港鐵站（route = 站代號，dest = 站名；core mtrRecent） */
+  co: Co | 'mtr';
   route: string;
   dir: 'O' | 'I';
   dest: string;

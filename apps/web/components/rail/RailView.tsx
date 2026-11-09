@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import MtrMap, { type MtrFocus, type MtrInset } from './MtrMap';
 import MtrStationSheet from './MtrStationSheet';
+import { mtrRecent } from '@hknt/core';
+import { addRecent } from '@/lib/recent';
 
 const NARROW = '(max-width: 767.98px)';
 const isNarrow = () => typeof window !== 'undefined' && window.matchMedia(NARROW).matches;
@@ -47,6 +49,11 @@ export default function RailView({ pick }: { pick: { sta: string } | null }) {
     if (isNarrow()) setAll(false);
   }, []);
   const onClose = useCallback(() => setSta(null), []);
+
+  // 打開咗嘅站記入首頁「最近睇過」
+  useEffect(() => {
+    if (sta) addRecent(mtrRecent(sta));
+  }, [sta]);
 
   // 面板遮住咗嘅位：手機喺下面（量高度），闊螢幕喺右邊（量闊度）
   useLayoutEffect(() => {

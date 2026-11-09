@@ -139,33 +139,52 @@ export default function HomeTab() {
           )}
         </Section>
 
-        {recent.length > 0 && (
-          <Section title="最近睇過">
-            <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
-              {recent.slice(0, RECENT_SHOWN).map((r, i) => {
-                const c = COMPANIES[r.companies[0] ?? 'CTB'];
+        {/* 最近睇過：巴士路線同港鐵站；未有記錄都出，話俾人知點樣先會記低 */}
+        <Section title="最近睇過">
+          <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
+            {recent.length === 0 && <Text style={{ padding: 14, color: t.muted, lineHeight: 20 }}>未有記錄：打開巴士路線或者港鐵站就會喺度見到，方便再開。</Text>}
+            {recent.slice(0, RECENT_SHOWN).map((r, i) => {
+              const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: t.line };
+              if (r.co === 'mtr')
                 return (
-                  <Pressable
-                    key={`${r.co}-${r.route}-${r.dir}`}
-                    onPressIn={() => warmRoute(r.co, r.route, { dir: r.dir })}
-                    onPress={() => router.push({ pathname: '/[co]/[route]', params: { co: r.co, route: r.route, dir: r.dir } })}
-                    accessibilityRole="link"
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: t.line }}
-                  >
-                    <View style={{ minWidth: 56, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: 'center', backgroundColor: c.bg }}>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink, ...tabular }}>{r.route}</Text>
+                  <Pressable key={`mtr-${r.route}`} onPress={() => openMtr(r.route)} accessibilityRole="link" style={row}>
+                    <View style={{ minWidth: 56, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: 'center', backgroundColor: t.text }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: t.card }}>港鐵</Text>
                     </View>
-                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 16, fontWeight: '600', color: t.text }}>
-                      <Text style={{ fontSize: 13, fontWeight: '500', color: t.muted }}>往 </Text>
-                      {r.dest}
+                    <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: '600', color: t.text }}>
+                      {r.dest}站
                     </Text>
+                    <View style={{ flex: 1, flexDirection: 'row', gap: 3 }}>
+                      {mtrStationLines(r.route).map((l) => (
+                        <View key={l} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: mtrLine(l)?.color }} />
+                      ))}
+                    </View>
                     <Icon name="chevron-right" size={18} color={t.muted} />
                   </Pressable>
                 );
-              })}
-            </View>
-          </Section>
-        )}
+              const c = COMPANIES[r.companies[0] ?? 'CTB'];
+              const co = r.co;
+              return (
+                <Pressable
+                  key={`${r.co}-${r.route}-${r.dir}`}
+                  onPressIn={() => warmRoute(co, r.route, { dir: r.dir })}
+                  onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: r.route, dir: r.dir } })}
+                  accessibilityRole="link"
+                  style={row}
+                >
+                  <View style={{ minWidth: 56, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: 'center', backgroundColor: c.bg }}>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: c.ink, ...tabular }}>{r.route}</Text>
+                  </View>
+                  <Text numberOfLines={1} style={{ flex: 1, fontSize: 16, fontWeight: '600', color: t.text }}>
+                    <Text style={{ fontSize: 13, fontWeight: '500', color: t.muted }}>往 </Text>
+                    {r.dest}
+                  </Text>
+                  <Icon name="chevron-right" size={18} color={t.muted} />
+                </Pressable>
+              );
+            })}
+          </View>
+        </Section>
       </View>
       </Animated.ScrollView>
       <HomeHeader

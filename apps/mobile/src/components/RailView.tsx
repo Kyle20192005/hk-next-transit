@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
-import { mtrLine, mtrStationEn, mtrStationLines, mtrStationName, searchMtrStations } from '@hknt/core';
+import { mtrLine, mtrRecent, mtrStationEn, mtrStationLines, mtrStationName, searchMtrStations } from '@hknt/core';
+import { addRecent } from '@/lib/recent';
 import { radius, shadowLg, useTheme } from '@/lib/theme';
 import { MtrMap, type MtrFocus, type MtrInset } from './MtrMap';
 import { MtrStationSheet } from './MtrStationSheet';
@@ -56,6 +57,10 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
     if (!wide) setAll(false);
   };
   const close = useCallback(() => setSta(null), []);
+  // 打開咗嘅站記入首頁「最近睇過」
+  useEffect(() => {
+    if (sta) addRecent(mtrRecent(sta));
+  }, [sta]);
 
   const onPanelLayout = (e: LayoutChangeEvent) => {
     const { x, y } = e.nativeEvent.layout;

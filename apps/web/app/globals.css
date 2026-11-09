@@ -277,6 +277,11 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .recent-row .nc-badge { min-width: 56px; }
 .recent-row .route-to { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .recent-row .route-to small { color: var(--muted); font-weight: 500; }
+button.recent-row { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: none; font: inherit; text-align: left; cursor: pointer; }
+.recent-list li:last-child button.recent-row { border-bottom: 0; }
+.recent-mtr { background: var(--text); color: var(--card); }
+.recent-sta { display: inline-flex; align-items: center; gap: 6px; }
+.recent-sta .hero-mtr-dots i { box-shadow: none; }
 /* 首頁大卡（似港鐵 App「下班車」小工具）：頂部兩個分頁，入面打橫掃嘅到站卡 */
 .next-card { background: var(--card); border-radius: var(--radius-l, 18px); box-shadow: var(--shadow); overflow: hidden; }
 .nc-tabs { position: relative; display: grid; grid-template-columns: 1fr 1fr; }

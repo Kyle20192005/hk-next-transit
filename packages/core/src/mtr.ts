@@ -234,3 +234,15 @@ export function mtrDepartureRows(sta: string, lines: MtrLineEtas[], limit = 4, o
   }
   return rows.sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity)).slice(0, limit);
 }
+
+/**
+ * 首頁大卡嘅港鐵站卡：800 米內最多 2 個；冇嘅話照出（2 公里內）最近嗰個（例如青衣南去青衣站 1.9 公里），
+ * 下班車一定見到港鐵。mtr = `/api/nearby` 嘅 mtr（由近到遠）。
+ */
+export function mtrCardStations(mtr: NearMtr[], nearM = 800, max = 2): NearMtr[] {
+  const near = mtr.filter((m) => m.distance <= nearM).slice(0, max);
+  return near.length ? near : mtr.slice(0, 1);
+}
+
+/** 「最近睇過」入面嘅港鐵站（route = 站代號，co = 'mtr'） */
+export const mtrRecent = (sta: string) => ({ co: 'mtr' as const, route: sta, dir: 'O' as const, dest: mtrStationName(sta), companies: [] });

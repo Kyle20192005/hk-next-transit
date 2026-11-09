@@ -275,7 +275,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     揀最多 4 個，記喺 localStorage／AsyncStorage `hknt.tools`；圖示直接放白卡上（唔好再包淺色方塊），用雙色大圖示（`Icon duo`：線條實色 + 20% 同色填色）；交通消息工具有附近消息數目紅點）。「自訂」入「自訂常用工具」頁（參考港鐵 App：
     網頁 `ToolEditor.tsx`（Home 入面嘅 view）、App `src/app/tools.tsx`）：頂部黃色區揀咗嘅（紅「−」），下面分組全部工具（藍「+」），已揀嘅拖住左右移排位置（core `moveTool`／`dragShift`；網頁 pointer 事件，手指同滑鼠一樣，鍵盤左右箭嘴；App 用 PanResponder，橫向移動先算拖），撳「儲存」先生效；
     App 首頁同呢頁共用 `useTools` 嘅同一份狀態；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
-    最近睇過（`lib/recent.ts`，最多 8 條）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。
+    最近睇過（`lib/recent.ts`，最多 8 條；巴士路線同港鐵站（`co: 'mtr'`、`route` = 站代號，core `mtrRecent`，路綫圖打開站就記低，撳返開路綫圖）；
+    未有記錄都出呢一節，寫「打開巴士路線或者港鐵站就會喺度見到」）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。
     網頁闊螢幕：內容限 1100px 置中（設定頁 720px）；頂部欄由分頁列做（`.hh-bar` 收埋）；到站卡有左右箭嘴（只限有滑鼠）、圓點撳得；≥ 1024px 兩條獨立直欄（`.home-col-main` 大卡 + 最近睇過、`.home-col-side` 常用工具 + 交通消息），
     手機 `.home-col { display: contents }` 再用 `order` 排返「工具、大卡、消息、最近」。到站卡每張最闊 440px，闊螢幕一次見幾張。
   - **交通消息**（`/api/news`）：運輸署特別交通消息（`resource.data.one.gov.hk/td/tc/specialtrafficnews.xml`）+ 事故消息
@@ -288,7 +289,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     下班車：一張卡 = 一個站頭（core `groupStopHeads` 將 40 米內各公司嘅站併埋），每條線一班、最快 4 班（`busDepartureRows`，`/api/here`）。
     最近 8 個站頭一齊載入，**冇班次嘅唔出卡**；全部載入完先出（逐張加會推走畫面，唔再係第一張），出咗嘅卡之後冇車都保留，唔好跳位。
     收藏：一個收藏咗嘅站一張卡（`groupFavorites`），淨係收藏路線嘅一張「收藏路線」放最後（冇時間，撳入去）；`favDepartureRows`。
-    卡掃到先載入，每 30 秒更新。結構通用（core `DepartureRow`，有月台欄）。**港鐵站卡**：800 米內最多 2 個港鐵站排最前（`/api/mtr`，core `mtrDepartureRows`：
+    卡掃到先載入，每 30 秒更新。結構通用（core `DepartureRow`，有月台欄）。**港鐵站卡**：800 米內最多 2 個港鐵站，冇就出 2 公里內最近嗰個（core `mtrCardStations`，例如青衣南去青衣站 1.9 公里）（`/api/mtr`，core `mtrDepartureRows`：
     每條綫每個方向下一班，按時間排、最多 4 行；標籤用綫色同簡稱 `mtrLineShort`（機場快綫叫「機鐵」）、月台圈、0／1 分鐘寫「正在離開」「即將到站」），
     撳行或者「更多」開路綫圖嗰個站（網頁 Home `openMtr` → 路線分頁揀港鐵 + `railPick`；App `lib/open-mtr.ts` → `/routes?mode=rail&sta=&n=`）。
   - **附近車站唔係分頁**：由首頁「附近 › 更多」或者巴士路線頁頂「附近巴士站」捷徑入，有返回掣（網頁 Home 入面嘅 view，App `src/app/nearby.tsx` stack）。
