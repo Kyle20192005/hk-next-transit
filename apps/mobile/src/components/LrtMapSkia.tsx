@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { DashPathEffect, Group, RoundedRect, Skia, StrokeCap, StrokeJoin, createPicture, type SkCanvas, type SkPicture } from '@shopify/react-native-skia';
-import { LRT_MAP_ARROWS, LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_LEGEND, LRT_MAP_SIZE as S, LRT_MAP_STATIONS, LRT_MAP_VIEW, lrtRoute, lrtStopEn, lrtStopName, type LrtMapStation } from '@hknt/core';
+import { LRT_MAP_ARROWS, LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_LEGEND, LRT_MAP_SIZE as S, LRT_MAP_STATIONS, LRT_MAP_VIEW, lrtRoute, lrtStopEn, lrtStopName, mtrLine, type LrtMapStation } from '@hknt/core';
 import { useTheme, type Theme } from '@/lib/theme';
 import { alpha, drawText, makePaint } from '@/lib/skia-draw';
 import { SchematicMap, type MapFocus, type MapInset } from './SchematicMap';
@@ -46,6 +46,18 @@ function drawMarker(c: SkCanvas, s: LrtMapStation, fill = '#ffffff') {
   c.restore();
 }
 
+/** 轉乘港鐵（同網頁 XferLink 一樣）：a → b 出閘虛綫，c 站圈，c → e 屯馬綫色綫（黑邊，喺站圈底） */
+const TML = mtrLine('TML')!.color;
+type P2 = readonly [number, number];
+function drawXfer(c: SkCanvas, l: readonly P2[]) {
+  const [a, b, o, e] = l as [P2, P2, P2, P2];
+  c.drawLine(a[0], a[1], b[0], b[1], makePaint(INK, { stroke: 0.05, dash: [0.1, 0.07] }));
+  c.drawLine(o[0], o[1], e[0], e[1], makePaint(INK, { stroke: S.lane + 2 * S.casing, cap: StrokeCap.Round }));
+  c.drawLine(o[0], o[1], e[0], e[1], makePaint(TML, { stroke: S.lane - S.sep, cap: StrokeCap.Round }));
+  c.drawCircle(o[0], o[1], S.dot, makePaint('#ffffff'));
+  c.drawCircle(o[0], o[1], S.dot, makePaint(INK, { stroke: S.ring }));
+}
+
 function drawLegend(c: SkCanvas, t: Theme) {
   const L = LRT_MAP_LEGEND;
   c.save();
@@ -64,10 +76,12 @@ function drawLegend(c: SkCanvas, t: Theme) {
     'start',
     { gap: 0.15 },
   );
-  L.rows.forEach(([r, zh], i) => {
+  // 每條路線號碼同起訖站，最後一格轉乘港鐵標記
+  [...L.rows, ['', L.xfer] as const].forEach(([r, zh], i) => {
     const x = 0.4 + (i % L.cols) * 5.4;
     const y = 1.3 + Math.floor(i / L.cols) * 0.62;
-    drawCap(c, r, x + S.capW / 2, y);
+    if (r) drawCap(c, r, x + S.capW / 2, y);
+    else drawXfer(c, [[x, y], [x + 0.3, y], [x + 0.3 + S.dot, y], [x + S.capW - 0.065, y]]);
     drawText(c, [{ text: zh, size: 0.26, weight: 600, color: t.text }], x + S.capW + 0.2, y + 0.09, 'start');
   });
   c.restore();
@@ -99,6 +113,7 @@ function recordMap(t: Theme): SkPicture {
         c.restore();
       }
       for (const s of LRT_MAP_STATIONS) {
+        if (s.xl) drawXfer(c, s.xl);
         drawMarker(c, s);
         for (const cap of LRT_MAP_CAPS) if (cap.sta === s.id) drawCap(c, cap.r, cap.x, cap.y);
         drawText(c, [{ text: lrtStopName(s.id), size: S.zh, weight: 700, color: t.text }], s.lx, s.zy, s.an, { halo: t.card });

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, ScrollView, Text, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
-import { LIVE_REFRESH, hkClockSec, mtrLine, mtrStationEn, mtrStationLines, mtrStationName, mtrTrainEta, type MtrDirection, type MtrLineEtas, type MtrTrain, type Prefs } from '@hknt/core';
+import { LIVE_REFRESH, hkClockSec, lrtXferOf, mtrLine, mtrStationEn, mtrStationLines, mtrStationName, mtrTrainEta, type MtrDirection, type MtrLineEtas, type MtrTrain, type Prefs } from '@hknt/core';
 import { api } from '@/lib/api';
 import { mtrFavorite, useFavorite } from '@/lib/favorites';
 import { usePrefs } from '@/lib/prefs';
 import { radius, shadowLg, tabular, useTheme, type Theme } from '@/lib/theme';
 import { Icon } from './Icon';
 import { SheetGrab, useRailSheet, type SheetSize } from './RailSheet';
+import { XferButton } from './XferButton';
 
 type Data = { sta: string; lines: MtrLineEtas[]; failed: string[]; at: number };
 type Fmt = Prefs['etaFormat'];
@@ -28,6 +29,7 @@ export function MtrStationSheet({
   style,
   onLayout,
   sheet,
+  onXfer,
 }: {
   sta: string;
   onClose: () => void;
@@ -39,6 +41,8 @@ export function MtrStationSheet({
   onLayout?: (e: LayoutChangeEvent) => void;
   /** 手機拉板（null = 闊螢幕右邊面板） */
   sheet: SheetSize | null;
+  /** 「轉乘輕鐵」：轉去輕鐵圖嘅站 */
+  onXfer: (lrtSta: string) => void;
 }) {
   const t = useTheme();
   const { etaFormat } = usePrefs();
@@ -102,6 +106,7 @@ export function MtrStationSheet({
           <Text style={{ fontSize: 20, fontWeight: '800', color: t.text }}>{mtrStationName(sta)}</Text>
           <Text style={{ fontSize: 14, color: t.muted }}>{mtrStationEn(sta)}</Text>
         </View>
+        {lrtXferOf(sta) && <XferButton to="lrt" sta={lrtXferOf(sta)!} onPick={onXfer} />}
         <FavButton sta={sta} line={line} />
         <Pressable onPress={onClose} accessibilityLabel="關閉" style={{ width: 32, height: 32, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
           <Icon name="close" size={18} color={t.muted} />

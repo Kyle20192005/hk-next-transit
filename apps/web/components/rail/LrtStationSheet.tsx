@@ -1,10 +1,11 @@
 'use client';
 import { forwardRef, useEffect, useMemo, useState } from 'react';
-import { LIVE_REFRESH, LRT_STOPS, hkClockSec, lrtCars, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtTrainEta, type LrtPlatform, type LrtTrain } from '@hknt/core';
+import { LIVE_REFRESH, LRT_STOPS, hkClockSec, lrtCars, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtTrainEta, mtrXferOf, type LrtPlatform, type LrtTrain } from '@hknt/core';
 import { liveClient } from '@/lib/buses';
 import { usePrefs } from '@/lib/prefs';
 import Icon from '../Icon';
 import { useSheetDrag } from './useSheetDrag';
+import { XferButton } from './XferButton';
 
 type Data = { sta: string; platforms: LrtPlatform[]; failed: boolean; at: number };
 /** 車費：[八達通成人, 小童, 長者, 殘疾, 學生, 樂悠咭, 單程成人, 單程小童, 單程長者] */
@@ -32,8 +33,8 @@ const SHOW_FARES = false;
  * 輕鐵站面板（撳輕鐵路綫圖個站或者搜尋）：每個月台嘅班次（路線號碼、往邊、單／孖卡、幾分鐘），30 秒更新。
  * 車費（八達通各種、單程票）暫時隱藏（SHOW_FARES）。手機貼底拉板、闊螢幕右邊面板（同港鐵面板共用）。
  */
-const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => void; all: boolean; onAll: (all: boolean) => void; sheet: boolean }>(function LrtStationSheet(
-  { sta, onClose, all, onAll, sheet },
+const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => void; all: boolean; onAll: (all: boolean) => void; sheet: boolean; onXfer: (mtrSta: string) => void }>(function LrtStationSheet(
+  { sta, onClose, all, onAll, sheet, onXfer },
   ref,
 ) {
   const { etaFormat } = usePrefs();
@@ -87,6 +88,7 @@ const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => vo
             <h2>{lrtStopName(sta)}</h2>
             <span className="muted">{lrtStopEn(sta)}</span>
           </div>
+          {mtrXferOf(sta) && <XferButton to="mtr" sta={mtrXferOf(sta)!} onPick={onXfer} />}
           <button className="drawer-close" onClick={onClose} aria-label="關閉">
             <Icon name="close" size={20} />
           </button>

@@ -81,6 +81,7 @@ export const MTR_MAP_LEGEND_SYMBOLS = [
   { kind: 'link', zh: '閘內步行轉乘', en: 'Inside gates' },
   { kind: 'walk', zh: '出閘步行轉乘', en: 'Outside gates' },
   { kind: 'race', zh: '只限賽馬日', en: 'Race days only' },
+  { kind: 'lrt', zh: '轉乘輕鐵', en: 'Light Rail' },
 ] as const;
 export const MTR_MAP_LINKS: readonly MtrMapLink[] = [{ a: 'HOK', b: 'CEN' }, { a: 'TST', b: 'ETS', dashed: true }];
 
@@ -194,6 +195,27 @@ export function mtrLabelPos(box: MtrMapStation['box'], side: LabelSide, gap = 0.
     case 'sw':
       return { x: left, y: bottom, anchor: 'end', baseline: 'top' };
   }
+}
+
+/**
+ * 轉乘輕鐵（core rail-xfer.ts）：由站向 MTR_MAP_XFER_DIR 方向拉一條出閘虛綫（同尖沙咀 ↔ 尖東一樣），
+ * 駁一個站圈，再伸出一小段輕鐵色綫（LRT_BRAND）。方向同長度由 tools/mtr-layout.py 寫入，檢查過唔撞綫、唔撞字。
+ */
+export const MTR_MAP_XFER_DIR: Readonly<Record<string, LabelSide>> = { TUM: 'e', SIH: 'e', TIS: 's', YUL: 's' };
+/** 虛綫長（兩個站圈之間）、色綫露出幾長（站圈外面） */
+export const MTR_MAP_XFER = { dash: 0.52, stub: 0.35 } as const;
+const XFER_U: Record<string, readonly [number, number]> = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0], ne: [Math.SQRT1_2, -Math.SQRT1_2], nw: [-Math.SQRT1_2, -Math.SQRT1_2], se: [Math.SQRT1_2, Math.SQRT1_2], sw: [-Math.SQRT1_2, Math.SQRT1_2] };
+/** 轉乘輕鐵虛綫：a → b 虛綫（兩個站圈邊），c = 外面站圈中心，c → e 輕鐵色綫（畫喺站圈底） */
+export function mtrXferLink(s: Pick<MtrMapStation, 'code' | 'box'>): { a: Pt; b: Pt; c: Pt; e: Pt } | null {
+  const dir = MTR_MAP_XFER_DIR[s.code];
+  if (!dir) return null;
+  const [ux, uy] = XFER_U[dir]!;
+  const px = s.box.x + s.box.w / 2;
+  const py = s.box.y + s.box.h / 2;
+  const at = (k: number): Pt => [px + ux * k, py + uy * k];
+  const R = MTR_MAP_DOT_R;
+  const { dash, stub } = MTR_MAP_XFER;
+  return { a: at(R), b: at(R + dash), c: at(2 * R + dash), e: at(3 * R + dash + stub) };
 }
 
 /** 點 p 喺唔喺線段 a–b 上（容差 0.01） */

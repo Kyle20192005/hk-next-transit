@@ -36,3 +36,4 @@ export * from './lrt-data';
 export * from './lrt-geo';
 export * from './lrt-map';
 export * from './mtr-map';
+export * from './rail-xfer';

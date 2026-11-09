@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { MTR_LINES, MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LEGEND, MTR_MAP_LEGEND_SYMBOLS, MTR_MAP_LINES, MTR_MAP_LINKS, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
+import { LRT_BRAND, MTR_LINES, MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LEGEND, MTR_MAP_LEGEND_SYMBOLS, MTR_MAP_LINES, MTR_MAP_LINKS, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName, mtrXferLink, type Pt } from '@hknt/core';
 import Icon from '../Icon';
 import { useMapView, type MapFocus, type MapInset } from './useMapView';
 
@@ -119,6 +119,11 @@ export default function MtrMap({
               <g key={s.code} data-sta={s.code} className={`mtr-sta${on ? ' on' : ''}`} role="button" aria-label={`${mtrStationName(s.code)}站`}>
                 {/* 撳得嘅範圍大過站粒 */}
                 <rect x={s.box.x - 0.25} y={s.box.y - 0.25} width={s.box.w + 0.5} height={s.box.h + 0.5} className="mtr-hit" />
+                {/* 轉乘輕鐵（core rail-xfer.ts）：出閘虛綫 → 站圈 → 一小段輕鐵色綫 */}
+                {(() => {
+                  const x = mtrXferLink(s);
+                  return x && <XferLink {...x} />;
+                })()}
                 {/* 每條綫正中一個黑邊白圈；轉車站幾個圈重疊成「8」字：先畫晒黑圈，再畫白心，再畫綫色短棒 */}
                 {s.pts.map((p, i) => (
                   <circle key={`r${i}`} cx={p[0]} cy={p[1]} r={MTR_MAP_DOT_R} className="mtr-ring" />
@@ -161,7 +166,19 @@ export default function MtrMap({
   );
 }
 
-/** 圖例：左上角空位（core MTR_MAP_LEGEND，排版工具保證唔撞綫同站名）。綫兩欄，下面四個符號 */
+/** 轉乘輕鐵：a → b 出閘虛綫（同尖沙咀 ↔ 尖東一樣），c 站圈，c → e 輕鐵色綫（喺站圈底） */
+function XferLink({ a, b, c, e }: { a: Pt; b: Pt; c: Pt; e: Pt }) {
+  return (
+    <g aria-hidden="true">
+      <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} className="mtr-link dashed" />
+      <line x1={c[0]} y1={c[1]} x2={e[0]} y2={e[1]} stroke={LRT_BRAND.color} strokeWidth={MTR_MAP_GAP} strokeLinecap="round" />
+      <circle cx={c[0]} cy={c[1]} r={MTR_MAP_DOT_R} className="mtr-ring" />
+      <circle cx={c[0]} cy={c[1]} r={MTR_MAP_DOT_R - MTR_MAP_RING} className="mtr-fill" />
+    </g>
+  );
+}
+
+/** 圖例：左上角空位（core MTR_MAP_LEGEND，排版工具保證唔撞綫同站名）。綫兩欄，下面六個符號 */
 function MapLegend() {
   const L = MTR_MAP_LEGEND;
   const col = (i: number) => 0.4 + i * 5.3;
@@ -211,6 +228,7 @@ function MapLegend() {
           ];
         } else if (sym.kind === 'link') icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} className="mtr-link" />;
         else if (sym.kind === 'walk') icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} className="mtr-link dashed" />;
+        else if (sym.kind === 'lrt') icon = <XferLink a={[x, y]} b={[x + 0.3, y]} c={[x + 0.3 + R, y]} e={[x + 0.8 - MTR_MAP_GAP / 2, y]} />;
         else icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} stroke={MTR_LINES.find((l) => l.code === 'EAL')!.color} strokeWidth={MTR_MAP_GAP} className="mtr-line dashed" />;
         return (
           <g key={sym.kind}>

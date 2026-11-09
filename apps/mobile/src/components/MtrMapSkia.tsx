@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Circle, DashPathEffect, FillType, Group, Skia, StrokeCap, StrokeJoin, createPicture, type SkCanvas, type SkPicture } from '@shopify/react-native-skia';
 import {
+  LRT_BRAND,
   MTR_LINES,
   MTR_MAP_DOT_R,
   MTR_MAP_GAP,
@@ -20,7 +21,9 @@ import {
   mtrRoundPathD,
   mtrStationEn,
   mtrStationName,
+  mtrXferLink,
   type MtrMapStation,
+  type Pt,
 } from '@hknt/core';
 import { useTheme, type Theme } from '@/lib/theme';
 import { alpha, drawText, makePaint } from '@/lib/skia-draw';
@@ -41,6 +44,9 @@ const NEAR = '#2f6fd6';
 // ---------------------------------------------------------------------------
 
 function drawStation(c: SkCanvas, s: MtrMapStation, t: Theme) {
+  // 轉乘輕鐵（core rail-xfer.ts）：先畫，站圈喺上面
+  const x = mtrXferLink(s);
+  if (x) drawXfer(c, x.a, x.b, x.c, x.e);
   const ring = makePaint(RING);
   const fill = makePaint('#ffffff');
   for (const p of s.pts) c.drawCircle(p[0], p[1], MTR_MAP_DOT_R, ring);
@@ -60,7 +66,15 @@ function drawStation(c: SkCanvas, s: MtrMapStation, t: Theme) {
   drawText(c, [{ text: mtrStationEn(s.code), size: 0.18, weight: 500, color: t.muted }], lp.x, zhY + 0.25, lp.anchor, { halo: t.card });
 }
 
-/** 圖例（同網頁 MapLegend 一樣）：綫兩欄，下面五個符號 */
+/** 轉乘輕鐵（同網頁 XferLink 一樣）：a → b 出閘虛綫，c 站圈，c → e 輕鐵色綫（喺站圈底） */
+function drawXfer(c: SkCanvas, a: Pt, b: Pt, o: Pt, e: Pt) {
+  c.drawLine(a[0], a[1], b[0], b[1], makePaint(RING, { stroke: 0.06, dash: [0.12, 0.08] }));
+  c.drawLine(o[0], o[1], e[0], e[1], makePaint(LRT_BRAND.color, { stroke: MTR_MAP_GAP, cap: StrokeCap.Round }));
+  c.drawCircle(o[0], o[1], MTR_MAP_DOT_R, makePaint(RING));
+  c.drawCircle(o[0], o[1], MTR_MAP_DOT_R - MTR_MAP_RING, makePaint('#ffffff'));
+}
+
+/** 圖例（同網頁 MapLegend 一樣）：綫兩欄，下面六個符號 */
 function drawLegend(c: SkCanvas, t: Theme) {
   const L = MTR_MAP_LEGEND;
   const col = (i: number) => 0.4 + i * 5.3;
@@ -110,6 +124,7 @@ function drawLegend(c: SkCanvas, t: Theme) {
       c.drawLine(b - MTR_MAP_GAP / 2, y, b + MTR_MAP_GAP / 2, y, makePaint(MTR_LINES[1]!.color, { stroke: MTR_MAP_TICK.width }));
     } else if (sym.kind === 'link') c.drawLine(x, y, x + 0.8, y, makePaint(RING, { stroke: 0.05 }));
     else if (sym.kind === 'walk') c.drawLine(x, y, x + 0.8, y, makePaint(RING, { stroke: 0.06, dash: [0.12, 0.08] }));
+    else if (sym.kind === 'lrt') drawXfer(c, [x, y], [x + 0.3, y], [x + 0.3 + R, y], [x + 0.8 - MTR_MAP_GAP / 2, y]);
     else c.drawLine(x, y, x + 0.8, y, makePaint(MTR_LINES.find((l) => l.code === 'EAL')!.color, { stroke: MTR_MAP_GAP, dash: [0.22, 0.14] }));
     label(x + 1.05, y + 0.1, sym.zh, sym.en);
   });

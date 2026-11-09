@@ -91,16 +91,19 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
     },
     [wide],
   );
-  const pick = (h: Hit) => {
-    Keyboard.dismiss();
-    onPicked();
-    const k: Kind = h.lrt ? 'lrt' : 'mtr';
+  /** 轉去某幅圖嘅站（搜尋、面板「轉乘」）：飛去（放大置中）再打開 */
+  const jump = (k: Kind, s: string) => {
     setKindState(k);
     setMovedNear(k);
     AsyncStorage.setItem(KIND_KEY, k).catch(() => {});
-    setSta(h.sta);
-    setFocus({ sta: h.sta, zoom: true });
+    setSta(s);
+    setFocus({ sta: s, zoom: true });
     if (!wide) setAll(false);
+  };
+  const pick = (h: Hit) => {
+    Keyboard.dismiss();
+    onPicked();
+    jump(h.lrt ? 'lrt' : 'mtr', h.sta);
   };
   const close = useCallback(() => setSta(null), []);
   // 打開咗嘅港鐵站記入首頁「最近睇過」
@@ -155,8 +158,8 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
           </Pressable>
         )}
       </View>
-      {sta && kind === 'mtr' && <MtrStationSheet sta={sta} onClose={close} tab={tab} onTab={setTab} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} />}
-      {sta && kind === 'lrt' && <LrtStationSheet sta={sta} onClose={close} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} />}
+      {sta && kind === 'mtr' && <MtrStationSheet sta={sta} onClose={close} tab={tab} onTab={setTab} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} onXfer={(s) => jump('lrt', s)} />}
+      {sta && kind === 'lrt' && <LrtStationSheet sta={sta} onClose={close} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} onXfer={(s) => jump('mtr', s)} />}
       {query.trim() !== '' && (
         <View style={{ position: 'absolute', top: 8, left: 12, right: 12, maxHeight: '70%', borderRadius: radius.m, backgroundColor: t.card, ...shadowLg }}>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 6 }}>

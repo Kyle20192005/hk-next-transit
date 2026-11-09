@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, ScrollView, Text, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
-import { LIVE_REFRESH, hkClockSec, lrtCars, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtTrainEta, type LrtPlatform, type LrtTrain, type Prefs } from '@hknt/core';
+import { LIVE_REFRESH, hkClockSec, lrtCars, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtTrainEta, mtrXferOf, type LrtPlatform, type LrtTrain, type Prefs } from '@hknt/core';
 import { api } from '@/lib/api';
 import { usePrefs } from '@/lib/prefs';
 import { radius, shadowLg, tabular, useTheme, type Theme } from '@/lib/theme';
 import { Icon } from './Icon';
 import { SheetGrab, useRailSheet, type SheetSize } from './RailSheet';
+import { XferButton } from './XferButton';
 
 type Data = { sta: string; platforms: LrtPlatform[]; failed: boolean; at: number };
 type Fmt = Prefs['etaFormat'];
@@ -22,6 +23,7 @@ export function LrtStationSheet({
   style,
   onLayout,
   sheet,
+  onXfer,
 }: {
   sta: string;
   onClose: () => void;
@@ -31,6 +33,8 @@ export function LrtStationSheet({
   onLayout?: (e: LayoutChangeEvent) => void;
   /** 手機拉板（null = 闊螢幕右邊面板） */
   sheet: SheetSize | null;
+  /** 「轉乘港鐵」：轉去港鐵圖嘅站 */
+  onXfer: (mtrSta: string) => void;
 }) {
   const t = useTheme();
   const { etaFormat } = usePrefs();
@@ -83,6 +87,7 @@ export function LrtStationSheet({
             <Text style={{ fontSize: 20, fontWeight: '800', color: t.text }}>{lrtStopName(sta)}</Text>
             <Text style={{ fontSize: 14, color: t.muted }}>{lrtStopEn(sta)}</Text>
           </View>
+          {mtrXferOf(sta) && <XferButton to="mtr" sta={mtrXferOf(sta)!} onPick={onXfer} />}
           <Pressable onPress={onClose} accessibilityLabel="關閉" style={{ width: 32, height: 32, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
             <Icon name="close" size={18} color={t.muted} />
           </Pressable>

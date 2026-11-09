@@ -53,16 +53,26 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
   const panel = useRef<HTMLElement>(null);
   const [inset, setInset] = useState<MapInset>({ right: 0, bottom: 0 });
 
-  const setKind = (k: Kind) => {
+  const saveKind = (k: Kind) => {
     setKindState(k);
-    setSta(null);
-    setFocus(null);
-    movedNear.current = false;
     try {
       sessionStorage.setItem(KIND_KEY, k);
     } catch {
       /* 唔記得都冇所謂 */
     }
+  };
+  const setKind = (k: Kind) => {
+    saveKind(k);
+    setSta(null);
+    setFocus(null);
+    movedNear.current = false;
+  };
+  /** 轉去另一幅圖嘅站（搜尋、首頁、面板「轉乘」）：飛去（放大置中）再打開 */
+  const jump = (k: Kind, s: string) => {
+    saveKind(k);
+    setSta(s);
+    setFocus({ sta: s, zoom: true });
+    if (isNarrow()) setAll(false);
   };
 
   // 附近嘅站（用首頁嗰份定位，有快取）：800 米內嘅都標，冇就標 2 公里內最近一個
@@ -90,17 +100,9 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
 
   // 標題列搜尋、首頁揀咗站：轉去嗰幅圖，飛去（放大置中）再打開
   useEffect(() => {
-    if (!pick) return;
-    const k: Kind = pick.lrt ? 'lrt' : 'mtr';
-    setKindState(k);
-    try {
-      sessionStorage.setItem(KIND_KEY, k);
-    } catch {
-      /* 唔記得都冇所謂 */
-    }
-    setSta(pick.sta);
-    setFocus({ sta: pick.sta, zoom: true });
-    if (isNarrow()) setAll(false);
+    if (pick) jump(pick.lrt ? 'lrt' : 'mtr', pick.sta);
+    // jump 每次 render 都係新 function，只跟 pick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pick]);
 
   const onStation = useCallback((c: string) => {
@@ -170,8 +172,8 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
           </button>
         )}
       </div>
-      {sta && kind === 'mtr' && <MtrStationSheet ref={panel} sta={sta} onClose={onClose} tab={tab} onTab={setTab} all={all} onAll={setAll} sheet={sheet} />}
-      {sta && kind === 'lrt' && <LrtStationSheet ref={panel} sta={sta} onClose={onClose} all={all} onAll={setAll} sheet={sheet} />}
+      {sta && kind === 'mtr' && <MtrStationSheet ref={panel} sta={sta} onClose={onClose} tab={tab} onTab={setTab} all={all} onAll={setAll} sheet={sheet} onXfer={(s) => jump('lrt', s)} />}
+      {sta && kind === 'lrt' && <LrtStationSheet ref={panel} sta={sta} onClose={onClose} all={all} onAll={setAll} sheet={sheet} onXfer={(s) => jump('mtr', s)} />}
     </div>
   );
 }

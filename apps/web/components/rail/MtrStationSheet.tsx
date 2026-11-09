@@ -1,11 +1,12 @@
 'use client';
 import { forwardRef, useEffect, useState } from 'react';
-import { LIVE_REFRESH, hkClockSec, mtrLine, mtrStationEn, mtrStationLines, mtrStationName, mtrTrainEta, type MtrDirection, type MtrLineEtas, type MtrTrain } from '@hknt/core';
+import { LIVE_REFRESH, hkClockSec, lrtXferOf, mtrLine, mtrStationEn, mtrStationLines, mtrStationName, mtrTrainEta, type MtrDirection, type MtrLineEtas, type MtrTrain } from '@hknt/core';
 import { liveClient } from '@/lib/buses';
 import { mtrFavorite, useFavorite } from '@/lib/favorites';
 import { usePrefs } from '@/lib/prefs';
 import Icon from '../Icon';
 import { useSheetDrag } from './useSheetDrag';
+import { XferButton } from './XferButton';
 
 type Data = { sta: string; lines: MtrLineEtas[]; failed: string[]; at: number };
 
@@ -18,8 +19,8 @@ type Data = { sta: string; lines: MtrLineEtas[]; failed: string[]; at: number };
  */
 const MtrStationSheet = forwardRef<
   HTMLElement,
-  { sta: string; onClose: () => void; tab: string | null; onTab: (line: string) => void; all: boolean; onAll: (all: boolean) => void; sheet: boolean }
->(function MtrStationSheet({ sta, onClose, tab, onTab, all, onAll, sheet }, ref) {
+  { sta: string; onClose: () => void; tab: string | null; onTab: (line: string) => void; all: boolean; onAll: (all: boolean) => void; sheet: boolean; onXfer: (lrtSta: string) => void }
+>(function MtrStationSheet({ sta, onClose, tab, onTab, all, onAll, sheet, onXfer }, ref) {
   const { etaFormat } = usePrefs();
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +85,7 @@ const MtrStationSheet = forwardRef<
             <h2>{mtrStationName(sta)}</h2>
             <span className="muted">{mtrStationEn(sta)}</span>
           </div>
+          {lrtXferOf(sta) && <XferButton to="lrt" sta={lrtXferOf(sta)!} onPick={onXfer} />}
           <FavButton sta={sta} line={line} />
           <button className="drawer-close" onClick={onClose} aria-label="關閉">
             <Icon name="close" size={20} />
