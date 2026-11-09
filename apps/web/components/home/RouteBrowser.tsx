@@ -27,6 +27,8 @@ export default function RouteBrowser({
   mode,
   onMode,
   onNearby,
+  railPick,
+  onRailPick,
 }: {
   routes: Routes;
   updated: string | null;
@@ -35,10 +37,12 @@ export default function RouteBrowser({
   onMode: (m: TransportMode) => void;
   /** 「附近巴士站」捷徑 */
   onNearby: () => void;
+  /** 港鐵：要打開嘅站（搜尋、首頁大卡、收藏）；每次新 object 就飛去一次 */
+  railPick: { sta: string } | null;
+  onRailPick: (sta: string) => void;
 }) {
   const [code, setCode] = useState(''); // 路線號碼（鍵盤）
   const [place, setPlace] = useState<string | null>(null); // 地點搜尋（null = 用緊號碼鍵盤）
-  const [railPick, setRailPick] = useState<{ sta: string } | null>(null); // 港鐵站搜尋揀咗邊個站
   const [shown, setShown] = useState(PAGE);
   const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
   const { priority, nearbyRadius } = usePrefs();
@@ -149,7 +153,7 @@ export default function RouteBrowser({
           ))}
         </div>
         {!modeInfo.ready ? null : mode === 'rail' ? (
-          <MtrSearch onPick={(sta) => setRailPick({ sta })} />
+          <MtrSearch onPick={onRailPick} />
         ) : place === null ? (
           <button className="search-field" onClick={usePlace} aria-label="搜尋路線">
             <Icon name="search" size={20} className="search-icon" />

@@ -128,7 +128,8 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
     彎位係圓弧，統一半徑 `R` 0.7（`MTR_MAP_RADIUS`），並排綫一齊轉彎外面嗰條半徑加 `G`（點寫 `(x, y, 半徑)`），同心先會一直貼住；
     段長夠放彎位；站喺直綫部分；轉車站嘅點喺同一條橫、直或者 45° 綫上、相隔 `G`；站名唔撞綫、唔撞站、站名之間最少 0.15；冇嘢入圖例。
   - 之後一定要行 `packages/core/tools/mtr-water.py [快取目錄] --write`：OSM 海岸綫 → 海水格仔 → 用每個站（示意圖 ↔ OSM 真實位置）做
-    moving least squares 變形 → 簡化多邊形（`MTR_MAP_WATER`，第一個環係外框，畫嘅時候 `fillRule="evenodd"`）。真實座標唔入 repo。
+    moving least squares 變形 → 簡化多邊形（`MTR_MAP_WATER`，第一個環係外框，畫嘅時候 `fillRule="evenodd"`）。海岸綫真實座標唔入 repo。
+  - 站真實位置（附近港鐵站用）：`packages/core/tools/mtr-coords.py [快取目錄] --write` → core `mtr-geo.ts`（`MTR_STATION_LL`，OSM 站點中位數，同 mtr-water 共用快取；唔好人手改）。
   - 站位置參考真實地理（OSM 站點，市區放大、新界收細），但係自己排：**唔好照抄港鐵官方路綫圖**（版權）；用 OSM 數據所以地圖要註明「© OpenStreetMap 貢獻者」。
 - 畫法（網頁 SVG、App react-native-svg 一樣）：綫闊 = 並排距離 `G` 0.18（貼住）；站 = 黑邊白圈（圈心喺綫正中，`MTR_MAP_DOT_R` 0.17）；
   轉車站每條綫一個圈，重疊成「8」字，圈入面綫色短棒（每條長 `G`，相鄰黐埋）；上水、將軍澳係分岔站，雙圈冇短棒
@@ -261,7 +262,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
     黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
     quarter 權重 1.4、屋苑 3.5，村名只喺 1.2 公里內冇其他地區名先用；冇地區數據就用最近站頭名），
-    下面一行「最近巴士站：X · N 米」。**頂部一行 + 大字 + 搜尋欄係同一個 component `HomeHeader`**（網頁 `components/home/HomeHeader.tsx`、
+    下面兩行「最近港鐵站：X ●● · N 米」（2 公里內，`/api/nearby` 回傳 `mtr`，core `nearestMtrStations`，唔計馬場；綫色圓點；撳入路綫圖嗰個站）同「最近巴士站：X · N 米」。**頂部一行 + 大字 + 搜尋欄係同一個 component `HomeHeader`**（網頁 `components/home/HomeHeader.tsx`、
     App `src/components/HomeHeader.tsx`），浮喺捲動區上面（網頁放捲動區入面一個高度 0 嘅 sticky 外框，後面 spacer 留位；App 絕對定位 +
     `contentContainerStyle.paddingTop`）。捲上去時黃色底同捲動 1:1 收起（內容黐住佢底，唔會捲入佢下面、唔會留空白黃色），收到剩頂部一行；
     收到頂部一行**上下留一樣嘅位（`PAD` 12px，同 CSS padding-top 一致）**，膠囊同搜尋掣喺 header 正中。**停喺收縮一半會自動捲去收埋或者展開**（跟最後捲動方向，似 iPhone 大標題；網頁 scroll 停 140ms 而且手指離開先捲，只限手機有頂部一行；App 用 onScrollEndDrag／onMomentumScrollEnd + `onRange`）。收縮期間**變形唔淡走**：大字中心移去頂部右邊地區膠囊、縮到膠囊字咁大（最後 10% 先同真膠囊交接）；英文名同最近巴士站跟黃色底收走、早啲淡出；
@@ -286,13 +287,16 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     下班車：一張卡 = 一個站頭（core `groupStopHeads` 將 40 米內各公司嘅站併埋），每條線一班、最快 4 班（`busDepartureRows`，`/api/here`）。
     最近 8 個站頭一齊載入，**冇班次嘅唔出卡**；全部載入完先出（逐張加會推走畫面，唔再係第一張），出咗嘅卡之後冇車都保留，唔好跳位。
     收藏：一個收藏咗嘅站一張卡（`groupFavorites`），淨係收藏路線嘅一張「收藏路線」放最後（冇時間，撳入去）；`favDepartureRows`。
-    卡掃到先載入，每 30 秒更新。結構通用（core `DepartureRow`，有月台欄），將來港鐵站卡（綫色、800 米、排第一）用同一款。
+    卡掃到先載入，每 30 秒更新。結構通用（core `DepartureRow`，有月台欄）。**港鐵站卡**：800 米內最多 2 個港鐵站排最前（`/api/mtr`，core `mtrDepartureRows`：
+    每條綫每個方向下一班，按時間排、最多 4 行；標籤用綫色同簡稱 `mtrLineShort`（機場快綫叫「機鐵」）、月台圈、0／1 分鐘寫「正在離開」「即將到站」），
+    撳行或者「更多」開路綫圖嗰個站（網頁 Home `openMtr` → 路線分頁揀港鐵 + `railPick`；App `lib/open-mtr.ts` → `/routes?mode=rail&sta=&n=`）。
   - **附近車站唔係分頁**：由首頁「附近 › 更多」或者巴士路線頁頂「附近巴士站」捷徑入，有返回掣（網頁 Home 入面嘅 view，App `src/app/nearby.tsx` stack）。
     定位邏輯 `useNearbyStops`（網頁 `components/home/Nearby.tsx`、App `components/Nearby.tsx`）。
     **唔好每次都等定位**（core `nearby-cache.ts`）：上次結果記喺 localStorage／AsyncStorage `hknt.nearby.v1`，1 分鐘內直接用、
     15 分鐘內即刻顯示再背景靜靜雞更新（App 背景唔彈權限）；定位分兩步：先快（網頁 `enableHighAccuracy: false`、App `getLastKnownPositionAsync`），
     再準（GPS），同顯示緊／問緊嘅位置相差 40 米內就唔再問 `/api/nearby`。
   - 收藏（`lib/favorites.ts`，localStorage，try/catch）：路線頁標題列星號收藏路線（某方向），打開站撳「收藏呢個站」；
+    港鐵站喺路綫圖面板撳星號（`co: 'mtr'`、`stopId` = 站代號，`mtrFavorite`／`isMtrFav`；收藏頁 `MtrFavItem`、大卡 `MtrFavCard` 顯示每條綫每個方向下一班，撳入路綫圖）；
     收藏頁同首頁直接顯示收藏咗嘅站嘅下一班（`/api/eta`，同方向；App `components/FavItem.tsx`）。
   - **收藏分組**（core `fav-groups.ts`，`hknt.favGroups.v1`；網頁 `lib/fav-groups.ts`、App `src/lib/fav-groups.ts`）：例如「返工」「返屋企」，
     最多 8 組，每組可以設時段（`FAV_GROUP_WINDOWS`，深夜跨午夜）；收藏記 `group`（冇 = 未分組，刪組變返未分組，收藏唔刪）。

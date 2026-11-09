@@ -1,11 +1,27 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { activeFavGroup, FAV_GROUP_PRESETS, FAV_GROUP_WINDOWS, favGroupWindowLabel, favsInGroup, newFavGroupId, type Eta, type FavGroupDef } from '@hknt/core';
+import {
+  activeFavGroup,
+  FAV_GROUP_PRESETS,
+  FAV_GROUP_WINDOWS,
+  favGroupWindowLabel,
+  favsInGroup,
+  minutesLabel,
+  mtrDepartureRows,
+  mtrLine,
+  mtrStationLines,
+  newFavGroupId,
+  type DepartureRow,
+  type Eta,
+  type FavGroupDef,
+  type MtrLineEtas,
+} from '@hknt/core';
 import CompanyTag from '@/components/CompanyTag';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
-import { favKey, removeFavorite, setFavoriteGroup, useFavorites, type Favorite } from '@/lib/favorites';
+import { favKey, isMtrFav, removeFavorite, setFavoriteGroup, useFavorites, type Favorite } from '@/lib/favorites';
+import { usePrefs } from '@/lib/prefs';
 import { deleteFavGroup, saveFavGroup, useFavGroups } from '@/lib/fav-groups';
 import EtaInline from '@/components/EtaInline';
 import { liveClient } from '@/lib/buses';
@@ -13,10 +29,10 @@ import { liveClient } from '@/lib/buses';
 const REFRESH_MS = 30_000;
 
 /**
- * 收藏：收藏咗嘅站直接顯示下一班；收藏咗嘅路線一撳就入。
+ * 收藏：收藏咗嘅站直接顯示下一班；收藏咗嘅路線一撳就入；收藏咗嘅港鐵站顯示每條綫每個方向下一班（撳入路綫圖）。
  * 分組（例如「返工」「返屋企」，core fav-groups.ts）：頂部一行揀組，預設揀而家時段嘅組；每個收藏下面揀放入邊組。
  */
-export default function Favorites({ onBrowse }: { onBrowse: () => void }) {
+export default function Favorites({ onBrowse, onMtr }: { onBrowse: () => void; onMtr: (sta: string) => void }) {
   const list = useFavorites();
   const groups = useFavGroups();
   const [picked, setPicked] = useState<string | null>(null);
@@ -42,7 +58,7 @@ export default function Favorites({ onBrowse }: { onBrowse: () => void }) {
           <p>
             喺路線頁撳標題列嘅 <Icon name="star" size={16} /> 收藏路線，
             <br />
-            或者打開一個站撳「收藏呢個站」。
+            或者打開一個站撳「收藏呢個站」；港鐵站喺路綫圖撳站再撳 <Icon name="star" size={16} />。
           </p>
           <p className="muted">收藏咗嘅站會喺度直接顯示下一班車（只儲存喺呢部機）</p>
           <button className="primary-btn" onClick={onBrowse}>
@@ -78,7 +94,7 @@ export default function Favorites({ onBrowse }: { onBrowse: () => void }) {
           ) : (
             <ul className="fav-list compact">
               {shown.map((f) => (
-                <FavItem key={favKey(f)} f={f} groups={groups} />
+                <FavItem key={favKey(f)} f={f} groups={groups} onMtr={onMtr} />
               ))}
             </ul>
           )}
@@ -99,7 +115,8 @@ export default function Favorites({ onBrowse }: { onBrowse: () => void }) {
   );
 }
 
-export function FavItem({ f, groups = [] }: { f: Favorite; groups?: FavGroupDef[] }) {
+export function FavItem({ f, groups = [], onMtr }: { f: Favorite; groups?: FavGroupDef[]; onMtr: (sta: string) => void }) {
+  if (isMtrFav(f)) return <MtrFavItem f={f} groups={groups} onMtr={onMtr} />;
   const href = `/${f.co}/${f.route}?dir=${f.dir}${f.stopId ? `&stop=${f.stopId}` : ''}`;
   return (
     <li className="fav card">
@@ -119,20 +136,90 @@ export function FavItem({ f, groups = [] }: { f: Favorite; groups?: FavGroupDef[
       <button className="fav-remove" onClick={() => removeFavorite(f)} aria-label={`取消收藏 ${f.route}${f.stopName ? ` ${f.stopName}` : ''}`}>
         <Icon name="star-fill" size={20} />
       </button>
-      {groups.length > 0 && (
-        <label className="fav-group-pick">
-          <Icon name="folder" size={14} />
-          <select value={f.group && groups.some((g) => g.id === f.group) ? f.group : ''} onChange={(e) => setFavoriteGroup(f, e.target.value || null)} aria-label={`${f.route} 放入分組`}>
-            <option value="">未分組</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
+      <GroupPick f={f} groups={groups} label={f.route} />
+    </li>
+  );
+}
+
+/** 每個收藏下面：放入邊個分組 */
+function GroupPick({ f, groups, label }: { f: Favorite; groups: FavGroupDef[]; label: string }) {
+  if (!groups.length) return null;
+  return (
+    <label className="fav-group-pick">
+      <Icon name="folder" size={14} />
+      <select value={f.group && groups.some((g) => g.id === f.group) ? f.group : ''} onChange={(e) => setFavoriteGroup(f, e.target.value || null)} aria-label={`${label} 放入分組`}>
+        <option value="">未分組</option>
+        {groups.map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.name}
+          </option>
+        ))}
+      </select>
+      <Icon name="chevron-down" size={14} />
+    </label>
+  );
+}
+
+/** 收藏咗嘅港鐵站：站名、綫，下面每條綫每個方向下一班（最多 4 行）；撳入路綫圖嗰個站 */
+function MtrFavItem({ f, groups, onMtr }: { f: Favorite; groups: FavGroupDef[]; onMtr: (sta: string) => void }) {
+  const sta = f.stopId!;
+  const { etaFormat } = usePrefs();
+  const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await liveClient.mtr(sta);
+        const body = (await res.json()) as { lines?: MtrLineEtas[] };
+        if (!cancelled && res.ok) setState({ rows: mtrDepartureRows(sta, body.lines ?? [], 4), now: Date.now() });
+      } catch {
+        /* 下次再試 */
+      }
+    };
+    void tick();
+    const t = setInterval(tick, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [sta]);
+  return (
+    <li className="fav card fav-mtr">
+      <button className="fav-main" onClick={() => onMtr(sta)}>
+        <span className="fav-mtr-name">
+          <Icon name="train" size={18} />
+          <strong>{f.stopName}</strong>
+          <span className="fav-mtr-lines">
+            {mtrStationLines(sta).map((l) => (
+              <span key={l} className="mtr-chip" style={{ background: mtrLine(l)?.color, color: mtrLine(l)?.ink }}>
+                {mtrLine(l)?.zh}
+              </span>
             ))}
-          </select>
-          <Icon name="chevron-down" size={14} />
-        </label>
-      )}
+          </span>
+        </span>
+        <span className="fav-mtr-rows">
+          {state === null && <span className="muted">…</span>}
+          {state?.rows.length === 0 && <span className="muted">{sta === 'RAC' ? '只喺賽馬日開放' : '暫時冇班次'}</span>}
+          {state?.rows.map((r) => (
+            <span key={r.key} className="fav-mtr-row">
+              <span className="nc-badge" style={{ background: r.badge.bg, color: r.badge.ink }}>
+                {r.badge.text}
+              </span>
+              <span className="nc-dest">往{r.dest}</span>
+              {r.platform && (
+                <span className="nc-plat" style={{ background: r.badge.bg, color: r.badge.ink }}>
+                  {r.platform}
+                </span>
+              )}
+              <span className={r.nowText ? 'nc-min nc-now' : 'nc-min'}>{r.nowText ?? minutesLabel(r.at, state.now, etaFormat)}</span>
+            </span>
+          ))}
+        </span>
+      </button>
+      <button className="fav-remove" onClick={() => removeFavorite(f)} aria-label={`取消收藏${f.stopName}站`}>
+        <Icon name="star-fill" size={20} />
+      </button>
+      <GroupPick f={f} groups={groups} label={`${f.stopName}站`} />
     </li>
   );
 }

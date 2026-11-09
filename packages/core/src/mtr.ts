@@ -1,4 +1,8 @@
+import type { DepartureRow } from './departures';
+import { metresBetween } from './geo';
 import { MTR_LINE_STATIONS, MTR_STATION_NAMES } from './mtr-data';
+import { MTR_STATION_LL } from './mtr-geo';
+import type { NearMtr } from './nearby-cache';
 import { hkClock, type Prefs } from './prefs';
 
 /**
@@ -184,4 +188,49 @@ export function searchMtrStations(query: string, limit = 8): string[] {
     .sort((a, b) => a.score - b.score || a.len - b.len || a.code.localeCompare(b.code))
     .slice(0, limit)
     .map((h) => h.code);
+}
+
+/** 綫名簡稱（到站卡標籤）：「荃灣」「東鐵」；機場快綫叫「機鐵」 */
+export function mtrLineShort(code: string): string {
+  if (code === 'AEL') return '機鐵';
+  return (mtrLine(code)?.zh ?? code).replace(/綫$/, '');
+}
+
+/**
+ * 附近港鐵站（直綫距離，由近到遠）。馬場只喺賽馬日開，唔計。
+ * 首頁大字「最近港鐵站」用 2 公里內最近一個；大卡用 800 米內嘅。
+ */
+export function nearestMtrStations(lat: number, lng: number, maxM = 2000, limit = 3): NearMtr[] {
+  return Object.entries(MTR_STATION_LL)
+    .filter(([sta]) => sta !== 'RAC')
+    .map(([sta, ll]) => ({ sta, distance: Math.round(metresBetween([lat, lng], [ll[0], ll[1]])) }))
+    .filter((s) => s.distance <= maxM)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, limit);
+}
+
+/**
+ * 港鐵站到站卡嘅行（首頁大卡）：每條綫每個方向下一班，按時間排，最多 limit 行；標籤用綫色同簡稱，有月台。
+ * 撳落去開港鐵路綫圖嗰個站（link.co = 'mtr'）。
+ */
+export function mtrDepartureRows(sta: string, lines: MtrLineEtas[], limit = 4): DepartureRow[] {
+  const rows: DepartureRow[] = [];
+  for (const l of lines) {
+    const info = mtrLine(l.line);
+    if (!info || l.noData) continue;
+    for (const d of l.dirs) {
+      const t = d.trains[0];
+      if (!t) continue;
+      rows.push({
+        key: `mtr-${sta}-${l.line}-${d.dir}`,
+        badge: { text: mtrLineShort(l.line), bg: info.color, ink: info.ink },
+        dest: t.destName,
+        at: Date.parse(t.time),
+        platform: t.plat || undefined,
+        nowText: t.mins <= 0 ? '正在離開' : t.mins === 1 ? '即將到站' : undefined,
+        link: { co: 'mtr', route: l.line, dir: d.dir === 'UP' ? 'O' : 'I', stop: sta },
+      });
+    }
+  }
+  return rows.sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity)).slice(0, limit);
 }

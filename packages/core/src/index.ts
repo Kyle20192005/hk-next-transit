@@ -30,4 +30,5 @@ export * from './stop-search';
 export * from './route-extras';
 export * from './mtr';
 export * from './mtr-data';
+export * from './mtr-geo';
 export * from './mtr-map';

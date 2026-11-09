@@ -1,15 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useSyncExternalStore } from 'react';
-import type { Company } from '@hknt/core';
+import { mtrStationName, type Company } from '@hknt/core';
 import type { Co } from './api';
 import { haptic } from './haptics';
 
 /**
- * 收藏（同網頁版 lib/favorites.ts 一樣嘅格式）：路線（某個方向）或者路線上嘅某個站。
+ * 收藏（同網頁版 lib/favorites.ts 一樣嘅格式）：路線（某個方向）、路線上嘅某個站，或者港鐵站（co = 'mtr'，stopId = 站代號）。
  * 存喺 AsyncStorage（只喺呢部機）；開 App 時讀一次入記憶體，之後同步更新。
  */
 export interface Favorite {
-  co: Co;
+  co: Co | 'mtr';
   route: string;
   dir: 'O' | 'I';
   dest: string;
@@ -26,6 +26,10 @@ let list: Favorite[] = [];
 let loaded = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
+
+/** 港鐵站收藏（路綫圖面板撳星號） */
+export const mtrFavorite = (sta: string): Omit<Favorite, 'at'> => ({ co: 'mtr', route: '', dir: 'O', dest: '', companies: [], stopId: sta, stopName: mtrStationName(sta) });
+export const isMtrFav = (f: Pick<Favorite, 'co'>): f is Favorite & { co: 'mtr' } => f.co === 'mtr';
 
 export const favKey = (f: Pick<Favorite, 'co' | 'route' | 'dir' | 'stopId'>) => `${f.co}/${f.route}/${f.dir}/${f.stopId ?? ''}`;
 

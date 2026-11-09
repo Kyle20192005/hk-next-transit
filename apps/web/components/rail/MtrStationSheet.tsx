@@ -2,6 +2,7 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { LIVE_REFRESH, hkClockSec, mtrLine, mtrStationEn, mtrStationLines, mtrStationName, mtrTrainEta, type MtrDirection, type MtrLineEtas, type MtrTrain } from '@hknt/core';
 import { liveClient } from '@/lib/buses';
+import { mtrFavorite, useFavorite } from '@/lib/favorites';
 import { usePrefs } from '@/lib/prefs';
 import Icon from '../Icon';
 
@@ -150,6 +151,7 @@ const MtrStationSheet = forwardRef<
             <h2>{mtrStationName(sta)}</h2>
             <span className="muted">{mtrStationEn(sta)}</span>
           </div>
+          <FavButton sta={sta} />
           <button className="drawer-close" onClick={onClose} aria-label="關閉">
             <Icon name="close" size={20} />
           </button>
@@ -249,6 +251,16 @@ const MtrStationSheet = forwardRef<
   );
 });
 export default MtrStationSheet;
+
+/** 收藏呢個站（收藏頁、首頁大卡「收藏」會出） */
+function FavButton({ sta }: { sta: string }) {
+  const [on, toggle] = useFavorite(mtrFavorite(sta));
+  return (
+    <button className={on ? 'drawer-close mtr-fav on' : 'drawer-close mtr-fav'} onClick={toggle} aria-pressed={on} aria-label={on ? `取消收藏${mtrStationName(sta)}站` : `收藏${mtrStationName(sta)}站`}>
+      <Icon name={on ? 'star-fill' : 'star'} size={20} />
+    </button>
+  );
+}
 
 /** 下班車：一個方向一行（目的地、月台圈、時間）；後面一班細字 */
 function NextRow({ d, empty, fmt }: { d: MtrDirection; empty: string; fmt: 'minutes' | 'clock' }) {

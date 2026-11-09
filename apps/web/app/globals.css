@@ -307,6 +307,10 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .nc-dest { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.0625rem; font-weight: 600; }
 .nc-min { flex: none; display: flex; align-items: center; gap: 6px; font-size: 1.125rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .nc-none { font-size: 0.9375rem; font-weight: 600; }
+/* 港鐵行：綫色標籤、月台圈；撳落去開路綫圖 */
+button.nc-row { width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.nc-plat { flex: none; width: 22px; height: 22px; display: inline-grid; place-items: center; border-radius: 50%; font-size: 0.75rem; font-weight: 800; }
+.nc-min.nc-now { font-size: 0.9375rem; }
 .nc-empty { padding: 10px 14px; text-align: center; }
 .nc-dots { display: flex; justify-content: center; gap: 6px; padding-top: 8px; }
 .nc-dots button { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 3px; background: var(--line); transition: width 0.2s; cursor: pointer; }
@@ -346,7 +350,11 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 .hero-loc { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; text-align: center; }
 .hero-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 2.375rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; }
 .hero-en { margin-top: -2px; font-size: 1.125rem; font-weight: 800; letter-spacing: 0.01em; opacity: 0.85; }
-.hero-sub { margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; font-size: 0.875rem; font-weight: 600; opacity: 0.75; }
+.hero-sub { margin-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 0.875rem; font-weight: 600; opacity: 0.75; }
+.hero-line { display: inline-flex; align-items: center; gap: 4px; }
+.hero-mtr { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; pointer-events: auto; }
+.hero-mtr-dots { display: inline-flex; gap: 2px; margin-left: 2px; }
+.hero-mtr-dots i { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.7); }
 .hero-retry { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .hero-search { padding: 0 6px 0 0; gap: 0; }
 .hero-search-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; align-self: stretch; padding: 0 0 0 14px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
@@ -490,6 +498,17 @@ svg[data-duo] [fill="currentColor"] { fill-opacity: 1; }
 @media (min-width: 768px) { .sheet-backdrop { align-items: center; } .sheet { border-radius: var(--radius); } }
 .fav-remove { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: var(--radius-s); background: none; color: var(--brand); cursor: pointer; }
 .fav:has(.fav-eta) .fav-main { padding-right: 52px; }
+/* 收藏咗嘅港鐵站：站名、綫，下面每條綫每個方向下一班 */
+.fav-mtr .fav-main { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 52px 12px 14px; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.fav-mtr-name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.fav-mtr-name strong { font-size: 1.0625rem; }
+.fav-mtr-lines { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.mtr-chip { padding: 1px 6px; border-radius: 6px; font-size: 0.6875rem; font-weight: 800; }
+.fav-mtr-rows { display: flex; flex-direction: column; gap: 6px; }
+.fav-mtr-row { display: flex; align-items: center; gap: 8px; }
+.fav-mtr-row .nc-dest { font-size: 0.9375rem; }
+.fav-mtr-row .nc-min { font-size: 1rem; }
+.fav-mtr .fav-remove, .fav-mtr:has(.fav-group-pick) .fav-remove { top: 8px; transform: none; }
 
 /* ================= 路線頁 ================= */
 .route-page { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; }
@@ -834,6 +853,7 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 @keyframes mtr-panel-in { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 .mtr-panel-head { display: flex; align-items: center; gap: 10px; padding: 10px 10px 8px 16px; }
 .mtr-panel-head .drawer-close { width: 32px; height: 32px; }
+.mtr-panel-head .mtr-fav.on { color: var(--accent); }
 .mtr-panel-title { flex: 1; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; }
 .mtr-panel-title h2 { margin: 0; font-size: 1.25rem; }
 .mtr-panel-title .muted { font-size: 0.875rem; }

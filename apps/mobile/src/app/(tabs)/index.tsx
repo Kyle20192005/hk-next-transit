@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
-import { COMPANIES, filterNews, formatDistance, groupStopHeads, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
+import { COMPANIES, filterNews, formatDistance, groupStopHeads, mtrLine, mtrStationLines, mtrStationName, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
 import { Icon } from '@/components/Icon';
 import { HomeHeader } from '@/components/HomeHeader';
 import { useNearbyStops } from '@/components/Nearby';
@@ -10,6 +10,7 @@ import { ToolTile } from '@/components/ToolTile';
 import { NewsChips, NewsList } from '@/components/NewsList';
 import { useNews, useTools } from '@/lib/news';
 import { warmRoute } from '@/lib/prefetch';
+import { openMtr } from '@/lib/open-mtr';
 import { useRecent } from '@/lib/recent';
 import { usePrefs } from '@/lib/prefs';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
@@ -39,6 +40,7 @@ export default function HomeTab() {
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
+  const mtrNear = state.kind === 'ok' ? state.mtr[0] : undefined;
   // 首頁 header（HomeHeader，一件嘢，會收縮；同網頁一樣）：浮喺捲動區上面，捲動內容頂留返 header 咁高
   const { height: screenH } = useWindowDimensions();
   const [scrollY] = useState(() => new Animated.Value(0));
@@ -161,17 +163,34 @@ export default function HomeTab() {
         pill={area ? area.n : head ? head.name : null}
         onSearch={() => go('nav')}
         sub={
-          head ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.75 }}>
-              <Icon name="navigate" size={14} color={t.onBrand} />
-              <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
-                最近巴士站：{head.name} · {formatDistance(head.distance)}
-              </Text>
+          state.kind === 'ok' ? (
+            // 最近港鐵站（2 公里內，撳入路綫圖）同最近巴士站
+            <View style={{ alignItems: 'center', gap: 3, opacity: 0.75 }}>
+              {mtrNear && (
+                <Pressable onPress={() => openMtr(mtrNear.sta)} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Icon name="train" size={14} color={t.onBrand} />
+                  <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
+                    最近港鐵站：{mtrStationName(mtrNear.sta)}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 2, marginLeft: 2 }}>
+                    {mtrStationLines(mtrNear.sta).map((l) => (
+                      <View key={l} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: mtrLine(l)?.color, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' }} />
+                    ))}
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>· {formatDistance(mtrNear.distance)}</Text>
+                </Pressable>
+              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Icon name="navigate" size={14} color={t.onBrand} />
+                <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
+                  {head ? `最近巴士站：${head.name} · ${formatDistance(head.distance)}` : `${radiusLabel(prefs.nearbyRadius)}內冇巴士站`}
+                </Text>
+              </View>
             </View>
           ) : (
             <Pressable onPress={state.kind === 'error' || state.kind === 'idle' ? () => void locate() : undefined}>
               <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand, opacity: 0.75, textDecorationLine: state.kind === 'error' || state.kind === 'idle' ? 'underline' : 'none' }}>
-                {state.kind === 'error' ? `${state.message} · 再試` : state.kind === 'ok' ? `${radiusLabel(prefs.nearbyRadius)}內冇巴士站` : state.kind === 'idle' ? '撳呢度定位，搵附近巴士站' : '搵緊你附近嘅巴士站'}
+                {state.kind === 'error' ? `${state.message} · 再試` : state.kind === 'idle' ? '撳呢度定位，搵附近巴士站同港鐵站' : '搵緊你附近嘅巴士站同港鐵站'}
               </Text>
             </Pressable>
           )

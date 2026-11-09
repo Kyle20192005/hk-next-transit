@@ -228,3 +228,31 @@ describe('mtr no data', () => {
     expect(r).toEqual({ line: 'KTL', dirs: [], delayed: false, noData: true });
   });
 });
+
+describe('mtr nearby + departure rows', () => {
+  it('finds nearest stations by real position (no Racecourse)', async () => {
+    const { nearestMtrStations } = await import('./mtr');
+    // 旺角道／彌敦道交界附近
+    const near = nearestMtrStations(22.3193, 114.1694, 800);
+    expect(near[0]?.sta).toBe('MOK');
+    expect(near[0]!.distance).toBeLessThan(80);
+    expect(near.map((s) => s.sta)).toContain('PRE');
+    // 火炭／大學附近都唔會出馬場
+    expect(nearestMtrStations(22.4003, 114.2029, 2000).map((s) => s.sta)).not.toContain('RAC');
+    // 海中間冇站
+    expect(nearestMtrStations(22.2, 114.3, 800)).toEqual([]);
+  });
+  it('builds card rows: one per line-direction, soonest first, line colour + platform', async () => {
+    const { mtrDepartureRows, mtrLineShort } = await import('./mtr');
+    const t = (m: number) => `2026-11-09T09:${String(m).padStart(2, '0')}:00+08:00`;
+    const rows = mtrDepartureRows('ADM', [
+      { line: 'TWL', delayed: false, dirs: [{ dir: 'UP', label: '往 荃灣', trains: [{ dest: 'TSW', destName: '荃灣', plat: '3', time: t(5), mins: 4 }, { dest: 'TSW', destName: '荃灣', plat: '3', time: t(8), mins: 7 }] }] },
+      { line: 'ISL', delayed: false, dirs: [{ dir: 'DOWN', label: '往 堅尼地城', trains: [{ dest: 'KET', destName: '堅尼地城', plat: '2', time: t(1), mins: 0 }] }] },
+      { line: 'KTL', delayed: false, dirs: [], noData: true },
+    ]);
+    expect(rows.map((r) => r.badge.text)).toEqual(['港島', '荃灣']);
+    expect(rows[0]).toMatchObject({ dest: '堅尼地城', platform: '2', nowText: '正在離開', link: { co: 'mtr', stop: 'ADM', dir: 'I' } });
+    expect(rows[1]?.badge.bg).toBe('#E2231A');
+    expect(mtrLineShort('AEL')).toBe('機鐵');
+  });
+});

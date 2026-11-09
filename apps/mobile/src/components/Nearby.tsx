@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { formatDistance, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, type NearbyCache } from '@hknt/core';
+import { formatDistance, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, type NearbyCache, type NearMtr } from '@hknt/core';
 import { api, type NearStop } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { warmRoute } from '@/lib/prefetch';
@@ -14,7 +14,7 @@ import { getPrefs } from '@/lib/prefs';
 
 const REFRESH_MS = 30_000;
 
-export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[]; lat: number; lng: number; area: { n: string; en: string | null } | null };
+export type NearbyState = { kind: 'idle' } | { kind: 'locating' } | { kind: 'error'; message: string } | { kind: 'ok'; stops: NearStop[]; lat: number; lng: number; area: { n: string; en: string | null } | null; mtr: NearMtr[] };
 
 /** 上次「附近」結果（core nearby-cache.ts）：AsyncStorage + 記憶體（同一次開 App 轉頁即刻有） */
 let memoCache: NearbyCache<NearStop> | null = null;
@@ -45,7 +45,7 @@ export function useNearbyStops(auto = false) {
 
   const show = useCallback((c: NearbyCache<NearStop>) => {
     shown.current = { lat: c.lat, lng: c.lng };
-    setState({ kind: 'ok', stops: c.stops, lat: c.lat, lng: c.lng, area: c.area });
+    setState({ kind: 'ok', stops: c.stops, lat: c.lat, lng: c.lng, area: c.area, mtr: c.mtr ?? [] });
   }, []);
 
   const locate = useCallback(
@@ -69,7 +69,7 @@ export function useNearbyStops(auto = false) {
         const mine = ++fetchRef.current;
         const body = await api.nearby(lat, lng, radius);
         if (mine !== fetchRef.current) return;
-        const c: NearbyCache<NearStop> = { at: Date.now(), radius, lat, lng, stops: body.stops, area: body.area ?? null };
+        const c: NearbyCache<NearStop> = { at: Date.now(), radius, lat, lng, stops: body.stops, area: body.area ?? null, mtr: body.mtr ?? [] };
         writeCache(c);
         show(c);
       };

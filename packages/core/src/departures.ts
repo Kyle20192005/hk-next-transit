@@ -16,9 +16,11 @@ export interface DepartureRow {
   scheduled?: boolean;
   /** 收藏咗嘅站暫時冇班次（at = null 但唔係淨係收藏路線） */
   noService?: boolean;
-  /** 港鐵月台（將來用） */
+  /** 港鐵月台 */
   platform?: string;
-  /** 撳落去開邊度 */
+  /** 代替分鐘顯示嘅字（港鐵：0 分鐘「正在離開」、1 分鐘「即將到站」） */
+  nowText?: string;
+  /** 撳落去開邊度（co = 'mtr'：開港鐵路綫圖嗰個站，stop = 站代號） */
   link: { co: string; route: string; dir: 'O' | 'I'; stop?: string };
 }
 

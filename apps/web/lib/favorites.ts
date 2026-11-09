@@ -1,14 +1,15 @@
 'use client';
 import { useCallback, useSyncExternalStore } from 'react';
-import type { Company } from '@hknt/core';
+import { mtrStationName, type Company } from '@hknt/core';
 import type { Co } from './data';
 
 /**
- * 收藏：路線（某個方向）或者路線上嘅某個站。存喺瀏覽器 localStorage（唔使登入，只喺呢部機）。
+ * 收藏：路線（某個方向）、路線上嘅某個站，或者港鐵站（co = 'mtr'，stopId = 站代號，成個站所有綫）。
+ * 存喺瀏覽器 localStorage（唔使登入，只喺呢部機）。
  * localStorage 可能用唔到（私密瀏覽、封鎖網站資料），所以讀寫都 try/catch，用唔到就只喺記憶體。
  */
 export interface Favorite {
-  co: Co;
+  co: Co | 'mtr';
   route: string;
   dir: 'O' | 'I';
   /** 往邊度（顯示用） */
@@ -27,6 +28,10 @@ const KEY = 'hknt.favorites.v1';
 const EVENT = 'hknt:favorites';
 let memory: Favorite[] | null = null;
 const EMPTY: Favorite[] = [];
+
+/** 港鐵站收藏（路綫圖面板撳星號） */
+export const mtrFavorite = (sta: string): Omit<Favorite, 'at'> => ({ co: 'mtr', route: '', dir: 'O', dest: '', companies: [], stopId: sta, stopName: mtrStationName(sta) });
+export const isMtrFav = (f: Pick<Favorite, 'co'>): f is Favorite & { co: 'mtr' } => f.co === 'mtr';
 
 export const favKey = (f: Pick<Favorite, 'co' | 'route' | 'dir' | 'stopId'>) => `${f.co}/${f.route}/${f.dir}/${f.stopId ?? ''}`;
 

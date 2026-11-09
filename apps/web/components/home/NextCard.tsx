@@ -9,7 +9,10 @@ import {
   groupFavorites,
   groupStopHeads,
   minutesLabel,
+  mtrDepartureRows,
+  mtrStationName,
   radiusLabel,
+  type MtrLineEtas,
   type DepartureRow,
   type Eta,
   type FavGroup,
@@ -18,7 +21,7 @@ import {
 } from '@hknt/core';
 import Icon from '@/components/Icon';
 import type { Co } from '@/lib/data';
-import { useFavorites, type Favorite } from '@/lib/favorites';
+import { isMtrFav, useFavorites, type Favorite } from '@/lib/favorites';
 import { useFavGroups } from '@/lib/fav-groups';
 import { warmRoute } from '@/lib/prefetch';
 import { usePrefs } from '@/lib/prefs';
@@ -33,20 +36,29 @@ const ROWS = 4;
 const REFRESH_MS = 30_000;
 const TAB_KEY = 'hknt.nextTab';
 type Tab = 'next' | 'favs';
+/** 港鐵站卡：幾多米內、最多幾張（排最前） */
+const MTR_CARD_M = 800;
+const MTR_CARDS = 2;
+/** 下班車分頁一張卡：港鐵站或者巴士站頭 */
+type NearItem = { key: string; name: string; distance: number } & ({ kind: 'mtr'; sta: string } | { kind: 'bus'; head: StopHead<NearStop> });
 
 /**
  * 首頁大卡（似港鐵 App 嘅「下班車」小工具）：頂部兩個分頁「下班車」（附近）同「收藏」。
  * 入面一行站名（跟住而家睇緊嗰張卡），下面打橫掃嘅到站卡（左右兩邊色條），每張最多 4 行。
- * 卡入咗畫面先載入。App 版 apps/mobile/src/components/NextCard.tsx。
+ * 卡入咗畫面先載入。附近 800 米內嘅港鐵站卡排最前（綫色、月台）；收藏咗嘅港鐵站一個站一張卡。
+ * 港鐵行撳落去開路綫圖嗰個站（onMtr）。App 版 apps/mobile/src/components/NextCard.tsx。
  */
 export default function NextCard({
   nearby,
   onLocate,
   onMore,
   onFavs,
+  onMtr,
   notice,
 }: {
   nearby: NearbyState;
+  /** 打開港鐵路綫圖嗰個站 */
+  onMtr: (sta: string) => void;
   onLocate: () => void;
   onMore: () => void;
   onFavs: () => void;
@@ -96,7 +108,7 @@ export default function NextCard({
         </button>
       </div>
       <div className="nc-body">
-        {tab === 'next' ? <NearbyPane state={nearby} onLocate={onLocate} onMore={onMore} /> : <FavPane favs={favs} onAll={onFavs} />}
+        {tab === 'next' ? <NearbyPane state={nearby} onLocate={onLocate} onMore={onMore} onMtr={onMtr} /> : <FavPane favs={favs} onAll={onFavs} onMtr={onMtr} />}
         {tab === 'next' && notice && (
           <button className="nc-notice" onClick={notice.onClick}>
             <Icon name="warning" size={20} />
@@ -109,25 +121,36 @@ export default function NextCard({
   );
 }
 
-function NearbyPane({ state, onLocate, onMore }: { state: NearbyState; onLocate: () => void; onMore: () => void }) {
-  const heads = state.kind === 'ok' ? groupStopHeads(state.stops).slice(0, LOAD_HEADS) : [];
-  const data = useHeadRows(heads);
+function NearbyPane({ state, onLocate, onMore, onMtr }: { state: NearbyState; onLocate: () => void; onMore: () => void; onMtr: (sta: string) => void }) {
+  const items: NearItem[] =
+    state.kind === 'ok'
+      ? [
+          ...state.mtr
+            .filter((m) => m.distance <= MTR_CARD_M)
+            .slice(0, MTR_CARDS)
+            .map((m) => ({ key: `mtr-${m.sta}`, kind: 'mtr' as const, sta: m.sta, name: mtrStationName(m.sta), distance: m.distance })),
+          ...groupStopHeads(state.stops)
+            .slice(0, LOAD_HEADS)
+            .map((h) => ({ key: h.key, kind: 'bus' as const, head: h, name: h.name, distance: h.distance })),
+        ]
+      : [];
+  const data = useHeadRows(items);
   const shown = useRef(new Set<string>());
   const { nearbyRadius: radius } = usePrefs();
   if (state.kind !== 'ok') {
     return (
       <Message
-        text={state.kind === 'error' ? state.message : state.kind === 'locating' ? '定位中…' : '搵你附近嘅巴士站同下一班車'}
+        text={state.kind === 'error' ? state.message : state.kind === 'locating' ? '定位中…' : '搵你附近嘅車站同下一班車'}
         error={state.kind === 'error'}
         action={state.kind === 'locating' ? undefined : { label: state.kind === 'error' ? '再試' : '定位', onClick: onLocate }}
       />
     );
   }
-  if (!heads.length) return <Message text={`${radiusLabel(radius)}內冇巴士站`} />;
+  if (!items.length) return <Message text={`${radiusLabel(radius)}內冇巴士站`} />;
   // 冇班次嘅站頭唔出卡。全部載入完先出（逐張加會推走畫面）；出咗嘅卡之後冇車都保留，唔好令卡跳位
-  const ready = heads.every((h) => data[h.key]);
+  const ready = items.every((h) => data[h.key]);
   if (!ready && !shown.current.size) return <Message text="載入中…" />;
-  const cards = heads.filter((h) => data[h.key]?.rows.length || shown.current.has(h.key)).slice(0, MAX_CARDS);
+  const cards = items.filter((h) => data[h.key]?.rows.length || shown.current.has(h.key)).slice(0, MAX_CARDS);
   cards.forEach((h) => shown.current.add(h.key));
   if (!cards.length) return <Message text="附近暫時冇班次" />;
   return (
@@ -135,19 +158,19 @@ function NearbyPane({ state, onLocate, onMore }: { state: NearbyState; onLocate:
       items={cards}
       header={(h) => (
         <>
-          <Icon name="navigate" size={18} className="nc-loc-icon" />
-          <strong>{h.name}</strong>
+          <Icon name={h.kind === 'mtr' ? 'train' : 'navigate'} size={18} className="nc-loc-icon" />
+          <strong>{h.kind === 'mtr' ? `港鐵${h.name}站` : h.name}</strong>
           <span className="muted">{formatDistance(h.distance)}</span>
         </>
       )}
-      action={{ label: '更多', onClick: onMore }}
-      card={(h) => <RowsCard rows={data[h.key]?.rows ?? null} now={data[h.key]?.now ?? 0} />}
+      action={(h) => ({ label: '更多', onClick: h.kind === 'mtr' ? () => onMtr(h.sta) : onMore })}
+      card={(h) => <RowsCard rows={data[h.key]?.rows ?? null} now={data[h.key]?.now ?? 0} onMtr={onMtr} />}
     />
   );
 }
 
-/** 附近幾個站頭一齊載入（先知邊啲有車），每 30 秒更新 */
-function useHeadRows(heads: StopHead<NearStop>[]): Record<string, { rows: DepartureRow[]; now: number }> {
+/** 附近幾個站頭（同港鐵站）一齊載入（先知邊啲有車），每 30 秒更新 */
+function useHeadRows(heads: NearItem[]): Record<string, { rows: DepartureRow[]; now: number }> {
   const [data, setData] = useState<Record<string, { rows: DepartureRow[]; now: number }>>({});
   const key = heads.map((h) => h.key).join('|');
   const headsRef = useRef(heads);
@@ -161,9 +184,15 @@ function useHeadRows(heads: StopHead<NearStop>[]): Record<string, { rows: Depart
       headsRef.current.forEach(async (h) => {
         let rows: DepartureRow[] = [];
         try {
-          const res = await liveClient.here(h.lat, h.lng);
-          const body = (await res.json()) as { routes?: HereRouteLike[] };
-          if (res.ok) rows = busDepartureRows(body.routes ?? [], Date.now(), ROWS);
+          if (h.kind === 'mtr') {
+            const res = await liveClient.mtr(h.sta);
+            const body = (await res.json()) as { lines?: MtrLineEtas[] };
+            if (res.ok) rows = mtrDepartureRows(h.sta, body.lines ?? [], ROWS);
+          } else {
+            const res = await liveClient.here(h.head.lat, h.head.lng);
+            const body = (await res.json()) as { routes?: HereRouteLike[] };
+            if (res.ok) rows = busDepartureRows(body.routes ?? [], Date.now(), ROWS);
+          }
         } catch {
           /* 當冇車，下次再試 */
         }
@@ -179,35 +208,37 @@ function useHeadRows(heads: StopHead<NearStop>[]): Record<string, { rows: Depart
   return data;
 }
 
-function FavPane({ favs, onAll }: { favs: Favorite[]; onAll: () => void }) {
+function FavPane({ favs, onAll, onMtr }: { favs: Favorite[]; onAll: () => void; onMtr: (sta: string) => void }) {
   // 收藏分組：而家時段嘅組（例如朝早「返工」）排最前，卡頂標組名
   const favGroups = useFavGroups();
   const [now] = useState(() => Date.now());
   const { favs: ordered, active } = favsForNow(favs, favGroups, now);
   const groups = groupFavorites(ordered);
-  if (!groups.length) return <Message text="喺路線頁撳星號收藏路線，或者打開一個站撳「收藏呢個站」，就會喺度見到下一班車。" />;
+  if (!groups.length) return <Message text="喺路線頁撳星號收藏路線，打開一個站撳「收藏呢個站」，或者喺港鐵路綫圖撳站嘅星號，就會喺度見到下一班車。" />;
   return (
     <Swiper
       items={groups}
       header={(g) => (
         <>
-          <Icon name={g.isStop ? 'pin' : 'route'} size={18} className="nc-loc-icon" />
-          <strong>{g.name}</strong>
+          <Icon name={g.favs[0] && isMtrFav(g.favs[0]) ? 'train' : g.isStop ? 'pin' : 'route'} size={18} className="nc-loc-icon" />
+          <strong>{g.favs[0] && isMtrFav(g.favs[0]) ? `港鐵${g.name}站` : g.name}</strong>
           {active && g.favs.some((f) => f.group === active.id) && <span className="nc-group-tag">{active.name}</span>}
         </>
       )}
-      action={{ label: '全部', onClick: onAll }}
-      card={(g, active) => <FavCard group={g} active={active} />}
+      action={() => ({ label: '全部', onClick: onAll })}
+      card={(g, active) => (g.favs[0] && isMtrFav(g.favs[0]) ? <MtrFavCard sta={g.favs[0].stopId!} active={active} onMtr={onMtr} /> : <FavCard group={g} active={active} />)}
     />
   );
 }
 
 /** 打橫掃嘅卡；頂部一行跟住而家睇緊嗰張；卡入咗畫面先 active（載入數據） */
-function Swiper<T extends { key: string }>({ items, header, action, card }: { items: T[]; header: (item: T) => ReactNode; action: { label: string; onClick: () => void }; card: (item: T, active: boolean) => ReactNode }) {
+function Swiper<T extends { key: string }>({ items, header, action: actionOf, card }: { items: T[]; header: (item: T) => ReactNode; action: (item: T) => { label: string; onClick: () => void }; card: (item: T, active: boolean) => ReactNode }) {
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [reached, setReached] = useState(1);
   const cur = items[Math.min(index, items.length - 1)]!;
+  // 右上掣跟住而家睇緊嗰張卡（港鐵卡「更多」開路綫圖嗰個站）
+  const action = actionOf(cur);
   const onScroll = () => {
     const el = track.current;
     const first = el?.firstElementChild as HTMLElement | null;
@@ -283,6 +314,17 @@ function FavCard({ group, active }: { group: FavGroup<Favorite>; active: boolean
   return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} empty="暫時冇班次" />;
 }
 
+/** 收藏咗嘅港鐵站：每條綫每個方向下一班 */
+function MtrFavCard({ sta, active, onMtr }: { sta: string; active: boolean; onMtr: (sta: string) => void }) {
+  const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
+  usePoll(active, `mtr-${sta}`, async () => {
+    const res = await liveClient.mtr(sta);
+    const body = (await res.json()) as { lines?: MtrLineEtas[] };
+    setState({ rows: res.ok ? mtrDepartureRows(sta, body.lines ?? [], ROWS) : [], now: Date.now() });
+  });
+  return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} empty={sta === 'RAC' ? '只喺賽馬日開放' : '暫時冇班次'} onMtr={onMtr} />;
+}
+
 /** active 時即刻 call 一次，之後每 30 秒 */
 function usePoll(active: boolean, key: string, run: () => Promise<void>, onError?: () => void) {
   const runRef = useRef(run);
@@ -304,15 +346,29 @@ function usePoll(active: boolean, key: string, run: () => Promise<void>, onError
   }, [active, key]);
 }
 
-/** 一張到站卡：左右兩邊色條（第一班嘅公司色），每行 標籤、往邊、分鐘 */
-function RowsCard({ rows, now, empty = '暫時冇班次' }: { rows: DepartureRow[] | null; now: number; empty?: string }) {
+/** 一張到站卡：左右兩邊色條（第一班嘅公司色／綫色），每行 標籤、往邊、（港鐵月台）、分鐘 */
+function RowsCard({ rows, now, empty = '暫時冇班次', onMtr }: { rows: DepartureRow[] | null; now: number; empty?: string; onMtr?: (sta: string) => void }) {
   const { etaFormat } = usePrefs();
   const accent = rows?.[0]?.badge.bg ?? 'var(--line)';
   return (
     <div className="nc-card" style={{ ['--nc-accent' as string]: accent }}>
       {rows === null && <div className="nc-empty muted">載入中…</div>}
       {rows?.length === 0 && <div className="nc-empty muted">{empty}</div>}
-      {rows?.map((r) => (
+      {rows?.map((r) =>
+        r.link.co === 'mtr' ? (
+          <button key={r.key} className="nc-row" onClick={() => onMtr?.(r.link.stop!)}>
+            <span className="nc-badge" style={{ background: r.badge.bg, color: r.badge.ink }}>
+              {r.badge.text}
+            </span>
+            <span className="nc-dest">往{r.dest}</span>
+            {r.platform && (
+              <span className="nc-plat" style={{ background: r.badge.bg, color: r.badge.ink }} aria-label={`${r.platform} 號月台`}>
+                {r.platform}
+              </span>
+            )}
+            <span className={r.nowText ? 'nc-min nc-now' : 'nc-min'}>{r.nowText ?? minutesLabel(r.at, now, etaFormat)}</span>
+          </button>
+        ) : (
         <Link
           key={r.key}
           href={`/${r.link.co}/${r.link.route}?dir=${r.link.dir}${r.link.stop ? `&stop=${r.link.stop}` : ''}`}
@@ -328,7 +384,8 @@ function RowsCard({ rows, now, empty = '暫時冇班次' }: { rows: DepartureRow
             {r.noService ? <span className="muted nc-none">冇班次</span> : r.at === null ? <Icon name="chevron-right" size={18} className="muted" /> : minutesLabel(r.at, now, etaFormat)}
           </span>
         </Link>
-      ))}
+        ),
+      )}
     </div>
   );
 }

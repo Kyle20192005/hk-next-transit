@@ -16,7 +16,7 @@ const FULL_GAP = 56;
  * 搜尋欄喺標題列（routes.tsx），呢度出結果（浮喺地圖頂）；揀咗就清空、收鍵盤、飛去嗰個站並打開面板。
  * 面板唔遮成幅圖：量佢遮咗幾多（inset）俾地圖。
  */
-export function RailView({ query, onPicked }: { query: string; onPicked: () => void }) {
+export function RailView({ query, onPicked, open }: { query: string; onPicked: () => void; open?: { sta: string; n: string } | null }) {
   const t = useTheme();
   const { width: winW } = useWindowDimensions();
   const wide = winW >= 768;
@@ -27,6 +27,17 @@ export function RailView({ query, onPicked }: { query: string; onPicked: () => v
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [inset, setInset] = useState<MtrInset>({ right: 0, bottom: 0 });
   const results = useMemo(() => searchMtrStations(query), [query]);
+  // 由首頁、收藏撳入嚟（?sta=）：飛去（放大置中）再打開
+  const openKey = open ? `${open.sta}:${open.n}` : null;
+  const [seenOpen, setSeenOpen] = useState<string | null>(null);
+  if (openKey !== seenOpen) {
+    setSeenOpen(openKey);
+    if (open) {
+      setSta(open.sta);
+      setFocus({ sta: open.sta, zoom: true });
+      if (!wide) setAll(false);
+    }
+  }
 
   // 手機每次揀新站都由半開開始（方便繼續撳地圖）
   const onStation = useCallback(

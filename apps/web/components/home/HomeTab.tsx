@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { COMPANIES, DEFAULT_TOOLS, filterNews, formatDistance, groupStopHeads, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
+import { COMPANIES, DEFAULT_TOOLS, filterNews, formatDistance, groupStopHeads, mtrLine, mtrStationLines, mtrStationName, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
@@ -18,10 +18,10 @@ const NEWS_SHOWN = 3;
 
 /**
  * 首頁（NextLeg 入口，參考港鐵 App）：
- * 黃色區大字顯示最近嘅站頭、「想去邊度？」（導航）同交通消息燈號；常用工具（可以揀）；大卡（下班車／收藏）；
+ * 黃色區大字顯示地區名，下面最近港鐵站（2 公里內，撳入路綫圖）同最近巴士站；「想去邊度？」（導航）同交通消息燈號；常用工具（可以揀）；大卡（下班車／收藏）；
  * 交通消息（全部／附近／港鐵）；最近睇過。App 版 apps/mobile/src/app/(tabs)/index.tsx。
  */
-export default function HomeTab({ go, onEditTools }: { go: (to: ToolId, pos?: { lat: number; lng: number } | null) => void; onEditTools: () => void }) {
+export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, pos?: { lat: number; lng: number } | null) => void; onEditTools: () => void; onMtr: (sta: string) => void }) {
   const recent = useRecent();
   const prefs = usePrefs();
   const { state, locate } = useNearbyStops(true);
@@ -33,6 +33,7 @@ export default function HomeTab({ go, onEditTools }: { go: (to: ToolId, pos?: { 
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
+  const mtrNear = state.kind === 'ok' ? state.mtr[0] : undefined;
   const scroller = useRef<HTMLDivElement>(null);
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
@@ -52,22 +53,33 @@ export default function HomeTab({ go, onEditTools }: { go: (to: ToolId, pos?: { 
         pill={area ? area.n : head ? head.name : null}
         onSearch={() => go('nav')}
         sub={
-          head ? (
+          state.kind === 'ok' ? (
             <>
-              <Icon name="navigate" size={14} /> 最近巴士站：{head.name} · {formatDistance(head.distance)}
+              {mtrNear && (
+                <button className="hero-line hero-mtr" onClick={() => onMtr(mtrNear.sta)}>
+                  <Icon name="train" size={14} /> 最近港鐵站：{mtrStationName(mtrNear.sta)}
+                  <span className="hero-mtr-dots" aria-hidden="true">
+                    {mtrStationLines(mtrNear.sta).map((l) => (
+                      <i key={l} style={{ background: mtrLine(l)?.color }} />
+                    ))}
+                  </span>
+                  · {formatDistance(mtrNear.distance)}
+                </button>
+              )}
+              <span className="hero-line">
+                <Icon name="navigate" size={14} /> {head ? `最近巴士站：${head.name} · ${formatDistance(head.distance)}` : `${radiusLabel(prefs.nearbyRadius)}內冇巴士站`}
+              </span>
             </>
           ) : state.kind === 'error' ? (
             <button className="hero-retry" onClick={locate}>
               {state.message} · 再試
             </button>
-          ) : state.kind === 'ok' ? (
-            `${radiusLabel(prefs.nearbyRadius)}內冇巴士站`
           ) : state.kind === 'idle' ? (
             <button className="hero-retry" onClick={locate}>
-              撳呢度定位，搵附近巴士站
+              撳呢度定位，搵附近巴士站同港鐵站
             </button>
           ) : (
-            '搵緊你附近嘅巴士站'
+            '搵緊你附近嘅巴士站同港鐵站'
           )
         }
         status={
@@ -83,6 +95,7 @@ export default function HomeTab({ go, onEditTools }: { go: (to: ToolId, pos?: { 
         <div className="home-col home-col-main">
         <NextCard
           nearby={state}
+          onMtr={onMtr}
           onLocate={locate}
           onMore={() => go('nearby', pos)}
           onFavs={() => go('favs')}

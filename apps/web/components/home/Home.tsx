@@ -39,6 +39,8 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   const { priority } = usePrefs();
   useEffect(() => setMode(priority === 'rail' ? 'rail' : 'bus'), [priority]);
   const favCount = useFavorites().length;
+  // 港鐵站（首頁大卡、收藏、路綫圖搜尋）：入「路線」分頁揀港鐵，飛去嗰個站並打開到站時間
+  const [railPick, setRailPick] = useState<{ sta: string } | null>(null);
 
   useEffect(() => {
     try {
@@ -57,6 +59,11 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
       /* 唔記得都冇所謂 */
     }
   };
+  const openMtr = (sta: string) => {
+    setMode('rail');
+    setRailPick({ sta });
+    pick('routes');
+  };
 
   return (
     <main className={`home tab-${view ? view.kind : tab}`}>
@@ -72,6 +79,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
             {tab === 'home' && (
               <HomeTab
                 onEditTools={() => setView({ kind: 'tools' })}
+                onMtr={openMtr}
                 go={(to: ToolId, pos) => {
                   const m = toolById(to).mode;
                   if (m) {
@@ -84,9 +92,9 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
                 }}
               />
             )}
-            {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} mode={mode} onMode={setMode} onNearby={() => setView({ kind: 'nearby' })} />}
+            {tab === 'routes' && <RouteBrowser routes={routes} updated={updated} mode={mode} onMode={setMode} onNearby={() => setView({ kind: 'nearby' })} railPick={railPick} onRailPick={(sta) => setRailPick({ sta })} />}
             {tab === 'nav' && <Navigation />}
-            {tab === 'favs' && <Favorites onBrowse={() => pick('routes')} />}
+            {tab === 'favs' && <Favorites onBrowse={() => pick('routes')} onMtr={openMtr} />}
             {tab === 'settings' && <Settings updated={updated} />}
           </>
         )}

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { pickArea } from '@hknt/core';
+import { nearestMtrStations, pickArea } from '@hknt/core';
 import { getAllStops, getIndex, getPlaces } from '@/lib/data';
 import { CORS } from '@/lib/cors';
 
@@ -13,7 +13,10 @@ function metres(lat1: number, lng1: number, lat2: number, lng2: number) {
   return Math.hypot(dx, dy);
 }
 
-/** GET /api/nearby?lat=22.28&lng=114.15：附近（600 米內）最近嘅巴士站（所有公司）同經過嘅路線，同埋地區名 `area` */
+/**
+ * GET /api/nearby?lat=22.28&lng=114.15：附近（600 米內）最近嘅巴士站（所有公司）同經過嘅路線、地區名 `area`，
+ * 同埋 2 公里內最近嘅港鐵站 `mtr`（最多 3 個，首頁大字同大卡用）
+ */
 export async function GET(req: NextRequest) {
   const lat = Number(req.nextUrl.searchParams.get('lat'));
   const lng = Number(req.nextUrl.searchParams.get('lng'));
@@ -41,7 +44,8 @@ export async function GET(req: NextRequest) {
     }));
   // 地區名（首頁大字，例如「青衣」「香港仔」）；冇地區數據就 null，前端用站頭名
   const area = pickArea(places, lat, lng);
-  return NextResponse.json({ stops, area }, { headers: { ...CORS, 'Cache-Control': 'no-store' } });
+  const mtr = nearestMtrStations(lat, lng, 2000, 3);
+  return NextResponse.json({ stops, area, mtr }, { headers: { ...CORS, 'Cache-Control': 'no-store' } });
 }
 
 export function OPTIONS() {

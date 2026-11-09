@@ -19,6 +19,15 @@ export interface NearbyCache<S> {
   lng: number;
   stops: S[];
   area: { n: string; en: string | null } | null;
+  /** 附近港鐵站（舊版快取冇） */
+  mtr?: NearMtr[];
+}
+
+/** 附近港鐵站（`/api/nearby` 回傳，由近到遠） */
+export interface NearMtr {
+  sta: string;
+  /** 直綫距離（米） */
+  distance: number;
 }
 
 /** 'fresh' = 直接用；'stale' = 先顯示再背景更新；null = 唔用 */
