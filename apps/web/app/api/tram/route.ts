@@ -10,6 +10,11 @@ import { CORS } from '@/lib/cors';
  * - realtime：電車公司網站「下一班電車」（唔係開放數據，可能隨時停用、或者只喺部分地方回應）；攞唔到就 null，前端用時間表
  */
 const NEXT_TRAM = 'https://www.hktramways.com/nextTram/geteat.php?stop_code=';
+/**
+ * 試唔試電車公司網站實時：2026-11-09 測試用唔到（開發環境回應空 <root/>、冇班次；Vercel 香港 2 秒超時），
+ * 所以先熄咗，每個站即刻用時間表。網站將來正常返就改 true（程式碼保留）。
+ */
+const TRY_REALTIME = false;
 const memo = new Map<string, { at: number; v: TramEta[] | null }>();
 /** 網站冇回應（超時、連唔到）就暫停問 2 分鐘：唔好令每個站都等超時先出時間表 */
 let downUntil = 0;
@@ -41,14 +46,14 @@ export async function GET(req: NextRequest) {
   const sta = req.nextUrl.searchParams.get('sta') ?? '';
   if (!isTramStation(sta)) return NextResponse.json({ error: '冇呢個電車站' }, { status: 400, headers: CORS });
   const st = tramStation(sta)!;
-  const [tt, calendar, lives] = await Promise.all([getTramTimetable(), getCalendar(), Promise.all(st.codes.map(nextTram))]);
+  const [tt, calendar, lives] = await Promise.all([getTramTimetable(), getCalendar(), TRY_REALTIME ? Promise.all(st.codes.map(nextTram)) : Promise.resolve([])]);
   const got = lives.filter((x): x is TramEta[] => x !== null);
   // 回應咗但係空（<root/>）都當攞唔到：分唔到係「冇車」定係網站冇提供
   const realtime = got.some((x) => x.length) ? got.flat().sort((a, b) => a.at - b.at) : null;
   const schedule = tt ? tramStopSchedule(tt, calendar, sta, new Date()) : [];
   return NextResponse.json(
-    { sta, fetchedAt: new Date().toISOString(), realtime, realtimeStatus: realtime ? 'ok' : got.length ? 'empty' : 'error', realtimeProblem: realtime ? null : lastProblem, schedule, fare: tt?.fare ?? null },
-    { headers: { ...CORS, 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=15' } },
+    { sta, fetchedAt: new Date().toISOString(), realtime, realtimeStatus: !TRY_REALTIME ? 'off' : realtime ? 'ok' : got.length ? 'empty' : 'error', realtimeProblem: realtime || !TRY_REALTIME ? null : lastProblem, schedule, fare: tt?.fare ?? null },
+    { headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=15' } },
   );
 }
 

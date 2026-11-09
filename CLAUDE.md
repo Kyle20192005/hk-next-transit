@@ -228,6 +228,8 @@ App `src/components/{TramView,TramMap,TramMapSkia,TramStationSheet}.tsx`（`(tab
   - `schedule`：core `tramStopSchedule`，每個目的地下 3 班（約）、而家約幾多分鐘一班（前後一個鐘中位數）、頭尾班；
   - `realtime`：用戶揀咗試電車公司網站「下一班電車」（`hktramways.com/nextTram/geteat.php?stop_code=`，XML，core `parseTramEta`）——
     唔係開放數據、可能隨時停用；**普通請求、唔好偽裝瀏覽器**（試過加 Referer／Cookie 俾安全檢查擋，係啱嘅）；2 秒超時，失敗停問 2 分鐘；回應空（`<root/>`）都當冇。
+    **2026-11-09 測試用唔到**（開發環境回應空 `<root/>`、冇班次；Vercel 香港 2 秒超時，`realtimeProblem` 寫「超時」），
+    所以 `app/api/tram/route.ts` 嘅 `TRY_REALTIME = false`（程式碼保留，`realtimeStatus: 'off'`），每個站即刻用時間表。
     冇實時就用時間表，介面寫明「按運輸署時間表推算」。
 - **路綫圖**（core `tram-map.ts`，`packages/core/tools/tram-layout.py --write`，`--svg 預覽.svg` 出打橫同打直預覽；唔好人手改；唔好照抄電車公司官方路綫圖）：
   用戶要求**打直**：堅尼地城喺頂、筲箕灣喺底；雙軌，右邊東行站、左邊西行站（站名打橫寫喺外面）；站上下位置跟真實里數（投影落主綫），同一條軌太近就成段推開（東西行唔錯開）；
