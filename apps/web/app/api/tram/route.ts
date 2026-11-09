@@ -13,6 +13,8 @@ const NEXT_TRAM = 'https://www.hktramways.com/nextTram/geteat.php?stop_code=';
 const memo = new Map<string, { at: number; v: TramEta[] | null }>();
 /** 網站冇回應（超時、連唔到）就暫停問 2 分鐘：唔好令每個站都等超時先出時間表 */
 let downUntil = 0;
+/** 最近一次攞唔到實時嘅原因（HTTP 狀態、超時等），回應入面俾人睇（診斷用） */
+let lastProblem: string | null = null;
 
 async function nextTram(code: string): Promise<TramEta[] | null> {
   const hit = memo.get(code);
@@ -21,9 +23,14 @@ async function nextTram(code: string): Promise<TramEta[] | null> {
   let v: TramEta[] | null = null;
   try {
     const res = await liveFetch(NEXT_TRAM + encodeURIComponent(code), { signal: AbortSignal.timeout(2000) });
-    if (res.ok) v = parseTramEta(await res.text());
-  } catch {
+    if (res.ok) {
+      const text = await res.text();
+      v = parseTramEta(text);
+      lastProblem = v === null ? `看唔明回應（${text.slice(0, 40)}）` : v.length ? null : '回應冇班次';
+    } else lastProblem = `HTTP ${res.status}`;
+  } catch (e) {
     v = null;
+    lastProblem = (e as Error).name === 'TimeoutError' ? '超時' : `連唔到（${(e as Error).message}）`;
     downUntil = Date.now() + 120_000;
   }
   memo.set(code, { at: Date.now(), v });
@@ -40,7 +47,7 @@ export async function GET(req: NextRequest) {
   const realtime = got.some((x) => x.length) ? got.flat().sort((a, b) => a.at - b.at) : null;
   const schedule = tt ? tramStopSchedule(tt, calendar, sta, new Date()) : [];
   return NextResponse.json(
-    { sta, fetchedAt: new Date().toISOString(), realtime, realtimeStatus: realtime ? 'ok' : got.length ? 'empty' : 'error', schedule, fare: tt?.fare ?? null },
+    { sta, fetchedAt: new Date().toISOString(), realtime, realtimeStatus: realtime ? 'ok' : got.length ? 'empty' : 'error', realtimeProblem: realtime ? null : lastProblem, schedule, fare: tt?.fare ?? null },
     { headers: { ...CORS, 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=15' } },
   );
 }

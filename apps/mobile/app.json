@@ -2,14 +2,14 @@
   "expo": {
     "name": "下一程",
     "slug": "hk-next-transit",
-    "version": "0.27.0",
+    "version": "0.27.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "hk.nexttransit.app",
-      "buildNumber": "86"
+      "buildNumber": "87"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +20,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "hk.nexttransit.app",
-      "versionCode": 86
+      "versionCode": 87
     },
     "web": {
       "favicon": "./assets/favicon.png"
