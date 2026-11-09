@@ -26,7 +26,8 @@ export function FareIcon({ role, size = 22 }: { role: FareRole; size?: number })
 /** 撳站之後喺站上面彈出：揀做起點定終點（深色底，下面有尖角指住個站） */
 export function FarePopover({ onPick }: { onPick: (role: FareRole) => void }) {
   return (
-    <div className="fare-pop" role="menu" aria-label="揀起點定終點" onPointerDown={(e) => e.stopPropagation()}>
+    // 撳選單唔好傳俾地圖（否則地圖當撳咗個站、或者開始拖）
+    <div className="fare-pop" role="menu" aria-label="揀起點定終點" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
       {(['from', 'to'] as const).map((r, i) => (
         <span key={r} className="fare-pop-item">
           {i > 0 && <span className="fare-pop-sep" aria-hidden="true" />}

@@ -113,9 +113,13 @@ export function useMapView({
     }
   };
   const onPointerUp = (e: React.PointerEvent) => {
+    // 唔係喺地圖開始嘅（例如浮喺站上面嘅車費選單，pointerdown 冇傳上嚟）唔理：否則會當再撳一次上次個站
+    if (!pointers.current.has(e.pointerId)) return;
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) gesture.current.pinch = null;
     if (pointers.current.size === 0 && gesture.current.moved < 8 && gesture.current.sta) onStation(gesture.current.sta);
+    // 處理完就清走，唔好下次再用
+    if (pointers.current.size === 0) gesture.current.sta = null;
   };
   // 滑鼠轆：要 passive: false 先可以 preventDefault（唔好捲成頁）
   useEffect(() => {
