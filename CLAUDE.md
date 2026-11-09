@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-「下一程」（NextLeg）：香港公共交通實時到站 App（名嘅意思：下一班 + 旅程，將來有導航）。目前做城巴、九巴（連龍運）、聯營線、新大嶼山巴士、港鐵巴士同港鐵（重鐵路綫圖 + 到站），網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
+「下一程」（NextLeg）：香港公共交通實時到站 App（名嘅意思：下一班 + 旅程，將來有導航）。目前做城巴、九巴（連龍運）、聯營線、新大嶼山巴士、港鐵巴士、港鐵（重鐵路綫圖 + 到站）同輕鐵（路綫圖 + 到站），網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
 App 同網頁版功能一致（四間公司、分頁、收藏、走法、地圖、時間線、巴士位置、班次表、港鐵路綫圖）。舊 App 用嘅 `/api/ctb` 保留。
 
 ## 結構
@@ -99,8 +99,11 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 
 ## 港鐵（重鐵）：路綫圖同到站時間
 
-「路線」分頁 →「港鐵・輕鐵」：自己畫嘅路綫圖，撳站或者搜尋睇到站時間（輕鐵未做）。網頁 `components/rail/{RailView,MtrMap,MtrStationSheet,MtrSearch}.tsx`，
-App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/routes.tsx` 揀港鐵就出地圖，搜尋欄喺標題列）。
+「路線」分頁 →「港鐵・輕鐵」：自己畫嘅路綫圖，左上角切換港鐵／輕鐵（記住上次揀邊個：網頁 sessionStorage、App AsyncStorage `hknt.rail`），
+撳站或者搜尋睇到站時間（輕鐵見下面「輕鐵」）。網頁 `components/rail/{RailView,MtrMap,MtrStationSheet,RailSearch}.tsx`，
+App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/routes.tsx` 揀港鐵就出地圖，搜尋欄喺標題列；港鐵站、輕鐵站一齊搵，港鐵排先）。
+**港鐵、輕鐵共用**：網頁 `useMapView`（拖拉縮放、飛去個站、縮放掣；邊界唔計面板遮住嘅位，地圖邊嘅站都可以移到面板上面正中）、
+`useSheetDrag`（拉板）；App `SchematicMap`（Skia 相機、手勢、飛去個站）、`RailSheet`（`useRailSheet` + `SheetGrab`）、`lib/skia-draw.ts`（筆、寫字）。
 
 - **到站面板**（2026-11，參考港鐵 App 嘅資訊排法，用自己嘅樣式）：唔係彈出視窗，唔遮成幅圖。
   手機（< 768px）係**貼底拉板**（有拉柄）：半開（自動高度，最高 `max(58%, min(100% - 120px, 380px))`）顯示站名、綫分頁、下班車；
@@ -149,6 +152,34 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
   （手機每次要重畫成幅圖，好卡；用 transform 郁已畫好嘅圖、放手先重畫都仲會頓）。站名用 Skia Paragraph（系統字 + 自動後備字型，`locale: 'zh-HK'`），
   以 100 倍大小排版再縮返（`TS`），底色描邊先畫一次再畫字。手勢照用 PanResponder（JS 只計三個數）。
   Expo 網頁預覽（`MtrMap.web.tsx`）：`WithSkiaWeb` 由 jsDelivr 載入 CanvasKit 同 Noto Sans TC（CanvasKit 冇系統字），只係開發測試用。
+
+## 輕鐵：路綫圖同到站時間
+
+「路線」分頁 →「港鐵・輕鐵」→ 左上角揀輕鐵。網頁 `components/rail/{LrtMap,LrtStationSheet}.tsx`，App `src/components/{LrtMap,LrtMapSkia,LrtStationSheet}.tsx`；
+首頁、收藏打開輕鐵站：網頁 Home `openMtr(sta, true)`，App `lib/open-mtr.ts` 嘅 `openLrt`（`/routes?mode=rail&lrt=1&sta=&n=`）。
+
+- 數據：core `lrt-data.ts`（`tools/lrt-data.py`，港鐵開放數據 light_rail_routes_and_stops.csv；同一個站連續兩次只留一次）、`lrt-geo.ts`
+  （`tools/lrt-coords.py`，OSM 站點，附近輕鐵站用）、`lrt.ts`（官方路線色 `LRT_ROUTES`、`parseLrtSchedule`、`lrtStationEtas`、`searchLrtStops`、
+  `nearestLrtStops`、`lrtTrainEta`：Departing「正在離開」、Arriving「即將到站」、「-」→「—」；`lrtCars` 單卡／孖卡）。
+- 到站：`rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule?station_id=`（同巴士 API 同一個 host，計埋上限）。網頁 `/api/lrt?sta=`、tracker `/api/lrt`、
+  前端 `liveClient.lrt`（App `api.lrt`）。tracker 未部署到 `/api/lrt` 會 404，前端自動改問 Vercel。
+- 站面板：經過嘅路線號碼、每個月台嘅班次（號碼、往邊、單／孖卡、時間），30 秒更新；拉板同港鐵面板共用。
+- 車費：`/api/lrt/fare?from=`（`apps/web/lib/lrt-fares.json`，`tools/lrt-fares.py` 由港鐵開放數據 light_rail_fares.csv 生成，加價後重跑）。
+  **介面先隱藏**（2026-11 用戶要求，`LrtStationSheet` 嘅 `SHOW_FARES`）。收費區地圖唔畫。
+- 路綫圖：core `lrt-map.ts` 由 `packages/core/tools/lrt-layout.py --write` 生成（`--svg 預覽.svg` 出預覽、印出檢查結果），**唔好人手改**。
+  網頁 SVG、App Skia（錄一次 SkPicture）用同一份：色綫（SVG path，轉角已係圓弧）、箭咀、站、號碼、站名、圖例。
+  用戶定落嘅畫法（2026-11，改之前問清楚；唔好照抄港鐵官方輕鐵路綫圖，版權）：
+  - 打橫、唔跟地理位置：屯門（左）、天水圍環綫（中上，打橫長方形）、元朗綫（右下）排喺同一條橫帶。屯門部分喺「設計方向」排好再轉 90°（`rot`），
+    幹綫、天水圍、元朗綫喺打橫之後另外排。
+  - 每段路軌行經嘅路線各一條色綫並排，每條有黑色綑邊、綫同綫之間有黑綫（先畫晒黑邊，再畫窄啲嘅色綫）。
+  - 站有軸：出入站沿軸、直行一段先轉彎；彎位統一半徑（並排一齊轉就同心）；同一邊出站幾段先並排，轉得急嘅喺內圈。
+  - 過站之後同一條路線喺返同一行（逐站試晒每段路軌放邊個位，`side_layouts`）。避唔到嘅交叉：分出去嗰條出站後彎出去跨過其他綫
+    （畫喺上面，有自己黑邊）；同一條路線分岔共用一個位；一束可以留空位俾另一條插入（直路軌兩頭空位一致）；幹綫 751 喺鍾屋村—洪水橋之間打斜跨過（`TWIST`）。
+  - 505 經山景／經鳴琴：石排—鳴琴旁邊一個細圈，喺石排南面同建安前面併返一條（匯合點 `J505N`、`J505S`，唔係站）。
+  - 兩條或以上色綫經過嘅站係膠囊（白底黑邊）；只得一條嘅係圓點。單方向色綫有白色箭咀。
+  - 終點站號碼（`CAPS`）：一律同條綫對正中，喺度完嘅綫入站前散開。盡頭站（元朗、屯門碼頭）號碼排一行／兩行，白色膠囊喺後面沿號碼方向拉長；
+    兆康、天逸（`PILL_COVERS_CAPS`）、天水圍站膠囊拉長包埋號碼；田景號碼蓋喺站；三聖、友愛係圓點，號碼蓋喺上面；天水圍 705／706 兩邊散開穿過自己個號碼。
+- 未做：輕鐵收藏、首頁大卡（附近輕鐵站）、最近睇過。
 
 ## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）
 
@@ -419,7 +450,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   `unknown`（「冇時間表資料」，灰色），唔好寫「今日沒有班次」；「班次」掣只計有時間表嘅走法。
 - 賽馬日改路等按事件嘅走法：政府數據冇。
 - ETA `seq` 規律只喺 38 號驗證過。
-- 輕鐵、小巴、電車、渡輪、導航（點到點）未做（港鐵重鐵做咗，見上面「港鐵」）。介面已經預留（2026-11，用戶要求）：底部分頁「首頁／路線／導航／收藏／設定」，
+- 小巴、電車、渡輪、導航（點到點）未做（港鐵、輕鐵做咗，見上面「港鐵」「輕鐵」）。介面已經預留（2026-11，用戶要求）：底部分頁「首頁／路線／導航／收藏／設定」，
   導航顯示「功能即將推出」（將來做好，首頁「你想去邊？」直接用）；「路線」標題下面、搜尋欄上面一行交通工具分類（core `TRANSPORT_MODES`，`ready: false` 嘅揀咗就收埋搜尋欄同鍵盤，
   只顯示「功能即將推出」）。網頁 `components/home/{ComingSoon,Navigation,Settings}.tsx`，App `src/app/(tabs)/{navigation,settings}.tsx` + `ui.tsx` 嘅 `ComingSoon`。
   加新交通工具：喺 `TRANSPORT_MODES` 改 `ready: true` 再接返列表。附近同收藏將來包埋所有交通工具；首頁標題「下一程」。

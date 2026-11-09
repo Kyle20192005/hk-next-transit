@@ -98,6 +98,8 @@ export function createLiveClient(opts: {
     here: (lat: number, lng: number) => area(`/api/here?lat=${lat}&lng=${lng}`),
     /** 港鐵站所有綫嘅到站時間 */
     mtr: (sta: string) => get(`/api/mtr?sta=${encodeURIComponent(sta)}`),
+    /** 輕鐵站每個月台嘅到站時間 */
+    lrt: (sta: string) => get(`/api/lrt?sta=${encodeURIComponent(sta)}`),
     /** 而家係咪用緊 tracker（除錯用） */
     usingTracker: () => Boolean(tracker) && now() >= downUntil,
   };

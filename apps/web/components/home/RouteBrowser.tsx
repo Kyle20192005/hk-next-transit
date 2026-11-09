@@ -5,8 +5,8 @@ import CompanyTag from '@/components/CompanyTag';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { TRANSPORT_MODES, orderedModes, placeMatches, radiusLabel, type PlaceMatch, type RouteIndex, type StopRouteHit, type TransportMode } from '@hknt/core';
 import ComingSoon from './ComingSoon';
-import RailView from '../rail/RailView';
-import MtrSearch from '../rail/MtrSearch';
+import RailView, { type RailPick } from '../rail/RailView';
+import RailSearch from '../rail/RailSearch';
 import Keypad from './Keypad';
 import Logo from '@/components/Logo';
 import Icon from '@/components/Icon';
@@ -38,8 +38,8 @@ export default function RouteBrowser({
   /** 「附近巴士站」捷徑 */
   onNearby: () => void;
   /** 港鐵：要打開嘅站（搜尋、首頁大卡、收藏）；每次新 object 就飛去一次 */
-  railPick: { sta: string } | null;
-  onRailPick: (sta: string) => void;
+  railPick: RailPick | null;
+  onRailPick: (sta: string, lrt: boolean) => void;
 }) {
   const [code, setCode] = useState(''); // 路線號碼（鍵盤）
   const [place, setPlace] = useState<string | null>(null); // 地點搜尋（null = 用緊號碼鍵盤）
@@ -153,7 +153,7 @@ export default function RouteBrowser({
           ))}
         </div>
         {!modeInfo.ready ? null : mode === 'rail' ? (
-          <MtrSearch onPick={onRailPick} />
+          <RailSearch onPick={onRailPick} />
         ) : place === null ? (
           <button className="search-field" onClick={usePlace} aria-label="搜尋路線">
             <Icon name="search" size={20} className="search-icon" />
