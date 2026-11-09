@@ -55,21 +55,21 @@ def put(name, x, y, axis):
 
 MID = 21.4                     # 天水圍環綫中綫、坑尾村
 W, E = MID - 2, MID + 2        # 環綫西、東
-for n, y in [('天逸', 0.3), ('天富', 1.25), ('頌富', 2.2), ('天瑞', 4.1), ('樂湖', 5.55), ('天耀', 7.0)]: put(n, W, y, 'v')
-for n, y in [('濕地公園', 0.1), ('天秀', 0.9), ('天悅', 1.7), ('天榮', 3.9), ('銀座', 4.7), ('天湖', 5.45), ('天慈', 6.2), ('天水圍', 7.0)]: put(n, E, y, 'v')
-put('天恒', MID, -0.9, 'h')
-YCW = 3.05                     # 翠湖
+for n, y in [('天逸', -1.65), ('天富', -0.45), ('頌富', 0.75), ('天瑞', 3.8), ('樂湖', 5.4), ('天耀', 7.0)]: put(n, W, y, 'v')
+for n, y in [('濕地公園', -1.65), ('天秀', -0.45), ('天悅', 0.75), ('天榮', 2.45), ('銀座', 3.6), ('天湖', 4.75), ('天慈', 5.9), ('天水圍', 7.0)]: put(n, E, y, 'v')
+YTOP = -2.65                   # 天恒一行
+put('天恒', MID, YTOP, 'h')
+YCW = 1.6                      # 翠湖
 put('翠湖', MID, YCW, 'h')
 put('坑尾村', MID, 10.5, 'v')
 BY = 13.1                      # 元朗綫
 put('洪水橋', MID - 0.9, BY + 0.9, 'd1')
 put('塘坊村', MID + 3.0, BY, 'h')
-for i, n in enumerate(['屏山', '水邊圍', '豐年路', '康樂路', '大棠路', '元朗']): put(n, MID + 4.5 + i * 1.5, BY, 'h')
 # 幹綫：洪水橋 → 兆康（x + y = 34.5）
 for i, n in enumerate(['鍾屋村', '泥圍', '藍地']): put(n, 19.5 - i, 15.0 + i, 'd1')
-KX, KY = 16.0, 19.2
+KX, KY = 16.6, 18.5            # 兆康（同麒麟一行之間留位，505 號碼放得落）
 put('兆康', KX, KY, 'v')
-Y1 = KY + 1.0                  # 屯門北一行
+Y1 = KY + 1.7                  # 屯門北一行
 for n, x in [('麒麟', 14.0), ('青松', 12.2), ('建生', 10.4), ('田景', 8.6)]: put(n, x, Y1, 'h')
 XW = 7.6                       # 西面直綫
 put('良景', XW, 21.2, 'v')
@@ -88,17 +88,17 @@ put('河田', ZX, 26.5, 'v')
 XS = XW + 0.75
 put('石排', XW, 24.2, 'v')
 put_join('J505N', XW, 24.75, 'v')  # 山景嗰邊喺石排南面併返入主綫
-put('鳴琴', XW, 26.0, 'v')
+put('鳴琴', XW, 27.25, 'v')
 put('山景(北)', XS, 26.25, 'v')
-put('山景(南)', XS, 26.85, 'v')
-put_join('J505S', XS, 27.85, 'v')  # 兩邊喺度併返一條紅綫
-put('建安', XS, 28.3, 'v')
-YK = 29.1                      # 建安 → 屯門
+put('山景(南)', XS, 28.0, 'v')
+put_join('J505S', XS, 29.1, 'v')   # 兩邊喺度併返一條紅綫
+put('建安', XS, 29.55, 'v')
+YK = 30.35                     # 建安 → 屯門
 YT = YK + 0.8                  # 屯門
 put('屯門', ZX, YT, 'v')
 YP = YT + 0.8                  # 杯渡一行
 put('市中心', ZX, YT + 1.6, 'v')
-put('杯渡', 14.4, YP, 'h')
+put('杯渡', ZX + 1.6, YP, 'h')
 put('安定', ZX, YT + 3.2, 'v')
 XY = ZX - 2.4
 put('友愛', XY, YT + 3.2, 'v')
@@ -106,16 +106,16 @@ put('兆麟', ZX, YT + 4.8, 'v')
 put('三聖', ZX + 1.6, YT + 5.6, 'h')
 DS2 = ZX + YT + 5.6            # 豐景園 → 兆禧：x + y = DS2
 XV = ZX - 0.8                  # 豐景園 → 兆禧 打直
-for n, y in [('豐景園', 37.0), ('海皇路', 38.0), ('兆禧', 39.0)]: put(n, XV, y, 'v')
-YF = 40.0                      # 屯門碼頭（橫軸：主綫由西面、兆禧嗰邊由東面入站，號碼排兩行）
+for n, y in [('豐景園', YT + 7.3), ('海皇路', YT + 8.8), ('兆禧', YT + 10.3)]: put(n, XV, y, 'v')
+YF = YT + 11.3                 # 屯門碼頭（橫軸：主綫由西面、兆禧嗰邊由東面入站，號碼排兩行）
 put('屯門碼頭', (XW + XV) / 2, YF, 'h')
-for i, n in enumerate(['青雲', '青山村', '龍門', '輕鐵車廠', '蝴蝶', '美樂']): put(n, XW, 28.2 + i * (YF - 1.9 - 28.2) / 5, 'v')
+for i, n in enumerate(['青雲', '青山村', '龍門', '輕鐵車廠', '蝴蝶', '美樂']): put(n, XW, 28.8 + i * (YF - 1.9 - 28.8) / 5, 'v')
 for i, n in enumerate(['鳳地', '景峰', '新墟', '何福堂']): put(n, KX, KY + 2.5 + i * (YP - 1.0 - KY - 2.5) / 3, 'v')
 
 # 路軌彎位：(甲, 乙) → 中間轉角點（由甲行去乙，中綫座標）
 BENDS = {
-    ('天恒', '天逸'): [(W, -0.9)],
-    ('天恒', '濕地公園'): [(E, -0.9)],
+    ('天恒', '天逸'): [(W, YTOP)],
+    ('天恒', '濕地公園'): [(E, YTOP)],
     ('頌富', '翠湖'): [(W, YCW)],
     ('翠湖', '天榮'): [(E, YCW)],
     ('天耀', '天水圍'): [(W, 7.8), (E, 7.8)],
@@ -124,7 +124,7 @@ BENDS = {
     ('坑尾村', '塘坊村'): [(MID, 11.2), (MID + 1.9, BY)],
     ('坑尾村', '洪水橋'): [(MID, BY)],
     ('洪水橋', '塘坊村'): [(MID, BY)],
-    ('藍地', '兆康'): [(KX, KY - 0.7)],
+    ('藍地', '兆康'): [(KX, 34.5 - KX)],
     ('兆康', '麒麟'): [(KX, Y1)],
     ('兆康', '屯門醫院'): [(KX, YH)],
     ('田景', '良景'): [(XW, Y1)],
@@ -134,7 +134,7 @@ BENDS = {
     ('澤豐', '蔡意橋'): [(ZX, RY)],
     ('銀圍', '蔡意橋'): [(ZX, RY)],
     ('J505N', '山景(北)'): [(XW, 24.97), (XS, 25.72)],
-    ('鳴琴', 'J505S'): [(XW, 26.55), (XS, 27.3)],
+    ('鳴琴', 'J505S'): [(XW, 27.8), (XS, 28.55)],
     ('建安', '屯門'): [(XS, YK), (ZX, YK)],
     ('市中心', '杯渡'): [(ZX, YP)],
     ('杯渡', '何福堂'): [(KX, YP)],
@@ -168,9 +168,10 @@ CHAIN_ORDER = [
 #   stack = 盡頭站：色綫入站前散開，每條駁住自己個號碼，成排號碼就係個站（白色膠囊包住）；兩邊都有綫入站就排兩行
 #   end   = 中途終點站：喺度完嘅綫，號碼擺喺條綫嘅尾（喺站度，向外伸出）；同一邊幾條並排就前後錯開，外面嗰條喺前面完
 #           end:-1 = 循環綫：由呢邊入站嗰啲綫當係完（喺度切開個圈）
+#   side+／side- = 循環綫起點：號碼並排喺站膠囊嗰頭（天水圍向環綫入面）
 #   tail  = 只得一條綫嘅盡頭站：站係圓點，色綫穿過圓點再駁住號碼
 #   dot+／dot- = 只得一條綫嘅中途終點站：站係圓點，號碼喺旁邊（+／- = 法綫方向）
-CAPS = {'元朗': 'stack', '三聖': 'tail', '屯門碼頭': 'stack', '友愛': 'dot-', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'end:-1'}
+CAPS = {'元朗': 'stack', '三聖': 'tail', '屯門碼頭': 'stack', '友愛': 'dot-', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'side+'}
 # 站名位置
 LABELS = {}
 for n in ['天逸', '天富', '頌富', '天瑞', '樂湖', '天耀']: LABELS[n] = 'w'
@@ -192,6 +193,23 @@ LEGEND_ROWS = [('505', '三聖 ↔ 兆康'), ('507', '屯門碼頭 ↔ 田景'),
                ('615', '屯門碼頭 ↔ 元朗'), ('615P', '屯門碼頭 ↔ 兆康'), ('705', '天水圍循環綫'), ('706', '天水圍循環綫'), ('751', '友愛 ↔ 天逸'), ('761P', '天逸 ↔ 元朗')]
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# 打橫（2026-11，用戶要求：唔理地理位置，成張圖打橫）：以上座標喺「設計方向」排（天水圍喺上），
+# 成張轉 90°（順時針）：屯門喺左、天水圍喺右；之後元朗綫喺新方向另外排（打橫向東）。
+def rot(p): return (round(-p[1], 4), round(p[0], 4))
+for k in list(P): P[k] = rot(P[k])
+AXIS = {k: {'h': 'v', 'v': 'h', 'd1': 'd2', 'd2': 'd1'}[a] for k, a in AXIS.items()}
+BENDS = {k: [rot(q) for q in v] for k, v in BENDS.items()}
+LABELS = {k: {'n': 'e', 'e': 's', 's': 'w', 'w': 'n', 'ne': 'se', 'se': 'sw', 'sw': 'nw', 'nw': 'ne'}[v] for k, v in LABELS.items()}
+XT_, YT_ = P[sid('塘坊村')]
+YYL = YT_ + 1.6                # 元朗綫：塘坊村向南再轉東
+for i, n in enumerate(['屏山', '水邊圍', '豐年路', '康樂路', '大棠路', '元朗']):
+    put(n, XT_ + 1.6 + i * 1.5, YYL, 'h')
+    LABELS[n] = 's' if i % 2 == 0 else 'n'
+BENDS[('塘坊村', '屏山')] = [(XT_, YYL)]
+LEGEND = (-13.5, 7.0, 11.6, 5.4)
+LABELS.update({'蔡意橋': 'nw'})
+
 missing = [STOPS[s][0] for s in STOPS if s not in P]
 if missing: sys.exit(f'未排嘅站：{missing}')
 S2 = 1 / math.sqrt(2)
@@ -237,7 +255,7 @@ def other(e, s): return next(x for x in e if x != s)
 def geom(u, v): return [P[u], *bends.get((u, v), []), P[v]]
 def oriented(u, v):
     dx, dy = P[v][0] - P[u][0], P[v][1] - P[u][1]
-    fwd = dx > 0 if abs(dx) > 1e-9 else dy < 0
+    fwd = dy > 0 if abs(dy) > 1e-9 else dx > 0     # 等於轉之前嘅「向右／向上」
     return (u, v) if fwd else (v, u)
 
 errors = []
@@ -614,6 +632,15 @@ for name, mode in CAPS.items():
                 o = items[0][0] + e * (DOT + 0.06 + capN / 2)
                 caps.append({'route': r, 'x': round(px + N[0] * o, 4), 'y': round(py + N[1] * o, 4), 'sta': s})
             continue
+        if mode.startswith('side'):
+            e = 1 if mode.endswith('+') else -1
+            half = m['r'] if m['kind'] == 'dot' else m['len'] / 2
+            k = len(rs)
+            for j, r in enumerate(rs):
+                on = c + e * (half + capN / 2 - 0.08)
+                oa = ((k - 1) / 2 - j) * (capA + 0.06)
+                caps.append({'route': r, 'x': round(px + N[0] * on + ax[0] * oa, 4), 'y': round(py + N[1] * on + ax[1] * oa, 4), 'sta': s})
+            continue
         if mode == 'tail':
             for r, items in term.items():
                 o, sd, lane, first = items[0]
@@ -725,7 +752,7 @@ for r, pts in all_lanes:
     if poly_hits(pts, (lx, ly, lw, lh), 0.1): errors.append(f'{r} 綫入咗圖例'); break
 
 xs = [m['x'] for m in markers.values()] + [l['box'][0] for l in labels.values()] + [l['box'][0] + l['box'][2] for l in labels.values()] + [c['x'] + CAP_W / 2 for c in caps] + [c['x'] - CAP_W / 2 for c in caps] + [lx + lw]
-ys = [m['y'] for m in markers.values()] + [l['box'][1] for l in labels.values()] + [l['box'][1] + l['box'][3] for l in labels.values()] + [c['y'] + CAP_H / 2 for c in caps] + [ly + lh, -0.9 - 0.4]
+ys = [m['y'] for m in markers.values()] + [l['box'][1] for l in labels.values()] + [l['box'][1] + l['box'][3] for l in labels.values()] + [c['y'] + CAP_H / 2 for c in caps] + [ly + lh]
 VIEW = (round(min(xs) - 0.6, 2), round(min(ys) - 0.6, 2), round(max(xs) - min(xs) + 1.2, 2), round(max(ys) - min(ys) + 1.2, 2))
 
 print(f'{len(P)} 個站、{len(edges)} 段路軌、{len(lanes)} 條色綫、{len(caps)} 個號碼、{len(arrows)} 個箭咀；範圍 {VIEW}', file=sys.stderr)
