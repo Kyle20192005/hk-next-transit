@@ -211,7 +211,7 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
 /** 圖例：左上角空位（core MTR_MAP_LEGEND，排版工具保證唔撞綫同站名）。綫兩欄，下面四個符號 */
 function MapLegend() {
   const L = MTR_MAP_LEGEND;
-  const col = (i: number) => 0.4 + i * 5.2;
+  const col = (i: number) => 0.4 + i * 5.3;
   const rowY = (i: number) => 1.3 + i * 0.62;
   const symY = (i: number) => rowY(5) + 0.12 + i * 0.62;
   const R = MTR_MAP_DOT_R;
@@ -256,7 +256,8 @@ function MapLegend() {
             <line key="ta" x1={a - MTR_MAP_GAP / 2} y1={y} x2={a + MTR_MAP_GAP / 2} y2={y} stroke={MTR_LINES[0]!.color} strokeWidth={MTR_MAP_TICK.width} />,
             <line key="tb" x1={b - MTR_MAP_GAP / 2} y1={y} x2={b + MTR_MAP_GAP / 2} y2={y} stroke={MTR_LINES[1]!.color} strokeWidth={MTR_MAP_TICK.width} />,
           ];
-        } else if (sym.kind === 'walk') icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} className="mtr-link dashed" />;
+        } else if (sym.kind === 'link') icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} className="mtr-link" />;
+        else if (sym.kind === 'walk') icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} className="mtr-link dashed" />;
         else icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} stroke={MTR_LINES.find((l) => l.code === 'EAL')!.color} strokeWidth={MTR_MAP_GAP} className="mtr-line dashed" />;
         return (
           <g key={sym.kind}>
