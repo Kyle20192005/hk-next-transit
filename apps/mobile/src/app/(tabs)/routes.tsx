@@ -27,7 +27,7 @@ export default function RoutesTab() {
   const [place, setPlace] = useState<string | null>(null);
   // 交通工具：暫時只有巴士做好；首頁捷徑會帶 ?mode= 過嚟
   // 首頁大字、大卡、收藏撳港鐵站：?mode=rail&sta=XXX&n=（n 每次唔同，同一個站都會再飛）
-  const params = useLocalSearchParams<{ mode?: string; sta?: string; n?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; sta?: string; n?: string; lrt?: string }>();
   // 設定「交通工具優先」：預設揀邊款、分類次序
   const { priority } = usePrefs();
   const [mode, setMode] = useState<TransportMode>(priority === 'rail' ? 'rail' : 'bus');
@@ -124,7 +124,7 @@ export default function RoutesTab() {
             <TextInput
               value={railQ}
               onChangeText={setRailQ}
-              placeholder="搜尋車站，例如 旺角、Mong Kok"
+              placeholder="搜尋港鐵站、輕鐵站，例如 旺角、天水圍"
               placeholderTextColor={t.muted}
               returnKeyType="search"
               autoCorrect={false}
@@ -171,7 +171,7 @@ export default function RoutesTab() {
       </AppBar>
 
       {rail ? (
-        <RailView query={railQ} onPicked={() => setRailQ('')} open={params.sta ? { sta: params.sta, n: params.n ?? '' } : null} />
+        <RailView query={railQ} onPicked={() => setRailQ('')} open={params.sta ? { sta: params.sta, n: params.n ?? '', lrt: params.lrt === '1' } : null} />
       ) : !modeInfo.ready ? (
         <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
       ) : error ? (

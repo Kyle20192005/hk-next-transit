@@ -148,7 +148,7 @@ export function RouteChip({ r }: { r: string }) {
 }
 
 function TrainRow({ t, fmt, now }: { t: LrtTrain; fmt: 'minutes' | 'clock'; now: number }) {
-  const e = lrtTrainEta(t, fmt, now || Date.now());
+  const e = lrtTrainEta(t, fmt, now);
   return (
     <div className="mtr-next-row lrt-row">
       <RouteChip r={t.route} />

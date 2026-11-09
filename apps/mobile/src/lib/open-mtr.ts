@@ -7,3 +7,8 @@ import { router } from 'expo-router';
 export function openMtr(sta: string) {
   router.navigate({ pathname: '/routes', params: { mode: 'rail', sta, n: String(Date.now()) } });
 }
+
+/** 打開輕鐵路綫圖嗰個站（首頁、收藏）：同 openMtr 一樣，lrt=1 */
+export function openLrt(sta: string) {
+  router.navigate({ pathname: '/routes', params: { mode: 'rail', sta, lrt: '1', n: String(Date.now()) } });
+}
