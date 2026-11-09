@@ -199,7 +199,7 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
   - 最近睇過：打開輕鐵站記低（core `lrtRecent`，`co: 'lrt'`），撳返開輕鐵圖。
   - 附近車站頁：巴士站、範圍內嘅港鐵站同輕鐵站按距離混埋排，鐵路站卡每條綫／路線每個方向下一班，撳入路綫圖。
   - 站面板路線號碼撳得：路綫圖標出成條路線（其他淡咗，core `lrtRouteStopIds`），左上角標籤「[610] 屯門碼頭 ↔ 元朗 ✕」（`lrtRouteName`）；
-    網頁 SVG 蓋一層半透明再畫返嗰條路線，App 每個主題 + 路線錄一張 SkPicture 疊喺 overlay。轉圖、搜尋、轉乘就取消。
+    網頁 SVG 喺所有站之後（站同站名都要淡咗）蓋一層半透明再畫返嗰條路線，揀咗嘅站框補畫喺最上面；App 每個主題 + 路線錄一張 SkPicture 疊喺 overlay。轉圖、搜尋、轉乘就取消。
 - 未做：收費區、車費（數據有，介面收埋）。
 
 ## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）

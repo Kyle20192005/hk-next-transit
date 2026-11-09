@@ -66,8 +66,6 @@ export default function LrtMap({
           {LRT_MAP_ARROWS.map((a, i) => (
             <path key={`a${i}`} d="M-0.035 -0.042 L0.025 0 L-0.035 0.042" className="lrt-arrow" transform={`translate(${a.x} ${a.y}) rotate(${a.a})`} />
           ))}
-          {/* 標出一條路線：成幅圖蓋一層半透明底色，再喺上面畫返呢條路線嘅色綫、站、號碼、站名（唔接收撳，撳照落到下面嘅站） */}
-          {route && <RouteHighlight route={route} />}
           {near.map((id) => {
             const s = byId.get(id);
             return s ? <Ring key={`near-${id}`} s={s} className="mtr-near" /> : null;
@@ -94,6 +92,10 @@ export default function LrtMap({
               </text>
             </g>
           ))}
+          {/* 標出一條路線：最後先畫，成幅圖（連站、站名）蓋一層半透明底色，再喺上面畫返呢條路線嘅色綫、站、號碼、站名；
+              揀咗嘅站框補畫喺最上面。唔接收撳，撳照落到下面嘅站 */}
+          {route && <RouteHighlight route={route} />}
+          {route && selected && byId.get(selected) && <Ring s={byId.get(selected)!} className="mtr-focus lrt-hl" />}
         </svg>
       )}
       <div className={size.h - inset.bottom < 110 ? 'mtr-zoom row hidden' : size.h - inset.bottom < 200 ? 'mtr-zoom row' : 'mtr-zoom'} style={{ bottom: 12 + inset.bottom, right: 12 + inset.right }} onPointerDown={(e) => e.stopPropagation()}>
