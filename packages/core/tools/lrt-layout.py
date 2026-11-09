@@ -168,8 +168,9 @@ CHAIN_ORDER = [
 #   stack = 盡頭站：色綫入站前散開，每條駁住自己個號碼，成排號碼就係個站（白色膠囊包住）；兩邊都有綫入站就排兩行
 #   end   = 中途終點站：喺度完嘅綫，號碼擺喺條綫嘅尾（喺站度，向外伸出）；同一邊幾條並排就前後錯開，外面嗰條喺前面完
 #           end:-1 = 循環綫：由呢邊入站嗰啲綫當係完（喺度切開個圈）
-#   dot   = 只得一條綫嘅站：號碼就係個站
-CAPS = {'元朗': 'stack', '三聖': 'stack', '屯門碼頭': 'stack', '友愛': 'dot', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'end:-1'}
+#   tail  = 只得一條綫嘅盡頭站：站係圓點，色綫穿過圓點再駁住號碼
+#   dot+／dot- = 只得一條綫嘅中途終點站：站係圓點，號碼喺旁邊（+／- = 法綫方向）
+CAPS = {'元朗': 'stack', '三聖': 'tail', '屯門碼頭': 'stack', '友愛': 'dot-', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'end:-1'}
 # 站名位置
 LABELS = {}
 for n in ['天逸', '天富', '頌富', '天瑞', '樂湖', '天耀']: LABELS[n] = 'w'
@@ -607,13 +608,21 @@ for name, mode in CAPS.items():
             if cut_side is not None and sd != cut_side: continue
             q = pts[0] if u == s else pts[-1]
             term.setdefault(r, []).append(((q[0] - px) * N[0] + (q[1] - py) * N[1], sd, lane, u == s))
-        if mode == 'dot':
+        if mode.startswith('dot'):
+            e = 1 if mode.endswith('+') else -1
             for r, items in term.items():
-                o = items[0][0]
-                cx, cy = px + N[0] * o, py + N[1] * o
+                o = items[0][0] + e * (DOT + 0.06 + capN / 2)
+                caps.append({'route': r, 'x': round(px + N[0] * o, 4), 'y': round(py + N[1] * o, 4), 'sta': s})
+            continue
+        if mode == 'tail':
+            for r, items in term.items():
+                o, sd, lane, first = items[0]
+                out = (-ax[0] * sd, -ax[1] * sd)
+                q = (px + N[0] * o, py + N[1] * o)
+                t = DOT + 0.1 + capA / 2
+                cx, cy = q[0] + out[0] * t, q[1] + out[1] * t
+                cap_lanes.append((r, [q, (cx, cy)]))
                 caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4), 'sta': s})
-                w, h = (capA + 0.1, capN + 0.3) if vertN else (capN + 0.3, capA + 0.1)
-                markers[s] = {'kind': 'box', 'x': round(cx, 4), 'y': round(cy, 4), 'w': round(w, 4), 'h': round(h, 4)}
             continue
         groups = {}
         for r, items in term.items():
