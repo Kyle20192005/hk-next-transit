@@ -6,6 +6,8 @@ import { useColorScheme } from 'react-native';
  */
 const light = {
   bg: '#f2f3f5',
+  /** 港鐵路綫圖嘅海（同網頁 --water） */
+  water: '#d9edf9',
   card: '#ffffff',
   surface2: '#f6f7f9',
   text: '#111318',
@@ -25,6 +27,7 @@ const light = {
 };
 const dark: typeof light = {
   bg: '#0b0d11',
+  water: '#10283a',
   card: '#161920',
   surface2: '#1d2128',
   text: '#edeef1',

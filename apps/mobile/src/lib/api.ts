@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createLiveClient, isCo, type Co, type Calendar, type Company, type Eta, type NewsItem, type RouteData, type RouteIndex, type StopRouteHit } from '@hknt/core';
+import { createLiveClient, isCo, type Co, type Calendar, type Company, type Eta, type MtrLineEtas, type NewsItem, type RouteData, type RouteIndex, type StopRouteHit } from '@hknt/core';
 
 /**
  * 後端 = apps/web 嘅 API。預設用線上網站（手機連唔到電腦嘅 localhost）；
@@ -81,6 +81,8 @@ export const api = {
   stopSearch: (query: string) => get<{ q: string; routes: StopRouteHit[] }>(`/api/stop-search?q=${encodeURIComponent(query)}`),
   nearby: (lat: number, lng: number, r = 600) => get<{ stops: NearStop[]; area?: { n: string; en: string | null } | null }>(`/api/nearby?lat=${lat}&lng=${lng}&r=${r}`),
   /** 一個站所有路線嘅下一班 */
+  /** 港鐵站到站時間（tracker 優先）：每條綫兩個方向；failed = 攞唔到嘅綫 */
+  mtr: (sta: string) => liveJson<{ sta: string; lines: MtrLineEtas[]; failed: string[] }>(live.mtr(sta)),
   stopEtas: (co: Co, stop: string) =>
     liveJson<{ routes: { route: string; dir: 'O' | 'I'; etas: { eta: string; company: Company; scheduled: boolean }[] }[] }>(live.stopEtas(co, stop)),
 };

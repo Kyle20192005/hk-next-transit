@@ -88,7 +88,7 @@ export default function MtrStationSheet({ sta, onClose }: { sta: string; onClose
                       {plats.length === 1 && <span className="mtr-plat">{plats[0]} 號月台</span>}
                     </div>
                     {!d.trains.length ? (
-                      <div className="muted">暫時冇班次</div>
+                      <div className="muted">{sta === 'RAC' ? '暫時冇班次（只喺賽馬日開放）' : '暫時冇班次'}</div>
                     ) : dests.length === 1 && plats.length === 1 ? (
                       <div className="mtr-etas">
                         <EtaInline ats={d.trains.map((t) => Date.parse(t.time))} now={now} />

@@ -5,6 +5,8 @@ import { TRANSPORT_MODES, orderedModes, placeMatches, radiusLabel, type PlaceMat
 import { api, type Co } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { AppBar, Brand, BRAND_ROW, ComingSoon, CompanyTag } from '@/components/ui';
+import { MtrMap } from '@/components/MtrMap';
+import { MtrStationSheet } from '@/components/MtrStationSheet';
 import { Icon } from '@/components/Icon';
 import { Keypad } from '@/components/Keypad';
 import { preloadRoute, warmRoute } from '@/lib/prefetch';
@@ -40,8 +42,10 @@ export default function RoutesTab() {
     setMode(priority === 'rail' ? 'rail' : 'bus');
   }
   // 港鐵路綫圖網頁版做咗，App 版未做：App 暫時當未 ready（顯示「功能即將推出」）
-  const baseMode = TRANSPORT_MODES.find((m) => m.id === mode)!;
-  const modeInfo = mode === 'rail' ? { ...baseMode, ready: false } : baseMode;
+  const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
+  // 港鐵：路綫圖（唔使搜尋欄同鍵盤）
+  const rail = mode === 'rail';
+  const [railSta, setRailSta] = useState<string | null>(null);
   const list = useRef<FlatList<PlaceMatch<Route>>>(null);
 
   const fetchRoutes = () => api.routes().then((r) => setRoutes(r.routes)).catch((e: Error) => setError(e.message));
@@ -113,7 +117,7 @@ export default function RoutesTab() {
             );
           })}
         </ScrollView>
-        {modeInfo.ready && (
+        {modeInfo.ready && !rail && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingLeft: 14, paddingRight: 8, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
           <Icon name="search" size={20} color={t.muted} />
           {place === null ? (
@@ -144,7 +148,12 @@ export default function RoutesTab() {
         )}
       </AppBar>
 
-      {!modeInfo.ready ? (
+      {rail ? (
+        <>
+          <MtrMap selected={railSta} onStation={setRailSta} />
+          {railSta && <MtrStationSheet sta={railSta} onClose={() => setRailSta(null)} />}
+        </>
+      ) : !modeInfo.ready ? (
         <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
       ) : error ? (
         <Pressable onPress={load} style={{ padding: 24, alignItems: 'center' }}>
@@ -169,7 +178,7 @@ export default function RoutesTab() {
         />
       )}
 
-      {modeInfo.ready && place === null && routes && (
+      {modeInfo.ready && !rail && place === null && routes && (
         <Keypad nextChars={nextChars} onKey={(k) => setCode((c) => c + k)} onBack={() => setCode((c) => c.slice(0, -1))} onPlace={() => setPlace('')} canBack={code.length > 0} />
       )}
     </View>
