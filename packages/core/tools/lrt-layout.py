@@ -40,7 +40,13 @@ ORDER = ['761P', '705', '706', '751', '615', '615P', '505', '507', '610', '614',
 # 站位置（x 向右、y 向下）同軸（h 橫、v 直、d1 東北—西南、d2 西北—東南）
 P, AXIS = {}, {}
 NAME = {v[0]: k for k, v in STOPS.items()}
-def sid(n): return n if n in STOPS else NAME[n]
+VIRTUAL = set()                # 唔係站嘅匯合點（例如 505 兩個方向喺建安前併返一條）
+def sid(n): return n if n in STOPS or n in VIRTUAL else NAME[n]
+def nm_(s): return STOPS[s][0] if s in STOPS else s
+def put_join(name, x, y, axis):
+    VIRTUAL.add(name)
+    P[name] = (round(x, 4), round(y, 4))
+    AXIS[name] = axis
 def put(name, x, y, axis):
     s = sid(name)
     P[s] = (round(x, 4), round(y, 4))
@@ -80,11 +86,12 @@ put('河田', ZX, 26.5, 'v')
 # 505 經山景／經鳴琴：山景兩個站喺石排—鳴琴旁邊行一條平行綫，兩邊喺建安會合（似港鐵地圖嘅細圈）
 XS = XW + 0.75
 put('石排', XW, 24.2, 'v')
-put('鳴琴', XW, 26.05, 'v')
+put('鳴琴', XW, 25.85, 'v')
 put('山景(北)', XS, 26.05, 'v')
-put('山景(南)', XS, 26.85, 'v')
-put('建安', XS, 27.9, 'v')
-YK = 28.7                      # 建安 → 屯門
+put('山景(南)', XS, 26.7, 'v')
+put_join('J505', XS, 27.7, 'v')   # 兩邊喺度併返一條紅綫
+put('建安', XS, 28.15, 'v')
+YK = 28.95                     # 建安 → 屯門
 YT = YK + 0.8                  # 屯門
 put('屯門', ZX, YT, 'v')
 YP = YT + 0.8                  # 杯渡一行
@@ -124,7 +131,7 @@ BENDS = {
     ('澤豐', '蔡意橋'): [(ZX, RY)],
     ('銀圍', '蔡意橋'): [(ZX, RY)],
     ('石排', '山景(北)'): [(XW, 24.75), (XS, 25.5)],
-    ('鳴琴', '建安'): [(XW, 26.6), (XS, 27.35)],
+    ('鳴琴', 'J505'): [(XW, 26.4), (XS, 27.15)],
     ('建安', '屯門'): [(XS, YK), (ZX, YK)],
     ('市中心', '杯渡'): [(ZX, YP)],
     ('杯渡', '何福堂'): [(KX, YP)],
@@ -135,7 +142,7 @@ BENDS = {
     ('兆禧', '屯門碼頭'): [(XW, DS2 - XW)],
 }
 # 唔停站經過（615 青松 → 兆康 經麒麟唔停）
-VIA = {('青松', '兆康'): ['麒麟']}
+VIA = {('青松', '兆康'): ['麒麟'], ('鳴琴', '建安'): ['J505'], ('山景(南)', '建安'): ['J505']}
 # 指定色綫次序：沿住呢串站行，由左至右
 CHAIN_ORDER = [
     (['濕地公園', '天秀', '天悅', '天榮', '銀座', '天湖', '天慈', '天水圍'], ['751', '705', '706']),
@@ -223,7 +230,7 @@ def octi(p, q):
 for e in edges:
     u, v = sorted(e)
     g = geom(u, v)
-    nm = f'{STOPS[u][0]}–{STOPS[v][0]}'
+    nm = f'{nm_(u)}–{nm_(v)}'
     bad = False
     for p, q in zip(g, g[1:]):
         if math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-9: errors.append(f'{nm} 有重複點 {p}'); bad = True
@@ -231,9 +238,9 @@ for e in edges:
     if bad: continue
     for s, a, b, c in ((u, g[0], g[1], g[2] if len(g) > 2 else None), (v, g[-1], g[-2], g[-3] if len(g) > 2 else None)):
         d, L = unit(a, b)
-        if abs(cross(d, AX[AXIS[s]])) > 1e-6: errors.append(f'{nm}：出入 {STOPS[s][0]} 唔係沿軸（{AXIS[s]}）')
+        if abs(cross(d, AX[AXIS[s]])) > 1e-6: errors.append(f'{nm}：出入 {nm_(s)} 唔係沿軸（{AXIS[s]}）')
         need = STRAIGHT + (tan_len(a, b, c) if c else 0)
-        if L < need - 1e-6: errors.append(f'{nm}：出入 {STOPS[s][0]} 直綫得 {L:.2f}，要 {need:.2f}')
+        if L < need - 1e-6: errors.append(f'{nm}：出入 {nm_(s)} 直綫得 {L:.2f}，要 {need:.2f}')
     for i in range(1, len(g) - 2):
         need = tan_len(g[i - 1], g[i], g[i + 1]) + tan_len(g[i], g[i + 1], g[i + 2])
         _, L = unit(g[i], g[i + 1])
@@ -276,7 +283,7 @@ for (s, side), lst in side_edges.items():
     pos = sum(len(edges[e]) for _, e in lst) * G / 2
     for _, e in lst:
         n = len(edges[e])
-        port_base[(s, e)] = pos - n * G / 2
+        port_base[(s, e)] = 0.0 if s in VIRTUAL else pos - n * G / 2
         pos -= n * G
 
 # 站嘅橫移：令每段路軌兩頭嘅出站位一致（色綫一路平行，轉彎同心）。
@@ -294,10 +301,15 @@ def prio(e):
     return 1 if any(bend_use[(round(b[0], 3), round(b[1], 3))] > 1 for b in g[1:-1]) else 2
 lanes_at = {s: sum(len(edges[e]) for e in adj[s]) for s in P}
 counter = itertools.count()
+seed = []
+for j in VIRTUAL:              # 匯合點固定喺正中，佢兩邊嘅直路軌跟佢
+    shift[j] = 0.0
+    seed += [(prio(e), next(counter), j, e) for e in adj[j] if prio(e) == 0]
 for start in sorted(P, key=lambda s: -lanes_at[s]):
     if start in shift: continue
     shift[start] = 0.0
-    heap = [(prio(e), next(counter), start, e) for e in adj[start]]
+    heap = [(prio(e), next(counter), start, e) for e in adj[start]] + seed
+    seed = []
     heapq.heapify(heap)
     while heap:
         _, _, s, e = heapq.heappop(heap)
@@ -338,7 +350,7 @@ for e in edges:
     rs = lane_order(u, v)
     n = len(rs)
     pu, pv = port_eff(u, e), -port_eff(v, e)
-    if len(g) == 2 and abs(pu - pv) > 1e-6: jogs.append(f'{STOPS[u][0]}–{STOPS[v][0]}（{abs(pu - pv):.2f}）')
+    if len(g) == 2 and abs(pu - pv) > 1e-6: jogs.append(f'{nm_(u)}–{nm_(v)}（{abs(pu - pv):.2f}）')
     for i, r in enumerate(rs):
         l = ((n - 1) / 2 - i) * G
         if len(g) == 2 and abs(pu - pv) > 1e-6:
@@ -365,7 +377,8 @@ for e in edges:
 # ---------------------------------------------------------------------------
 # 站：膠囊或者圓點（中心跟色綫實際位置）
 markers = {}
-for s in P:
+STATIONS = [s for s in P if s not in VIRTUAL]
+for s in STATIONS:
     ax = AX[AXIS[s]]
     N = left(ax)
     offs = []
@@ -475,7 +488,7 @@ def text_w(s, size, en=False):
     if en: return len(s) * size * 0.52
     return sum(size * (0.45 if c in '()（）' else 1.0) for c in s)
 labels = {}
-for s in P:
+for s in STATIONS:
     zh, en = STOPS[s]
     side = LABELS.get(zh, 's')
     bx, by, bw, bh = marker_box(s)
@@ -513,14 +526,14 @@ for s, lb in labels.items():
     for r, pts in all_lanes:
         if poly_hits(pts, lb['box'], G / 2 + CASE):
             errors.append(f'站名「{nm}」撞到 {r} 綫'); break
-    for t in P:
+    for t in STATIONS:
         if t != s and overlap(lb['box'], marker_box(t)): errors.append(f'站名「{nm}」撞到站 {STOPS[t][0]}')
     for c in caps:
         if overlap(lb['box'], cap_box(c), 0.04, 0.04): errors.append(f'站名「{nm}」撞到 {c["route"]} 號碼')
     for t, lt in labels.items():
         if t > s and overlap(lb['box'], lt['box'], 0.12, 0.06): errors.append(f'站名「{nm}」同「{STOPS[t][0]}」太近')
 for i, c in enumerate(caps):
-    for t in P:
+    for t in STATIONS:
         if overlap(cap_box(c), marker_box(t), 0.02, 0.02): errors.append(f'{c["route"]} 號碼撞到站 {STOPS[t][0]}')
     for r, pts, *_ in lanes:
         if poly_hits(pts, cap_box(c), G / 2): errors.append(f'{c["route"]} 號碼撞到 {r} 綫'); break
