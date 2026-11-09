@@ -3,7 +3,7 @@
 用法：
   python3 packages/core/tools/lrt-layout.py [--svg 預覽.svg]
 畫法（2026-11，用戶要求）：
-- 每段路軌（兩個站之間）上面，行經嘅路線各一條色綫並排（貼住），外面黑色綑邊。
+- 每段路軌（兩個站之間）上面，行經嘅路線各一條色綫並排，每條色綫都有黑色綑邊（綫同綫之間都有黑綫）。
 - 每個站有一條「軸」（橫、直或者 45°）：路軌一律沿軸出入站，出站直行一段先轉彎。
   同一邊出站嘅幾段路軌先並排（「出站位」，轉得急嘅喺內圈），轉彎時同心，之後先各自分開。
 - 有兩條或以上色綫經過嘅站係膠囊（白底黑邊，橫跨所有色綫）；只有一條嘅係圓點。
@@ -24,7 +24,8 @@ COLORS = dict(re.findall(r"route: '(\w+)', color: '(#\w+)'", open(os.path.join(R
 # ---------------------------------------------------------------------------
 # 尺寸（地圖單位）
 G = 0.13          # 每條色綫闊（並排貼住）
-CASE = 0.035      # 黑色綑邊
+CASE = 0.03       # 黑色綑邊（成束色綫外面）
+SEP = 0.028       # 並排色綫之間嘅黑綫（每條色綫畫窄啲，露出底下嘅黑邊）
 R = 0.5           # 彎位半徑（中綫）
 STRAIGHT = 0.3    # 出站最少直行幾遠先開始彎
 PAD = 0.07        # 站膠囊超出色綫
@@ -601,7 +602,7 @@ if '--svg' in sys.argv:
     for r, pts in all_lanes:
         o.append(f'<path d="{path_d(pts)}" fill="none" stroke="{INK}" stroke-width="{G + 2 * CASE}"/>')
     for r, pts in all_lanes:
-        o.append(f'<path d="{path_d(pts)}" fill="none" stroke="{COLORS[r]}" stroke-width="{G}"/>')
+        o.append(f'<path d="{path_d(pts)}" fill="none" stroke="{COLORS[r]}" stroke-width="{G - SEP}"/>')
     for a in arrows:
         o.append(f'<path d="M-0.035 -0.042 L0.025 0 L-0.035 0.042" fill="none" stroke="#fff" stroke-width="0.026" stroke-linecap="round" stroke-linejoin="round" transform="translate({a["x"]} {a["y"]}) rotate({a["angle"]})"/>')
     for s, m in markers.items():
