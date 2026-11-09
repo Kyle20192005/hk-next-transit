@@ -170,7 +170,7 @@ CHAIN_ORDER = [
 # 終點站路線號碼（似港鐵輕鐵圖；號碼一律同條綫對正中，喺度完嘅綫入站前散開）：
 #   stack = 盡頭站（全部綫喺度完）：號碼排一行（兩邊入站就兩行），白色膠囊喺後面沿號碼方向拉長；只得一條綫就蓋喺圓點上面
 #   end   = 中途終點站：喺度完嘅綫散開，號碼蓋喺站中間，同一邊幾個由內至外排；站膠囊大細唔變
-#   side+／side- = 循環綫起點：號碼並排蓋喺站膠囊嗰頭（天水圍向環綫入面）
+#   loop  = 循環綫起點（天水圍）：兩邊嘅色綫都散開穿過自己個號碼（號碼由內至外疊喺站中間）
 #   dot   = 只得一條綫經過嘅中途終點站：號碼蓋喺圓點上面
 CAPS = {'元朗': 'stack', '三聖': 'stack', '屯門碼頭': 'stack', '友愛': 'dot', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'side+'}
 # 站名位置
@@ -220,7 +220,7 @@ setb('坑尾村', '塘坊村', [(XK, YM - 1.05), (XK + 1.05, YM)])
 # 天水圍環綫：上面一行天水圍 → 濕地公園，右邊天恒，下面一行天逸 → 天耀，左邊天耀 ↔ 天水圍；翠湖喺中間直上直落
 YLT, YLB = YM - 6.7, YM - 3.2  # 環綫上、下兩行
 XLL = XK + 0.6                 # 環綫左邊
-X0 = XLL + 1.2                 # 天水圍
+X0 = XLL + 1.5                 # 天水圍
 for n, dx in [('天水圍', 0), ('天慈', 1.25), ('天湖', 2.5), ('銀座', 3.75), ('天榮', 5.0), ('天悅', 7.0), ('天秀', 8.25), ('濕地公園', 9.5)]: put(n, X0 + dx, YLT, 'h')
 for n, dx in [('天耀', 0.2), ('樂湖', 2.55), ('天瑞', 4.9), ('頌富', 7.0), ('天富', 8.25), ('天逸', 9.5)]: put(n, X0 + dx, YLB, 'h')
 XC2, XR = X0 + 6.0, X0 + 10.7
@@ -244,7 +244,7 @@ for n in ['天耀', '樂湖', '天瑞', '頌富', '天富', '天逸']: LABELS[n]
 LABELS.update({'天恒': 'e', '翠湖': 'e', '坑尾村': 'w', '洪水橋': 'n', '塘坊村': 's', '藍地': 'n', '泥圍': 'n', '鍾屋村': 'n'})
 for i, n in enumerate(['屏山', '水邊圍', '豐年路', '康樂路', '大棠路', '元朗']): LABELS[n] = 'n' if i % 2 == 0 else 's'
 LABELS['元朗'] = 'n'
-CAPS['天水圍'] = 'side-'
+CAPS['天水圍'] = 'loop'
 TWIST = {('洪水橋', '鍾屋村'): ['614', '610', '615', '751']}
 LEGEND = (-17.4, 3.4, 22.0, 3.6)
 LEGEND_COLS = 4
@@ -618,7 +618,7 @@ def fan_into(s, lane, first, a, N, o0, o1, tc, capA):
     d = abs(o1 - o0)
     T = tc + capA / 2 + 0.05
     pts = lane[1]
-    cut = at(o0, T + d + 0.45)
+    cut = at(o0, T + d + 0.25)
     if first: pts[0] = cut
     else: pts[-1] = cut
     seg = [cut, (*at(o0, T + d), R), (*at(o1, T), R), at(o1, tc)] if d > 1e-6 else [cut, at(o1, tc)]
@@ -671,6 +671,20 @@ for name, mode in CAPS.items():
         continue
     m = markers[s]
     c = (m['x'] - px) * N[0] + (m['y'] - py) * N[1]
+    if mode == 'loop':            # 循環綫起點：兩邊嘅色綫都散開，穿過自己個號碼正中
+        term = [(o, r, sd, lane, first) for o, r, sd, lane, first in lanes_here if r in rs]
+        thr = [o for o, r, *_ in lanes_here if r not in rs]
+        mt = sum(o for o, *_ in term) / len(term)
+        e = (1 if mt > sum(thr) / len(thr) else -1) if thr else 1
+        order = sorted({r for _, r, *_ in term}, key=lambda r: min(o for o, rr, *_ in term if rr == r) * e)
+        base = max(thr, key=lambda o: o * e) if thr else min(o for o, *_ in term) - e * G
+        ci = base + e * (G / 2 + 0.02 + capN / 2)
+        for r in order:
+            for o, rr, sd, lane, first in term:
+                if rr == r: cx, cy = fan_into(s, lane, first, (ax[0] * sd, ax[1] * sd), N, o, ci, 0.0, capA)
+            cap_at(r, cx, cy)
+            ci += e * (capN + 0.06)
+        continue
     if mode.startswith('side'):   # 循環綫起點：號碼並排蓋喺站膠囊嗰頭
         e = 1 if mode.endswith('+') else -1
         half = m['r'] if m['kind'] == 'dot' else m['len'] / 2
