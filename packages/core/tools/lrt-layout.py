@@ -10,7 +10,9 @@
 - 終點站：盡頭站（元朗、三聖、屯門碼頭）色綫穿過個站再散開，尾端係寫住路線號碼嘅膠囊；
   中途終點站（兆康、田景、天逸、天水圍、友愛）喺站旁邊放號碼膠囊。
 - 單方向行駛嘅色綫（天水圍循環綫、505 經山景／鳴琴、751 經友愛）加白色箭咀。
-站位置參考真實地理（tools/lrt-coords.py），自己排：唔好照抄港鐵官方輕鐵路綫圖（版權）。
+版面（2026-11，用戶要求）：打橫、唔理地理位置，屯門（左）、天水圍環綫（中上）、元朗綫（右下）排喺同一條橫帶；
+屯門部分喺「設計方向」排好再轉 90°（見「打橫」一段）。自己排：唔好照抄港鐵官方輕鐵路綫圖（版權）。
+交叉：分出去嗰條出站後彎出去跨過其他綫（畫喺上面）；幹綫上 751 喺鍾屋村—洪水橋之間打斜跨過（TWIST）。
 檢查：路軌只行橫直 45°；出入站嗰段沿站嘅軸、夠長；站名唔撞綫、唔撞站、唔撞號碼膠囊、站名之間有位。
 """
 import heapq, itertools, json, math, os, re, sys
@@ -145,6 +147,7 @@ BENDS = {
     ('兆禧', '屯門碼頭'): [(XV, YF)],
     ('美樂', '屯門碼頭'): [(XW, YF)],
 }
+TWIST = {}
 # 唔停站經過（615 青松 → 兆康 經麒麟唔停）
 VIA = {('青松', '兆康'): ['麒麟'], ('鳴琴', '建安'): ['J505S'], ('山景(南)', '建安'): ['J505S'],
        ('石排', '鳴琴'): ['J505N'], ('山景(北)', '石排'): ['J505N']}
@@ -201,13 +204,52 @@ for k in list(P): P[k] = rot(P[k])
 AXIS = {k: {'h': 'v', 'v': 'h', 'd1': 'd2', 'd2': 'd1'}[a] for k, a in AXIS.items()}
 BENDS = {k: [rot(q) for q in v] for k, v in BENDS.items()}
 LABELS = {k: {'n': 'e', 'e': 's', 's': 'w', 'w': 'n', 'ne': 'se', 'se': 'sw', 'sw': 'nw', 'nw': 'ne'}[v] for k, v in LABELS.items()}
-XT_, YT_ = P[sid('塘坊村')]
-YYL = YT_ + 1.6                # 元朗綫：塘坊村向南再轉東
-for i, n in enumerate(['屏山', '水邊圍', '豐年路', '康樂路', '大棠路', '元朗']):
-    put(n, XT_ + 1.6 + i * 1.5, YYL, 'h')
-    LABELS[n] = 's' if i % 2 == 0 else 'n'
-BENDS[('塘坊村', '屏山')] = [(XT_, YYL)]
-LEGEND = (-13.5, 7.0, 11.6, 5.4)
+# 屯門、天水圍、元朗排喺同一條橫帶（2026-11，用戶要求）：幹綫由兆康直接向東，天水圍環綫喺幹綫上面打橫，元朗綫沿幹綫向東
+def setb(a, b, pts):
+    BENDS.pop((a, b), None); BENDS.pop((b, a), None)
+    if pts: BENDS[(a, b)] = pts
+YM = P[sid('兆康')][1]          # 幹綫、元朗綫嗰行
+for n, x in [('藍地', -17.0), ('泥圍', -15.6), ('鍾屋村', -14.2), ('洪水橋', -12.6)]: put(n, x, YM, 'h')
+XK = -10.6                     # 坑尾村
+put('坑尾村', XK, YM - 1.6, 'v')
+put('塘坊村', XK + 2.2, YM, 'h')
+for i, n in enumerate(['屏山', '水邊圍', '豐年路', '康樂路', '大棠路', '元朗']): put(n, XK + 3.7 + i * 1.5, YM, 'h')
+setb('藍地', '兆康', None)
+setb('洪水橋', '塘坊村', None)
+setb('塘坊村', '屏山', None)
+setb('坑尾村', '洪水橋', [(XK, YM)])
+setb('坑尾村', '塘坊村', [(XK, YM - 1.05), (XK + 1.05, YM)])
+# 天水圍環綫：上面一行天水圍 → 濕地公園，右邊天恒，下面一行天逸 → 天耀，左邊天耀 ↔ 天水圍；翠湖喺中間直上直落
+YLT, YLB = YM - 6.7, YM - 3.2  # 環綫上、下兩行
+XLL = XK + 0.6                 # 環綫左邊
+X0 = XLL + 1.2                 # 天水圍
+for n, dx in [('天水圍', 0), ('天慈', 1.25), ('天湖', 2.5), ('銀座', 3.75), ('天榮', 5.0), ('天悅', 7.0), ('天秀', 8.25), ('濕地公園', 9.5)]: put(n, X0 + dx, YLT, 'h')
+for n, dx in [('天耀', 0.2), ('樂湖', 2.55), ('天瑞', 4.9), ('頌富', 7.0), ('天富', 8.25), ('天逸', 9.5)]: put(n, X0 + dx, YLB, 'h')
+XC2, XR = X0 + 6.0, X0 + 10.7
+put('翠湖', XC2, (YLT + YLB) / 2, 'v')
+put('天恒', XR, (YLT + YLB) / 2, 'v')
+setb('天恒', '濕地公園', [(XR, YLT)])
+setb('天恒', '天逸', [(XR, YLB)])
+setb('頌富', '翠湖', [(XC2, YLB)])
+setb('翠湖', '天榮', [(XC2, YLT)])
+setb('天耀', '天水圍', [(XLL, YLB), (XLL, YLT)])
+setb('天耀', '坑尾村', [(XK, YLB)])
+setb('天水圍', '坑尾村', [(XK, YLT)])
+CHAIN_ORDER = [c for c in CHAIN_ORDER if c[0][0] not in ('濕地公園', '天耀')] + [
+    (['天水圍', '天慈', '天湖', '銀座', '天榮', '天悅', '天秀', '濕地公園'], ['751', '705', '706']),
+    (['濕地公園', '天恒', '天逸'], ['705', '706']),
+    (['天逸', '天富', '頌富', '天瑞', '樂湖', '天耀'], ['761P', '705', '706', '751']),
+    (['天耀', '天水圍'], ['705', '706']),
+]
+for n in ['天水圍', '天慈', '天湖', '銀座', '天榮', '天悅', '天秀', '濕地公園']: LABELS[n] = 'n'
+for n in ['天耀', '樂湖', '天瑞', '頌富', '天富', '天逸']: LABELS[n] = 's'
+LABELS.update({'天恒': 'e', '翠湖': 'e', '坑尾村': 'w', '洪水橋': 'n', '塘坊村': 's', '藍地': 'n', '泥圍': 'n', '鍾屋村': 'n'})
+for i, n in enumerate(['屏山', '水邊圍', '豐年路', '康樂路', '大棠路', '元朗']): LABELS[n] = 'n' if i % 2 == 0 else 's'
+LABELS['元朗'] = 'n'
+CAPS['天水圍'] = 'side-'
+TWIST = {('洪水橋', '鍾屋村'): ['614', '610', '615', '751']}
+LEGEND = (-17.4, 3.4, 22.0, 3.6)
+LEGEND_COLS = 4
 LABELS.update({'蔡意橋': 'nw'})
 
 missing = [STOPS[s][0] for s in STOPS if s not in P]
@@ -332,11 +374,14 @@ for (s, side), lst in side_edges.items():
 
 # 站兩邊對齊：同一條路線入站出站用同一個位（唔會過咗站就走去第二行）。
 # 兩邊每段路軌（成束色綫）試晒放喺邊個位，揀兩邊同一條路線喺同一個位最多嘅排法；完咗、分出去嘅綫喺旁邊。
+# 喺兩個站之間交叉（似港鐵圖幹綫上面嘅交叉）：(站, 去邊個站) → 喺呢個站嗰頭嘅色綫次序（沿住行，由左至右）
+TWIST_IDS = {(sid(a), sid(b)): o for (a, b), o in TWIST.items()}
+def lane_order_at(s, t): return TWIST_IDS.get((s, t)) or lane_order(s, t)
 def side_seq(s, side):
     lst = [e for _, e in side_edges.get((s, side), [])]
     seq = []
     for e in (lst if side == 1 else lst[::-1]):
-        o = lane_order(s, other(e, s))
+        o = lane_order_at(s, other(e, s))
         seq += [(r, e) for r in (o if side == 1 else o[::-1])]
     return seq
 def blocks_of(seq):
@@ -528,6 +573,11 @@ for i in range(len(lanes)):
             ni, nj = len(edges[frozenset(ei)]), len(edges[frozenset(ej)])
             top = ei if (ni, ORDER.index(ri)) < (nj, ORDER.index(rj)) else ej
             over_edges.add(frozenset(top))
+over_keys = {(e, r) for e in over_edges for r in edges[e]}
+for (a, b), rs_ in TWIST.items():          # 兩站之間交叉：郁得最多嗰條畫喺上面
+    e = frozenset((sid(a), sid(b)))
+    o1, o2 = lane_order_at(sid(a), sid(b)), lane_order(sid(a), sid(b))
+    over_keys.add((e, max(edges[e], key=lambda r: abs(o1.index(r) - o2.index(r)))))
 
 # ---------------------------------------------------------------------------
 # 站：膠囊或者圓點（中心跟色綫實際位置）
@@ -752,7 +802,7 @@ for r, pts in all_lanes:
     if poly_hits(pts, (lx, ly, lw, lh), 0.1): errors.append(f'{r} 綫入咗圖例'); break
 
 xs = [m['x'] for m in markers.values()] + [l['box'][0] for l in labels.values()] + [l['box'][0] + l['box'][2] for l in labels.values()] + [c['x'] + CAP_W / 2 for c in caps] + [c['x'] - CAP_W / 2 for c in caps] + [lx + lw]
-ys = [m['y'] for m in markers.values()] + [l['box'][1] for l in labels.values()] + [l['box'][1] + l['box'][3] for l in labels.values()] + [c['y'] + CAP_H / 2 for c in caps] + [ly + lh]
+ys = [m['y'] for m in markers.values()] + [l['box'][1] for l in labels.values()] + [l['box'][1] + l['box'][3] for l in labels.values()] + [c['y'] + CAP_H / 2 for c in caps] + [ly, ly + lh]
 VIEW = (round(min(xs) - 0.6, 2), round(min(ys) - 0.6, 2), round(max(xs) - min(xs) + 1.2, 2), round(max(ys) - min(ys) + 1.2, 2))
 
 print(f'{len(P)} 個站、{len(edges)} 段路軌、{len(lanes)} 條色綫、{len(caps)} 個號碼、{len(arrows)} 個箭咀；範圍 {VIEW}', file=sys.stderr)
@@ -793,8 +843,8 @@ if '--svg' in sys.argv:
     sc = 60
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{vw * sc:.0f}" height="{vh * sc:.0f}" viewBox="{vx} {vy} {vw} {vh}" font-family="PingFang HK, Noto Sans CJK TC, sans-serif">',
          f'<rect x="{vx}" y="{vy}" width="{vw}" height="{vh}" fill="#fff"/>']
-    under = [(r, pts) for r, pts, uv, _ in lanes if frozenset(uv) not in over_edges] + cap_lanes
-    over = [(r, pts) for r, pts, uv, _ in lanes if frozenset(uv) in over_edges]
+    under = [(r, pts) for r, pts, uv, _ in lanes if (frozenset(uv), r) not in over_keys] + cap_lanes
+    over = [(r, pts) for r, pts, uv, _ in lanes if (frozenset(uv), r) in over_keys]
     for r, pts in under:
         o.append(f'<path d="{path_d(pts)}" fill="none" stroke="{INK}" stroke-width="{G + 2 * CASE}"/>')
     for r, pts in under:
@@ -817,8 +867,8 @@ if '--svg' in sys.argv:
     o.append(f'<rect x="{lx}" y="{ly}" width="{lw}" height="{lh}" rx="0.3" fill="#fff" stroke="#e5e7eb" stroke-width="0.04"/>')
     o.append(f'<text x="{lx + 0.4}" y="{ly + 0.75}" font-size="0.36" font-weight="700" fill="#111">輕鐵路綫圖<tspan font-size="0.2" fill="#666" dx="0.15">Light Rail</tspan></text>')
     for i, (r, zh) in enumerate(LEGEND_ROWS):
-        x = lx + 0.4 + (i % 2) * 5.6
-        y = ly + 1.5 + (i // 2) * 0.62
+        x = lx + 0.4 + (i % LEGEND_COLS) * 5.4
+        y = ly + 1.3 + (i // LEGEND_COLS) * 0.62
         o.append(cap_svg(x + CAP_W / 2, y, r))
         o.append(f'<text x="{x + CAP_W + 0.2}" y="{y + 0.09}" font-size="0.24" font-weight="600" fill="#111">{zh}</text>')
     for s, lb in labels.items():
