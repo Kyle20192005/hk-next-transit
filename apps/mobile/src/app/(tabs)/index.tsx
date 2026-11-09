@@ -41,6 +41,20 @@ export default function HomeTab() {
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
   const mtrNear = state.kind === 'ok' ? state.mtr[0] : undefined;
+  const mtrLineEl = mtrNear && (
+    <Pressable onPress={() => openMtr(mtrNear.sta)} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <Icon name="train" size={14} color={t.onBrand} />
+      <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
+        最近港鐵站：{mtrStationName(mtrNear.sta)}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 2, marginLeft: 2 }}>
+        {mtrStationLines(mtrNear.sta).map((l) => (
+          <View key={l} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: mtrLine(l)?.color, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' }} />
+        ))}
+      </View>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>· {formatDistance(mtrNear.distance)}</Text>
+    </Pressable>
+  );
   // 首頁 header（HomeHeader，一件嘢，會收縮；同網頁一樣）：浮喺捲動區上面，捲動內容頂留返 header 咁高
   const { height: screenH } = useWindowDimensions();
   const [scrollY] = useState(() => new Animated.Value(0));
@@ -164,28 +178,16 @@ export default function HomeTab() {
         onSearch={() => go('nav')}
         sub={
           state.kind === 'ok' ? (
-            // 最近港鐵站（2 公里內，撳入路綫圖）同最近巴士站
+            // 最近港鐵站（2 公里內，撳入路綫圖）同最近巴士站；設定「交通工具優先」揀港鐵就港鐵排先
             <View style={{ alignItems: 'center', gap: 3, opacity: 0.75 }}>
-              {mtrNear && (
-                <Pressable onPress={() => openMtr(mtrNear.sta)} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Icon name="train" size={14} color={t.onBrand} />
-                  <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
-                    最近港鐵站：{mtrStationName(mtrNear.sta)}
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 2, marginLeft: 2 }}>
-                    {mtrStationLines(mtrNear.sta).map((l) => (
-                      <View key={l} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: mtrLine(l)?.color, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' }} />
-                    ))}
-                  </View>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>· {formatDistance(mtrNear.distance)}</Text>
-                </Pressable>
-              )}
+              {prefs.priority === 'rail' && mtrLineEl}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Icon name="navigate" size={14} color={t.onBrand} />
                 <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
                   {head ? `最近巴士站：${head.name} · ${formatDistance(head.distance)}` : `${radiusLabel(prefs.nearbyRadius)}內冇巴士站`}
                 </Text>
               </View>
+              {prefs.priority !== 'rail' && mtrLineEl}
             </View>
           ) : (
             <Pressable onPress={state.kind === 'error' || state.kind === 'idle' ? () => void locate() : undefined}>

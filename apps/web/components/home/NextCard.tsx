@@ -11,6 +11,7 @@ import {
   minutesLabel,
   mtrDepartureRows,
   mtrStationName,
+  orderNearCards,
   radiusLabel,
   type MtrLineEtas,
   type DepartureRow,
@@ -45,7 +46,7 @@ type NearItem = { key: string; name: string; distance: number } & ({ kind: 'mtr'
 /**
  * 首頁大卡（似港鐵 App 嘅「下班車」小工具）：頂部兩個分頁「下班車」（附近）同「收藏」。
  * 入面一行站名（跟住而家睇緊嗰張卡），下面打橫掃嘅到站卡（左右兩邊色條），每張最多 4 行。
- * 卡入咗畫面先載入。附近 800 米內嘅港鐵站卡排最前（綫色、月台）；收藏咗嘅港鐵站一個站一張卡。
+ * 卡入咗畫面先載入。附近 800 米內嘅港鐵站卡（綫色、月台）：設定「交通工具優先」揀港鐵就排最前，揀巴士就跟喺巴士站卡後面；收藏咗嘅港鐵站一個站一張卡。
  * 港鐵行撳落去開路綫圖嗰個站（onMtr）。App 版 apps/mobile/src/components/NextCard.tsx。
  */
 export default function NextCard({
@@ -136,7 +137,7 @@ function NearbyPane({ state, onLocate, onMore, onMtr }: { state: NearbyState; on
       : [];
   const data = useHeadRows(items);
   const shown = useRef(new Set<string>());
-  const { nearbyRadius: radius } = usePrefs();
+  const { nearbyRadius: radius, priority } = usePrefs();
   if (state.kind !== 'ok') {
     return (
       <Message
@@ -150,7 +151,14 @@ function NearbyPane({ state, onLocate, onMore, onMtr }: { state: NearbyState; on
   // 冇班次嘅站頭唔出卡。全部載入完先出（逐張加會推走畫面）；出咗嘅卡之後冇車都保留，唔好令卡跳位
   const ready = items.every((h) => data[h.key]);
   if (!ready && !shown.current.size) return <Message text="載入中…" />;
-  const cards = items.filter((h) => data[h.key]?.rows.length || shown.current.has(h.key)).slice(0, MAX_CARDS);
+  const has = (h: NearItem) => data[h.key]?.rows.length || shown.current.has(h.key);
+  // 設定「交通工具優先」：港鐵 → 港鐵站卡排先；巴士 → 巴士站卡排先，港鐵站卡跟後
+  const cards = orderNearCards(
+    items.filter((h) => h.kind === 'mtr' && has(h)),
+    items.filter((h) => h.kind === 'bus' && has(h)),
+    priority,
+    MAX_CARDS,
+  );
   cards.forEach((h) => shown.current.add(h.key));
   if (!cards.length) return <Message text="附近暫時冇班次" />;
   return (

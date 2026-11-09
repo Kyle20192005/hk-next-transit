@@ -46,7 +46,7 @@ export default function SettingsTab() {
         <Group title="交通">
           <Choice
             label="交通工具優先"
-            hint={p.priority === 'rail' ? '「路線」分頁預設開港鐵，分類排第一。港鐵到站推出後，首頁下班車都會先顯示港鐵站。' : '「路線」分頁預設開巴士，分類排第一。'}
+            hint={p.priority === 'rail' ? '「路線」分頁預設開港鐵，分類排第一；首頁大字同下班車先顯示港鐵站。' : '「路線」分頁預設開巴士，分類排第一；首頁大字同下班車先顯示巴士站，港鐵站排後面。'}
             value={p.priority}
             onChange={(v) => setPref('priority', v)}
             options={[

@@ -155,3 +155,13 @@ export function favDepartureRows<F extends FavLike>(items: { fav: F; etas: { eta
     })
     .sort(byTime);
 }
+
+/**
+ * 首頁「下班車」卡次序（設定「交通工具優先」）：港鐵優先 → 港鐵站卡排先；巴士優先 → 巴士站卡排先、港鐵站卡跟後。
+ * 港鐵站卡一定出，總共最多 max 張（巴士站卡讓位）。
+ */
+export function orderNearCards<T>(mtr: T[], bus: T[], priority: 'bus' | 'rail', max: number): T[] {
+  const m = mtr.slice(0, max);
+  const b = bus.slice(0, Math.max(0, max - m.length));
+  return priority === 'rail' ? [...m, ...b] : [...b, ...m];
+}

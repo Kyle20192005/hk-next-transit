@@ -69,3 +69,14 @@ describe('favDepartureRows', () => {
     expect(minutesLabel(rows[2]!.at, now)).toBe('');
   });
 });
+
+describe('orderNearCards', () => {
+  it('puts MTR first for rail priority, after bus for bus priority, always keeping MTR cards', async () => {
+    const { orderNearCards } = await import('./departures');
+    const m = ['m1', 'm2'];
+    const b = ['b1', 'b2', 'b3', 'b4', 'b5'];
+    expect(orderNearCards(m, b, 'rail', 5)).toEqual(['m1', 'm2', 'b1', 'b2', 'b3']);
+    expect(orderNearCards(m, b, 'bus', 5)).toEqual(['b1', 'b2', 'b3', 'm1', 'm2']);
+    expect(orderNearCards([], b, 'rail', 5)).toEqual(b);
+  });
+});

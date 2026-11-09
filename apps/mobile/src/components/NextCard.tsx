@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { busDepartureRows, favDepartureRows, favsForNow, formatDistance, groupFavorites, groupStopHeads, minutesLabel, mtrDepartureRows, mtrStationName, radiusLabel, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
+import { busDepartureRows, favDepartureRows, favsForNow, formatDistance, groupFavorites, groupStopHeads, minutesLabel, mtrDepartureRows, mtrStationName, orderNearCards, radiusLabel, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
 import { api, type Co, type NearStop } from '@/lib/api';
 import { isMtrFav, useFavorites, type Favorite } from '@/lib/favorites';
 import { openMtr } from '@/lib/open-mtr';
@@ -32,7 +32,7 @@ type NearItem = { key: string; name: string; distance: number } & ({ kind: 'mtr'
 /**
  * 首頁大卡（似港鐵 App 嘅「下班車」小工具）：頂部兩個分頁「下班車」（附近）同「收藏」，
  * 入面一行站名（跟住而家睇緊嗰張），下面打橫掃嘅到站卡（左右兩邊色條）。同網頁 components/home/NextCard.tsx 一樣：
- * 附近 800 米內嘅港鐵站卡排最前（綫色、月台），收藏咗嘅港鐵站一個站一張卡；港鐵行撳落去開路綫圖嗰個站。
+ * 附近 800 米內嘅港鐵站卡（綫色、月台，「交通工具優先」揀港鐵就排最前），收藏咗嘅港鐵站一個站一張卡；港鐵行撳落去開路綫圖嗰個站。
  */
 export function NextCard({ nearby, onLocate, notice }: { nearby: NearbyState; onLocate: () => void; notice?: { text: string; onPress: () => void } }) {
   const t = useTheme();
@@ -110,7 +110,7 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
         ]
       : [];
   const data = useHeadRows(heads);
-  const { nearbyRadius } = usePrefs();
+  const { nearbyRadius, priority } = usePrefs();
   const [shown] = useState(() => new Set<string>());
   if (state.kind !== 'ok') {
     return (
@@ -125,7 +125,14 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
   // 冇班次嘅站頭唔出卡。全部載入完先出（逐張加會推走畫面）；出咗嘅卡之後冇車都保留（同網頁一樣）
   const ready = heads.every((h) => data[h.key]);
   if (!ready && !shown.size) return <Message text="載入中…" />;
-  const cards = heads.filter((h) => data[h.key]?.rows.length || shown.has(h.key)).slice(0, MAX_CARDS);
+  const has = (h: NearItem) => data[h.key]?.rows.length || shown.has(h.key);
+  // 設定「交通工具優先」：港鐵 → 港鐵站卡排先；巴士 → 巴士站卡排先，港鐵站卡跟後（同網頁一樣）
+  const cards = orderNearCards(
+    heads.filter((h) => h.kind === 'mtr' && has(h)),
+    heads.filter((h) => h.kind === 'bus' && has(h)),
+    priority,
+    MAX_CARDS,
+  );
   cards.forEach((h) => shown.add(h.key));
   if (!cards.length) return <Message text="附近暫時冇班次" />;
   return (

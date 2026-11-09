@@ -308,7 +308,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   `usePrefs()` 即時更新，effect／callback 入面用 `getPrefs()`（網頁 hydration 時 usePrefs 先俾預設值）。
   - 深色模式（跟系統／淺色／深色）：網頁寫 `<html data-theme>`（layout 嘅 `THEME_SCRIPT` 載入前先寫，唔閃；CSS 深色變數同時跟
     `prefers-color-scheme` + `:root:not([data-theme="light"])` 同 `:root[data-theme="dark"]`，地圖用 `useDark()`）；App 用 `Appearance.setColorScheme`。
-  - 交通工具優先（巴士／港鐵）：「路線」分頁預設同分類次序（`orderedModes`）；港鐵到站做好之後首頁下班車先顯示港鐵站。
+  - 交通工具優先（巴士／港鐵）：「路線」分頁預設同分類次序（`orderedModes`）；首頁大字兩行（最近港鐵站／巴士站）同大卡「下班車」嘅卡次序（core `orderNearCards`：
+    港鐵 → 港鐵站卡排先；巴士 → 巴士站卡排先，港鐵站卡跟後，但一定會出）。
   - 到站時間顯示（分鐘／鐘數）：core `etaParts`、`etaRest`、`minutesLabel(at, now, fmt)`；一行內嘅用 `EtaInline`（兩邊都有），站點列表 `StopRow` 大細字對調。
   - 附近車站範圍（300／600／1000 米，`/api/nearby?r=`，最多 1000）；自動定位開關（首頁、附近、路線頁）；首頁大卡預設分頁（上次／下班車／收藏）。
   - 資料：重設常用工具、清除最近睇過、清除所有收藏（要確認）。

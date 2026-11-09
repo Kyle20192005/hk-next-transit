@@ -34,6 +34,18 @@ export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, p
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
   const mtrNear = state.kind === 'ok' ? state.mtr[0] : undefined;
+  // 最近港鐵站（2 公里內）：撳入路綫圖嗰個站
+  const mtrLineEl = mtrNear && (
+    <button className="hero-line hero-mtr" onClick={() => onMtr(mtrNear.sta)}>
+      <Icon name="train" size={14} /> 最近港鐵站：{mtrStationName(mtrNear.sta)}
+      <span className="hero-mtr-dots" aria-hidden="true">
+        {mtrStationLines(mtrNear.sta).map((l) => (
+          <i key={l} style={{ background: mtrLine(l)?.color }} />
+        ))}
+      </span>
+      · {formatDistance(mtrNear.distance)}
+    </button>
+  );
   const scroller = useRef<HTMLDivElement>(null);
   const nearNews = news?.filter((n) => n.nearby && !n.closed) ?? [];
   const live = news?.filter((n) => !n.closed) ?? [];
@@ -54,21 +66,13 @@ export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, p
         onSearch={() => go('nav')}
         sub={
           state.kind === 'ok' ? (
+            // 設定「交通工具優先」：港鐵 → 最近港鐵站排先；巴士 → 最近巴士站排先
             <>
-              {mtrNear && (
-                <button className="hero-line hero-mtr" onClick={() => onMtr(mtrNear.sta)}>
-                  <Icon name="train" size={14} /> 最近港鐵站：{mtrStationName(mtrNear.sta)}
-                  <span className="hero-mtr-dots" aria-hidden="true">
-                    {mtrStationLines(mtrNear.sta).map((l) => (
-                      <i key={l} style={{ background: mtrLine(l)?.color }} />
-                    ))}
-                  </span>
-                  · {formatDistance(mtrNear.distance)}
-                </button>
-              )}
+              {prefs.priority === 'rail' && mtrLineEl}
               <span className="hero-line">
                 <Icon name="navigate" size={14} /> {head ? `最近巴士站：${head.name} · ${formatDistance(head.distance)}` : `${radiusLabel(prefs.nearbyRadius)}內冇巴士站`}
               </span>
+              {prefs.priority !== 'rail' && mtrLineEl}
             </>
           ) : state.kind === 'error' ? (
             <button className="hero-retry" onClick={locate}>
