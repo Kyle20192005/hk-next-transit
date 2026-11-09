@@ -244,8 +244,12 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
 - `app/manifest.ts`（`/manifest.webmanifest`）：`下一程 NextLeg`、黃色主題同底色（同 App 載入畫面）、standalone；
   圖示 `public/icons/`（`icon-*` 圓角、`maskable-*` 滿版黃底圖案縮到 80%，由 `docs/brand` 嘅 SVG 用 Playwright 畫出嚟）；
   捷徑（長撳圖示）`/?tab=favs`、`/?view=nearby`，Home 開頁讀完就 `replaceState` 清走。
-- layout：`appleWebApp`（capable、`statusBarStyle: 'default'`：狀態列跟 theme-color 黃色深色字，內容由狀態列下面開始）、
-  `viewportFit: 'cover'`（底部分頁列靠 `env(safe-area-inset-bottom)` 避開 Home 條；body 左右加 safe-area，橫放唔俾瀏海遮）。
+- layout：`appleWebApp`（capable、`statusBarStyle: 'default'`：狀態列唔透明，內容由狀態列下面開始）、
+  `viewportFit: 'cover'`（底部分頁列靠 `env(safe-area-inset-bottom)` 避開 Home 條；`.home`、`.route-page` 左右加 safe-area，橫放唔俾瀏海遮）。
+  **iOS 26 主畫面 App（同 Safari 26）唔睇 `theme-color`**：狀態列顏色由頁面決定：頂部中間有全闊（≥ 90%）`fixed`／`sticky` 元素就用佢底色，
+  冇就用 **body 底色**（2026-11 用戶截圖：路線分頁狀態列灰色 = 以前嘅 `--bg`）。所以 `html, body` 底色係品牌黃 `--brand`，
+  內容區 `.home`、`.route-page` 自己用 `--bg`（新頁面根元素都要加，否則成頁變黃）。`theme-color` 照留俾 Chrome／Android。
+  狀態列樣式（default／black-translucent）iOS 只喺加至主畫面嗰陣讀，改咗要刪咗再加；black-translucent 喺 iOS 26 有 viewport 矮咗一條狀態列嘅 bug（WebKit 301108），唔好用。
 - `public/sw.js`（`lib/pwa.ts` 嘅 `startPwa` 只喺正式版註冊，開發版唔註冊；`next.config.ts` 俾 `/sw.js` no-cache 同 CSP）：
   `/api/*`、其他網站（tracker、地圖、營辦商）、Next RSC 請求（`?_rsc`、`RSC` header）**一律唔 cache**；
   `/_next/static/*` cache 優先（最多 400）；撳入嘅頁網絡優先、記低最近 30 頁，冇網絡用記低嗰版（安裝時先記低首頁），

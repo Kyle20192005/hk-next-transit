@@ -82,16 +82,15 @@
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--text); }
+/* 頁面底色用品牌黃：iOS 26 主畫面 App（同 Safari 26）唔睇 theme-color，狀態列顏色由頁面決定——
+   頂部冇全闊 fixed／sticky 元素就用 body 底色（2026-11 路線分頁狀態列變咗灰）。內容區（.home、.route-page）先用 --bg */
+html, body { margin: 0; background: var(--brand); color: var(--text); }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "PingFang HK", "Noto Sans HK", "Microsoft JhengHei", sans-serif;
   font-size: 16px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  /* viewport-fit=cover（PWA）：橫放手機唔好俾瀏海遮住（直放係 0） */
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
 }
 a { color: var(--accent); text-decoration: none; }
 /* 統一字體：掣、輸入欄、下拉選單一律跟 body（瀏覽器預設唔繼承，Windows 等會變另一隻字） */
@@ -136,6 +135,8 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 
 /* ================= 首頁 ================= */
 .home { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; }
+/* 內容區底色（body 係品牌黃，見上面）；viewport-fit=cover（PWA）：橫放手機唔好俾瀏海遮住（直放係 0） */
+.home, .route-page { background: var(--bg); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); box-sizing: border-box; }
 .home-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
 /* 底部分頁列 */
