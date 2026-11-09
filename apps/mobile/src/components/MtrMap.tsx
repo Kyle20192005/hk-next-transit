@@ -1,5 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { Linking, PanResponder, Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
+import { Animated, Linking, PanResponder, Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText, TSpan } from 'react-native-svg';
 import {
   MTR_LINES,
@@ -60,12 +60,62 @@ function zoomAt(v: MapView, s: Size, factor: number, px: number, py: number): Ma
   return clamp({ x: ux - (px / s.w) * w, y: uy - (py / s.w) * w, w }, s);
 }
 
-/** 手勢 callback 用嘅最新值（PanResponder 只建一次） */
-type Live = { view: MapView | null; size: Size; setView: (v: MapView) => void; onStation: (sta: string) => void; stopAnim: () => void };
+/**
+ * 變形：已畫好嘅 SVG 外面套住嘅 translate + scale（RN transform 以中心為原點）。
+ * 拖、縮放、飛去個站嘅時候只改呢個（好似郁一張相，唔使重畫），放手先用新範圍重畫 SVG 一次。
+ */
+type Xf = { s: number; tx: number; ty: number };
+const ID: Xf = { s: 1, tx: 0, ty: 0 };
+/** 四邊畫多幾多出畫面外（拖嘅時候唔會即刻見到空白） */
+const OVERSCAN = 0.3;
+/** 拖緊嘅時候最多幾耐重畫一次（出咗已畫範圍、或者放大到矇） */
+const REDRAW_MS = 250;
+/** 一格細過幾多 px 就唔畫英文站名（字細過 4px 睇唔到，少畫一半字，重畫快啲） */
+const EN_MIN_PX = 22;
+
+/** 已畫好嘅範圍 V 加上變形 xf，畫面實際顯示緊嘅範圍 */
+function effView(V: MapView, xf: Xf, s: Size): MapView {
+  const k = s.w / V.w;
+  const cx = s.w / 2;
+  const cy = s.h / 2;
+  return { x: V.x + (cx + (-cx - xf.tx) / xf.s) / k, y: V.y + (cy + (-cy - xf.ty) / xf.s) / k, w: V.w / xf.s };
+}
+/** 要顯示範圍 E，已畫好嘅係 V：要套幾多變形 */
+function xfFor(V: MapView, E: MapView, s: Size): Xf {
+  const k = s.w / V.w;
+  const cx = s.w / 2;
+  const cy = s.h / 2;
+  const sc = V.w / E.w;
+  return { s: sc, tx: -cx - sc * ((E.x - V.x) * k - cx), ty: -cy - sc * ((E.y - V.y) * k - cy) };
+}
+
+type AnimXf = { tx: Animated.Value; ty: Animated.Value; s: Animated.Value };
+function pushXf(a: AnimXf, ref: RefObject<Xf>, n: Xf) {
+  ref.current = n;
+  a.tx.setValue(n.tx);
+  a.ty.setValue(n.ty);
+  a.s.setValue(n.s);
+}
+
+/** 手勢、動畫用嘅最新值同動作（PanResponder 只建一次） */
+type Live = {
+  size: Size;
+  /** 而家畫面顯示緊嘅範圍 */
+  eff: () => MapView | null;
+  /** 即刻顯示範圍 E（只改變形）；redraw = 出咗已畫範圍或者放大到矇就安排重畫 */
+  show: (E: MapView, redraw?: boolean) => void;
+  /** 用而家嘅範圍重畫 SVG */
+  commit: () => void;
+  /** 動畫去範圍 E（以 (fx, fy) 為焦點），完咗重畫 */
+  animateTo: (E: MapView, ms: number, fx: number, fy: number) => void;
+  stopAnim: () => void;
+  onStation: (sta: string) => void;
+};
 
 /**
  * 港鐵路綫圖（同網頁 components/rail/MtrMap.tsx 一樣嘅 core 資料同畫法）：一隻手指拖、兩隻手指放大縮細、撳站。
- * 用 viewBox 做平移縮放（每次郁都重畫，站名喺任何大細都清楚）；地圖內容 memo 住，郁嘅時候 React 唔使再砌。
+ * react-native-svg 每次改 viewBox 都要喺手機重畫成幅圖（百幾個站、幾百段字），逐格重畫會好卡：
+ * 所以手勢同動畫期間只係郁已畫好嘅圖（Animated transform），放手先重畫一次（四邊多畫 30%，拖嘅時候唔會即刻見空白）。
  */
 export function MtrMap({
   selected,
@@ -80,19 +130,80 @@ export function MtrMap({
 }) {
   const t = useTheme();
   const [size, setSize] = useState<Size>({ w: 0, h: 0 });
+  /** SVG 畫緊嘅範圍（改佢 = 重畫） */
   const [view, setView] = useState<MapView | null>(null);
-  const anim = useRef<number>(0);
-  const live = useRef<Live>({ view, size, setView, onStation, stopAnim: () => cancelAnimationFrame(anim.current) });
+  const [anim] = useState<AnimXf>(() => ({ tx: new Animated.Value(0), ty: new Animated.Value(0), s: new Animated.Value(1) }));
+  const xf = useRef<Xf>(ID);
+  /** 同 xf 配對嘅已畫範圍（SVG 真係畫好咗先更新） */
+  const base = useRef<{ view: MapView | null; size: Size }>({ view: null, size: { w: 0, h: 0 } });
+  const lastDraw = useRef(0);
+  const raf = useRef(0);
+
+  // SVG 用新範圍畫好：將變形換算返相對新範圍（重畫期間手指郁咗都唔會跳）
   useLayoutEffect(() => {
-    live.current = { ...live.current, view, size, setView, onStation };
-  }, [view, size, onStation]);
+    const b = base.current;
+    if (view && b.view && b.size.w === size.w && b.size.h === size.h) pushXf(anim, xf, xfFor(view, effView(b.view, xf.current, size), size));
+    else pushXf(anim, xf, ID);
+    base.current = { view, size };
+  }, [view, size, anim]);
+
+  const eff = () => (base.current.view ? effView(base.current.view, xf.current, base.current.size) : null);
+  const commit = () => {
+    const E = eff();
+    const V = base.current.view;
+    if (!E || !V) return;
+    lastDraw.current = Date.now();
+    if (Math.abs(E.x - V.x) + Math.abs(E.y - V.y) + Math.abs(E.w - V.w) > 1e-4) setView(E);
+  };
+  const show = (E: MapView, redraw = true) => {
+    const { view: V, size: S } = base.current;
+    if (!V || !S.w) return;
+    const c = clamp(E, S);
+    pushXf(anim, xf, xfFor(V, c, S));
+    if (!redraw || Date.now() - lastDraw.current < REDRAW_MS) return;
+    const k = S.w / V.w;
+    const mx = (S.w * OVERSCAN) / k;
+    const my = (S.h * OVERSCAN) / k;
+    const ch = (c.w * S.h) / S.w;
+    const out = c.x < V.x - mx || c.y < V.y - my || c.x + c.w > V.x + V.w + mx || c.y + ch > V.y + (V.w * S.h) / S.w + my;
+    // 放大到 1.6 倍以上，圖會開始矇
+    if (out || c.w < V.w / 1.6) commit();
+  };
+  const stopAnim = () => cancelAnimationFrame(raf.current);
+  const animateTo = (target: MapView, ms: number, fx: number, fy: number) => {
+    const from = eff();
+    const S = base.current.size;
+    if (!from || !S.w) return;
+    const to = clamp(target, S);
+    // 插值「焦點」嘅世界座標同縮放（對數），焦點唔會飄
+    const fc = { x: from.x + fx * (from.w / S.w), y: from.y + fy * (from.w / S.w) };
+    const tc = { x: to.x + fx * (to.w / S.w), y: to.y + fy * (to.w / S.w) };
+    const t0 = Date.now();
+    stopAnim();
+    const step = () => {
+      const p = Math.min(1, (Date.now() - t0) / ms);
+      const e = 1 - (1 - p) ** 3;
+      const ww = from.w * (to.w / from.w) ** e;
+      const c = { x: fc.x + (tc.x - fc.x) * e, y: fc.y + (tc.y - fc.y) * e };
+      show({ x: c.x - fx * (ww / S.w), y: c.y - fy * (ww / S.w), w: ww }, false);
+      if (p < 1) raf.current = requestAnimationFrame(step);
+      else commit();
+    };
+    raf.current = requestAnimationFrame(step);
+  };
+
+  const live = useRef<Live | null>(null);
+  useLayoutEffect(() => {
+    live.current = { size, eff, show, commit, animateTo, stopAnim, onStation };
+  });
 
   // 飛去某個站（同網頁一樣）：搜尋就放大置中；撳站只喺俾面板遮住先移；面板高度變（載入完）只喺揀站 1.5 秒內跟
   const handled = useRef<{ focus: MtrFocus; at: number } | null>(null);
   const ready = view !== null;
   useEffect(() => {
-    const v = live.current.view;
-    if (!focus || !v || !size.w) return;
+    const L = live.current;
+    const v = L?.eff();
+    if (!L || !focus || !v || !size.w) return;
     const s = STATIONS.find((x) => x.code === focus.sta);
     if (!s) return;
     const first = handled.current?.focus !== focus;
@@ -110,25 +221,9 @@ export function MtrMap({
       if (sx > 48 && sx < visW - 48 && sy > 48 && sy < visH - 48) return;
     }
     const k = w / size.w;
-    const target = clamp({ x: cx - (visW / 2) * k, y: cy - (visH / 2) * k, w }, size);
-    const from = v;
-    const fc = { x: from.x + (visW / 2) * (from.w / size.w), y: from.y + (visH / 2) * (from.w / size.w) };
-    const tc = { x: target.x + (visW / 2) * k, y: target.y + (visH / 2) * k };
-    const t0 = Date.now();
-    cancelAnimationFrame(anim.current);
-    const step = () => {
-      const p = Math.min(1, (Date.now() - t0) / 380);
-      const e = 1 - (1 - p) ** 3;
-      const ww = from.w * (target.w / from.w) ** e;
-      const c = { x: fc.x + (tc.x - fc.x) * e, y: fc.y + (tc.y - fc.y) * e };
-      const nv = { x: c.x - (visW / 2) * (ww / size.w), y: c.y - (visH / 2) * (ww / size.w), w: ww };
-      live.current.view = nv;
-      setView(nv);
-      if (p < 1) anim.current = requestAnimationFrame(step);
-    };
-    anim.current = requestAnimationFrame(step);
+    L.animateTo({ x: cx - (visW / 2) * k, y: cy - (visH / 2) * k, w }, 380, visW / 2, visH / 2);
   }, [focus, inset.right, inset.bottom, size, ready]);
-  useEffect(() => () => cancelAnimationFrame(anim.current), []);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -143,37 +238,47 @@ export function MtrMap({
 
   const aspect = size.w ? size.h / size.w : 1;
   const zoomBtn = (f: number) => {
-    cancelAnimationFrame(anim.current);
-    if (view) setView(zoomAt(view, size, f, (size.w - inset.right) / 2, (size.h - inset.bottom) / 2));
+    const v = eff();
+    const fx = (size.w - inset.right) / 2;
+    const fy = (size.h - inset.bottom) / 2;
+    if (v) animateTo(zoomAt(v, size, f, fx, fy), 200, fx, fy);
   };
   const fitAll = () => {
-    cancelAnimationFrame(anim.current);
     const w = Math.max(MTR_MAP_VIEW.width, MTR_MAP_VIEW.height / aspect);
-    setView(clamp({ x: MTR_MAP_VIEW.minX + MTR_MAP_VIEW.width / 2 - w / 2, y: MTR_MAP_VIEW.minY + MTR_MAP_VIEW.height / 2 - (w * aspect) / 2, w }, size));
+    animateTo({ x: MTR_MAP_VIEW.minX + MTR_MAP_VIEW.width / 2 - w / 2, y: MTR_MAP_VIEW.minY + MTR_MAP_VIEW.height / 2 - (w * aspect) / 2, w }, 260, size.w / 2, size.h / 2);
   };
   const sel = selected ? STATIONS.find((s) => s.code === selected) : undefined;
+  // 已畫範圍四邊各加 OVERSCAN
+  const mx = Math.round(size.w * OVERSCAN);
+  const my = Math.round(size.h * OVERSCAN);
+  const k = view ? size.w / view.w : 1;
 
   return (
     <View onLayout={onLayout} style={{ flex: 1, overflow: 'hidden', backgroundColor: t.card }}>
       <GestureSurface live={live}>
         {view && size.w > 0 && (
-          // pointerEvents none：觸點一律落喺外面嗰層（locationX 先係相對地圖）
-          <Svg width={size.w} height={size.h} viewBox={`${view.x} ${view.y} ${view.w} ${view.w * aspect}`} pointerEvents="none">
-            <MapContent t={t} />
-            {/* 揀咗嘅站：重點色光圈 + 白心變黃 */}
-            {sel && (
-              <Circle
-                cx={sel.box.x + sel.box.w / 2}
-                cy={sel.box.y + sel.box.h / 2}
-                r={Math.max(sel.box.w, sel.box.h) / 2 + 0.22}
-                fill={t.accent}
-                fillOpacity={0.16}
-                stroke={t.accent}
-                strokeWidth={0.05}
-              />
-            )}
-            {sel?.pts.map((p, i) => <Circle key={i} cx={p[0]} cy={p[1]} r={MTR_MAP_DOT_R - MTR_MAP_RING} fill={t.brand} />)}
-          </Svg>
+          // pointerEvents none：觸點一律落喺外面嗰層（locationX 先係相對地圖）。外框中心 = 地圖中心（變形以中心為原點）
+          <Animated.View
+            pointerEvents="none"
+            style={{ position: 'absolute', left: -mx, top: -my, width: size.w + 2 * mx, height: size.h + 2 * my, transform: [{ translateX: anim.tx }, { translateY: anim.ty }, { scale: anim.s }] }}
+          >
+            <Svg width={size.w + 2 * mx} height={size.h + 2 * my} viewBox={`${view.x - mx / k} ${view.y - my / k} ${(size.w + 2 * mx) / k} ${(size.h + 2 * my) / k}`}>
+              <MapContent t={t} en={k >= EN_MIN_PX} />
+              {/* 揀咗嘅站：重點色光圈 + 白心變黃 */}
+              {sel && (
+                <Circle
+                  cx={sel.box.x + sel.box.w / 2}
+                  cy={sel.box.y + sel.box.h / 2}
+                  r={Math.max(sel.box.w, sel.box.h) / 2 + 0.22}
+                  fill={t.accent}
+                  fillOpacity={0.16}
+                  stroke={t.accent}
+                  strokeWidth={0.05}
+                />
+              )}
+              {sel?.pts.map((p, i) => <Circle key={i} cx={p[0]} cy={p[1]} r={MTR_MAP_DOT_R - MTR_MAP_RING} fill={t.brand} />)}
+            </Svg>
+          </Animated.View>
         )}
       </GestureSurface>
       <Pressable onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')} style={{ position: 'absolute', left: 10, bottom: 8 + inset.bottom, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: t.card + 'cc' }}>
@@ -196,7 +301,7 @@ export function MtrMap({
 }
 
 /** 手勢層：一隻手指拖、兩隻手指縮放、輕撳揀站（撳中嘅範圍大過站圈少少） */
-function GestureSurface({ live, children }: { live: RefObject<Live>; children: React.ReactNode }) {
+function GestureSurface({ live, children }: { live: RefObject<Live | null>; children: React.ReactNode }) {
   const [responder] = useState(() => {
     let moved = 0;
     let last: { x: number; y: number } | null = null;
@@ -206,29 +311,41 @@ function GestureSurface({ live, children }: { live: RefObject<Live>; children: R
       const touch = e.nativeEvent.touches[i] ?? e.nativeEvent;
       return { x: touch.locationX, y: touch.locationY };
     };
-    const apply = (v: MapView) => {
-      live.current.view = v;
-      live.current.setView(v);
+    const end = () => {
+      const L = live.current;
+      if (!L) return;
+      // 拖完：用新範圍重畫一次
+      if (moved >= 8) return L.commit();
+      const v = L.eff();
+      if (!v || !start) return;
+      // 撳：換算做地圖座標，搵撳中嘅站
+      const k = v.w / L.size.w;
+      const mx = v.x + start.x * k;
+      const my = v.y + start.y * k;
+      const pad = Math.max(0.25, 12 * k);
+      const hit = STATIONS.find((s) => mx >= s.box.x - pad && mx <= s.box.x + s.box.w + pad && my >= s.box.y - pad && my <= s.box.y + s.box.h + pad);
+      if (hit) L.onStation(hit.code);
     };
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
-        live.current.stopAnim();
+        live.current?.stopAnim();
         moved = 0;
         pinch = null;
         last = start = pt(e);
       },
       onPanResponderMove: (e) => {
-        const { view: v, size } = live.current;
-        if (!v || !size.w) return;
+        const L = live.current;
+        const v = L?.eff();
+        if (!L || !v || !L.size.w) return;
         if (e.nativeEvent.touches.length >= 2) {
           const a = pt(e, 0);
           const b = pt(e, 1);
           const d = Math.hypot(a.x - b.x, a.y - b.y);
           moved += 100; // 兩隻手指唔當撳
-          if (pinch) apply(zoomAt(v, size, d / pinch, (a.x + b.x) / 2, (a.y + b.y) / 2));
+          if (pinch) L.show(zoomAt(v, L.size, d / pinch, (a.x + b.x) / 2, (a.y + b.y) / 2));
           pinch = d;
           last = null;
           return;
@@ -241,19 +358,13 @@ function GestureSurface({ live, children }: { live: RefObject<Live>; children: R
         const dx = p.x - prev.x;
         const dy = p.y - prev.y;
         moved += Math.abs(dx) + Math.abs(dy);
-        const k = v.w / size.w;
-        apply(clamp({ ...v, x: v.x - dx * k, y: v.y - dy * k }, size));
+        const k = v.w / L.size.w;
+        L.show({ ...v, x: v.x - dx * k, y: v.y - dy * k });
       },
-      onPanResponderRelease: () => {
-        const { view: v, size, onStation } = live.current;
-        if (!v || !start || moved >= 8) return;
-        // 撳：換算做地圖座標，搵撳中嘅站
-        const k = v.w / size.w;
-        const mx = v.x + start.x * k;
-        const my = v.y + start.y * k;
-        const pad = Math.max(0.25, 12 * k);
-        const hit = STATIONS.find((s) => mx >= s.box.x - pad && mx <= s.box.x + s.box.w + pad && my >= s.box.y - pad && my <= s.box.y + s.box.h + pad);
-        if (hit) onStation(hit.code);
+      onPanResponderRelease: end,
+      onPanResponderTerminate: () => {
+        moved = Math.max(moved, 8);
+        end();
       },
     });
   });
@@ -273,7 +384,7 @@ function ZoomButton({ t, onPress, label, children }: { t: Theme; onPress: () => 
 }
 
 /** 地圖內容（海、地區名、圖例、綫、連接綫、站、站名）：只跟主題變，郁地圖唔使再砌 */
-const MapContent = memo(function MapContent({ t }: { t: Theme }) {
+const MapContent = memo(function MapContent({ t, en }: { t: Theme; en: boolean }) {
   const waterD = MTR_MAP_WATER.map((w) => `${mtrRoundPathD(w, [], 0.3)} Z`).join(' ');
   return (
     <G fontFamily={FONT}>
@@ -315,13 +426,13 @@ const MapContent = memo(function MapContent({ t }: { t: Theme }) {
         return <Line key={`${a}-${b}`} x1={best[0][0]} y1={best[0][1]} x2={best[1][0]} y2={best[1][1]} stroke={RING} strokeWidth={dashed ? 0.06 : 0.05} strokeDasharray={dashed ? [0.12, 0.08] : undefined} />;
       })}
       {STATIONS.map((s) => (
-        <Station key={s.code} s={s} t={t} />
+        <Station key={s.code} s={s} t={t} en={en} />
       ))}
     </G>
   );
 });
 
-function Station({ s, t }: { s: MtrMapStation; t: Theme }) {
+function Station({ s, t, en }: { s: MtrMapStation; t: Theme; en: boolean }) {
   const lp = mtrLabelPos(s.box, s.label, 0.14 + s.labelGap);
   const zhY = lp.baseline === 'top' ? lp.y + 0.3 : lp.baseline === 'bottom' ? lp.y - 0.22 : lp.y - 0.02;
   const enY = zhY + 0.25;
@@ -348,12 +459,16 @@ function Station({ s, t }: { s: MtrMapStation; t: Theme }) {
       <SvgText x={lp.x} y={zhY} textAnchor={lp.anchor} fontSize={0.3} fontWeight="700" fill={t.text}>
         {mtrStationName(s.code)}
       </SvgText>
-      <SvgText x={lp.x} y={enY} textAnchor={lp.anchor} fontSize={0.18} fontWeight="500" fill={t.muted} stroke={t.card} strokeWidth={0.09} strokeLinejoin="round">
-        {mtrStationEn(s.code)}
-      </SvgText>
-      <SvgText x={lp.x} y={enY} textAnchor={lp.anchor} fontSize={0.18} fontWeight="500" fill={t.muted}>
-        {mtrStationEn(s.code)}
-      </SvgText>
+      {en && (
+        <>
+          <SvgText x={lp.x} y={enY} textAnchor={lp.anchor} fontSize={0.18} fontWeight="500" fill={t.muted} stroke={t.card} strokeWidth={0.09} strokeLinejoin="round">
+            {mtrStationEn(s.code)}
+          </SvgText>
+          <SvgText x={lp.x} y={enY} textAnchor={lp.anchor} fontSize={0.18} fontWeight="500" fill={t.muted}>
+            {mtrStationEn(s.code)}
+          </SvgText>
+        </>
+      )}
     </G>
   );
 }

@@ -139,6 +139,9 @@ App `src/components/{RailView,MtrMap,MtrStationSheet}.tsx`（`(tabs)/routes.tsx`
   迪士尼綫先貼住東涌綫向東北再屈落；香港站喺中環正上方、上下排；紅磡東鐵、屯馬一齊向東北斜（屯馬東南邊），何文田屯馬喺觀塘綫上面水平並排。
 - 手勢：網頁 viewBox 平移縮放（pointer、兩指、滑鼠轆）；App `PanResponder`（最新狀態放 `useLayoutEffect` 更新嘅 ref，`Svg pointerEvents="none"`，
   觸點用 `locationX`），一隻手指拖、兩隻手指縮放、輕撳搵站圈範圍。
+  **App 唔好逐格改 viewBox**（react-native-svg 會喺手機重畫成幅圖，好卡）：手勢、飛去個站、縮放掣期間只改外框嘅 `Animated` transform（`effView`／`xfFor` 換算），
+  放手或者動畫完先用新範圍重畫一次；SVG 四邊多畫 30%（`OVERSCAN`），拖出已畫範圍或者放大過 1.6 倍先中途重畫（最多 0.25 秒一次）；
+  重畫完 `useLayoutEffect` 將 transform 換算返相對新範圍（唔會跳）。一格細過 22px 唔畫英文站名（`EN_MIN_PX`）。
 
 ## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）
 
