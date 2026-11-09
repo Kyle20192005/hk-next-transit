@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LINES, MTR_MAP_LINKS, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
+import { MTR_LINES, MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LEGEND, MTR_MAP_LEGEND_SYMBOLS, MTR_MAP_LINES, MTR_MAP_LINKS, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
 import Icon from '../Icon';
 
 type View = { x: number; y: number; w: number };
@@ -25,16 +25,16 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
     () => MTR_MAP_LINES.flatMap((l) => l.paths.map((p, i) => ({ key: `${l.line}-${i}`, color: mtrLine(l.line)?.color, d: mtrLinePathD(p), dashed: l.dashed?.includes(i) ?? false }))),
     [],
   );
-  // 香港 ↔ 中環：兩個站最近嗰兩個圈之間一條細黑綫
+  // 香港 ↔ 中環（實綫）、尖沙咀 ↔ 尖東（步行虛綫）：兩個站最近嗰兩個圈之間一條細黑綫
   const links = useMemo(
     () =>
-      MTR_MAP_LINKS.flatMap(([a, b]) => {
+      MTR_MAP_LINKS.flatMap(({ a, b, dashed }) => {
         const sa = stations.find((s) => s.code === a);
         const sb = stations.find((s) => s.code === b);
         if (!sa || !sb) return [];
         let best: [readonly number[], readonly number[]] = [sa.pts[0]!, sb.pts[0]!];
         for (const p of sa.pts) for (const q of sb.pts) if (Math.hypot(p[0] - q[0], p[1] - q[1]) < Math.hypot(best[0][0]! - best[1][0]!, best[0][1]! - best[1][1]!)) best = [p, q];
-        return [{ key: `${a}-${b}`, p: best[0], q: best[1] }];
+        return [{ key: `${a}-${b}`, p: best[0], q: best[1], dashed: !!dashed }];
       }),
     [stations],
   );
@@ -144,11 +144,12 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
               </text>
             </g>
           ))}
+          <MapLegend />
           {linePaths.map((l) => (
             <path key={l.key} d={l.d} className={l.dashed ? 'mtr-line dashed' : 'mtr-line'} stroke={l.color} strokeWidth={MTR_MAP_GAP} />
           ))}
           {links.map((k) => (
-            <line key={k.key} x1={k.p[0]} y1={k.p[1]} x2={k.q[0]} y2={k.q[1]} className="mtr-link" />
+            <line key={k.key} x1={k.p[0]} y1={k.p[1]} x2={k.q[0]} y2={k.q[1]} className={k.dashed ? 'mtr-link dashed' : 'mtr-link'} />
           ))}
           {stations.map((s) => {
             const lp = mtrLabelPos(s.box, s.label, 0.14 + s.labelGap);
@@ -204,5 +205,71 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
         </button>
       </div>
     </div>
+  );
+}
+
+/** 圖例：左上角空位（core MTR_MAP_LEGEND，排版工具保證唔撞綫同站名）。綫兩欄，下面四個符號 */
+function MapLegend() {
+  const L = MTR_MAP_LEGEND;
+  const col = (i: number) => 0.4 + i * 5.2;
+  const rowY = (i: number) => 1.3 + i * 0.62;
+  const symY = (i: number) => rowY(5) + 0.12 + i * 0.62;
+  const R = MTR_MAP_DOT_R;
+  const ring = (cx: number, cy: number, key: string) => [
+    <circle key={`${key}r`} cx={cx} cy={cy} r={R} className="mtr-ring" />,
+    <circle key={`${key}f`} cx={cx} cy={cy} r={R - MTR_MAP_RING} className="mtr-fill" />,
+  ];
+  return (
+    <g className="mtr-legend" transform={`translate(${L.x} ${L.y})`} aria-hidden="true">
+      <rect width={L.w} height={L.h} rx={0.3} className="mtr-legend-box" />
+      <text x={0.4} y={0.68} className="mtr-legend-title">
+        圖例<tspan className="mtr-legend-en" dx={0.15}>Legend</tspan>
+      </text>
+      {MTR_LINES.map((l, i) => {
+        const x = col(Math.floor(i / 5));
+        const y = rowY(i % 5);
+        return (
+          <g key={l.code}>
+            <line x1={x} y1={y} x2={x + 0.8} y2={y} stroke={l.color} strokeWidth={MTR_MAP_GAP} strokeLinecap="round" />
+            <text x={x + 1.05} y={y + 0.1} className="mtr-legend-zh">
+              {l.zh}
+              <tspan className="mtr-legend-en" dx={0.15}>
+                {l.en}
+              </tspan>
+            </text>
+          </g>
+        );
+      })}
+      {MTR_MAP_LEGEND_SYMBOLS.map((sym, i) => {
+        const x = col(i % 2);
+        const y = symY(Math.floor(i / 2));
+        let icon;
+        if (sym.kind === 'station') icon = ring(x + 0.4, y, 's');
+        else if (sym.kind === 'interchange') {
+          const a = x + 0.4 - MTR_MAP_GAP / 2;
+          const b = x + 0.4 + MTR_MAP_GAP / 2;
+          icon = [
+            ...ring(a, y, 'a').slice(0, 1),
+            ...ring(b, y, 'b').slice(0, 1),
+            ...ring(a, y, 'a').slice(1),
+            ...ring(b, y, 'b').slice(1),
+            <line key="ta" x1={a - MTR_MAP_GAP / 2} y1={y} x2={a + MTR_MAP_GAP / 2} y2={y} stroke={MTR_LINES[0]!.color} strokeWidth={MTR_MAP_TICK.width} />,
+            <line key="tb" x1={b - MTR_MAP_GAP / 2} y1={y} x2={b + MTR_MAP_GAP / 2} y2={y} stroke={MTR_LINES[1]!.color} strokeWidth={MTR_MAP_TICK.width} />,
+          ];
+        } else if (sym.kind === 'walk') icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} className="mtr-link dashed" />;
+        else icon = <line x1={x} y1={y} x2={x + 0.8} y2={y} stroke={MTR_LINES.find((l) => l.code === 'EAL')!.color} strokeWidth={MTR_MAP_GAP} className="mtr-line dashed" />;
+        return (
+          <g key={sym.kind}>
+            {icon}
+            <text x={x + 1.05} y={y + 0.1} className="mtr-legend-zh">
+              {sym.zh}
+              <tspan className="mtr-legend-en" dx={0.15}>
+                {sym.en}
+              </tspan>
+            </text>
+          </g>
+        );
+      })}
+    </g>
   );
 }

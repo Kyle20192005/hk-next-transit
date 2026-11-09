@@ -137,6 +137,20 @@ describe('mtr map geometry', () => {
     expect(hok.pts.every((p) => p[0] === cen.pts[0]![0])).toBe(true);
     expect(Math.max(...hok.pts.map((p) => p[1]))).toBeLessThan(Math.min(...cen.pts.map((p) => p[1])));
   });
+  it('Hung Hom interchange is tilted 45°; at Ho Man Tin the Tuen Ma and Kwun Tong lines run side by side horizontally', () => {
+    const st = mtrMapStations();
+    const huh = st.find((s) => s.code === 'HUH')!;
+    expect(Math.abs(huh.pts[0]![0] - huh.pts[1]![0])).toBeCloseTo(Math.abs(huh.pts[0]![1] - huh.pts[1]![1]), 4);
+    const hom = st.find((s) => s.code === 'HOM')!;
+    expect(hom.pts[0]![0]).toBe(hom.pts[1]![0]);
+    // 兩條綫喺何文田都係橫行
+    for (const code of ['KTL', 'TML']) {
+      const l = MTR_MAP_LINES.find((x) => x.line === code)!;
+      const p = l.stations.HOM!;
+      const seg = l.paths.flatMap((path) => path.slice(1).map((b, i) => [path[i]!, b] as const)).find(([a, b]) => Math.abs(Math.hypot(p[0] - a[0], p[1] - a[1]) + Math.hypot(b[0] - p[0], b[1] - p[1]) - Math.hypot(b[0] - a[0], b[1] - a[1])) < 0.01)!;
+      expect(seg[0][1], code).toBe(seg[1][1]);
+    }
+  });
   it('interchange points line up horizontally, vertically or at 45°, circles touching (G apart)', () => {
     for (const s of mtrMapStations()) {
       if (s.pts.length < 2) continue;

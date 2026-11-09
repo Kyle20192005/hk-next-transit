@@ -15,7 +15,10 @@ H = G * math.sqrt(2) / 2   # 斜綫並排：垂直相隔 G 嘅點，x、y 各差
 # 支綫分岔站：畫雙圈（似轉車站，但冇綫色短棒）。主綫用上面個圈，支綫由呢個點（下面個圈）出發
 DOUBLE = {}   # 下面設
 # 兩個站之間畫一條細黑綫（同一個站名唔同嘅站：香港 ↔ 中環）
-LINKS = [('HOK', 'CEN')]
+# 圖例（x, y, 闊, 高）：左上角空位（后海灣、深圳）；綫、站、站名都唔可以入去
+LEGEND = (-2.4, -2.4, 10.6, 5.75)
+# (站, 站, 虛綫?)：香港 ↔ 中環實綫；尖沙咀 ↔ 尖東步行虛綫
+LINKS = [('HOK', 'CEN', False), ('TST', 'ETS', True)]
 L = {}
 def line(code, paths, stations, dashed=()):
     """dashed：邊幾段 path 用虛綫（例如東鐵綫經馬場）"""
@@ -32,12 +35,12 @@ TW = IY - G
 ML = 9.0 + 2*G   # 屯馬綫南昌、美孚嗰段直綫（機場快綫 9.0、東涌綫 9.0+G、屯馬綫 9.0+2G 並排）
 line('TWL', [[(10.2,TW),(13.3,TW),(15,TW-1.7),(15,12.3),(6.9,12.3),(6.9,7.5)]], dict(
     CEN=(10.2,TW), ADM=(12.4,TW), TST=(15,18.5), JOR=(15,17.2), YMT=(15,15.8), MOK=(15,14.8), PRE=(15,13.8),
-    SSP=(13.6,12.3), CSW=(12.25,12.3), LCK=(10.9,12.3), MEF=(ML,12.3), LAK=(7.86,12.3), KWF=(6.9,10.2), KWH=(6.9,9.3), TWH=(6.9,8.4), TSW=(6.9,7.5)))
+    SSP=(13.8,12.3), CSW=(12.25,12.3), LCK=(10.75,12.3), MEF=(ML,12.3), LAK=(7.86,12.3), KWF=(6.9,10.2), KWH=(6.9,9.3), TWH=(6.9,8.4), TSW=(6.9,7.5)))
 # ---------------- 觀塘綫：油麻地至太子喺荃灣綫右邊貼住 ----------------
 KX = 15 + G
-line('KTL', [[(21.2,17.2),(KX,17.2),(KX,9.8),(24.85,9.8),(24.85,15.4),(28.5,15.4)]], dict(
-    WHA=(21.2,17.2), HOM=(18.5+G,17.2), YMT=(KX,15.8), MOK=(KX,14.8), PRE=(KX,13.8), SKM=(KX,11.7), KOT=(17.5,9.8), LOF=(19.0,9.8),
-    WTS=(20.5,9.8), DIH=(22.0,9.8), CHH=(23.4,9.8), KOB=(24.85,11.3), NTK=(24.85,12.2), KWT=(24.85,13.1), LAT=(24.85,14.0), YAT=(27.2,15.4), TIK=(28.5,15.4)))
+line('KTL', [[(23.6,17.2),(KX,17.2),(KX,9.8),(24.85,9.8),(24.85,15.4),(28.5,15.4)]], dict(
+    WHA=(23.6,17.2), HOM=(21.9,17.2), YMT=(KX,15.8), MOK=(KX,14.8), PRE=(KX,13.8), SKM=(KX,11.7), KOT=(17.5,9.8), LOF=(19.3,9.8),
+    WTS=(21.15,9.8), DIH=(23.0,9.8), CHH=(24.0,9.8), KOB=(24.85,11.3), NTK=(24.85,12.2), KWT=(24.85,13.1), LAT=(24.85,14.0), YAT=(27.2,15.4), TIK=(28.5,15.4)))
 # ---------------- 將軍澳綫：北角、鰂魚涌貼住港島綫上面；油塘、調景嶺貼住觀塘綫下面；將軍澳分岔（雙圈） ----------------
 TK = 15.4 + G
 line('TKL', [[(22.6,TW),(25.9,TW),(25.9,TK),(31.0,TK),(31.0,12.4)],
@@ -46,12 +49,15 @@ line('TKL', [[(22.6,TW),(25.9,TW),(25.9,TK),(31.0,TK),(31.0,12.4)],
 DOUBLE['TKO'] = (29.6, TK+G)   # 康城支綫
 # ---------------- 屯馬綫：南昌、美孚直上，喺荃灣綫上面轉西（荔景、葵芳之間穿過荃灣綫）→ 荃灣西 → 錦上路 → 元朗、天水圍 → 屯門；
 #                  東面經大圍向東去馬鞍山（喺東鐵綫東南面） ----------------
-TX = 18.5 + G   # 紅磡、何文田嗰段直綫（東鐵綫東邊）
-line('TML', [[(-0.75,9.4),(-0.75,5.6),(5.0,5.6),(5.0,10.8),(ML,10.8),(ML,15.5),(ML+4.4,19.9),(TX,19.9),(TX,15.9),(22.0,15.9-(22.0-TX)),
-              (22.0,8.2),(17.5+G,8.2),(17.5+G,5.5),(23.4,5.5),(25.4,3.5),(27.6,3.5)]], dict(
-    TUM=(-0.75,9.4), SIH=(-0.75,7.6), TIS=(0.25,5.6), LOP=(1.4,5.6), YUL=(2.55,5.6), KSR=(3.7,5.6), TWW=(6.1,10.8),
-    MEF=(ML,12.3+G), NAC=(ML,14.9), AUS=(ML+1.92,17.42), ETS=(16.2,19.9), HUH=(TX,18.66), HOM=(TX,17.2-G), TKW=(20.3,TX+15.9-20.3), SUW=(22,12.0),
-    KAT=(22,11.3), DIH=(22,9.8+G), HIK=(20.0,8.2), TAW=(17.5+G,6.8), CKT=(19.2,5.5), STW=(20.4,5.5), CIO=(21.6,5.5), SHM=(22.8,5.5),
+# 紅磡：東鐵綫、屯馬綫一齊向東北斜（x + y = 常數），屯馬喺東南邊（喺紅磡南面穿過東鐵綫）
+CE1 = 36.4                   # 東鐵綫金鐘之後第一段斜上（唔好經灣仔）
+CE = 38.1                    # 東鐵綫會展 → 紅磡
+CM = CE + G*math.sqrt(2)     # 屯馬綫
+line('TML', [[(-0.75,9.4),(-0.75,5.6),(5.0,5.6),(5.0,10.8),(ML,10.8),(ML,15.5),(ML+4.4,19.9),(CM-19.9,19.9),(CM-(17.2-G),17.2-G),(22.4,17.2-G),(23.0,16.6-G),
+              (23.0,8.2),(17.5+G,8.2),(17.5+G,5.5),(23.4,5.5),(25.4,3.5),(27.6,3.5)]], dict(
+    TUM=(-0.75,9.4), SIH=(-0.75,7.6), TIS=(0.15,5.6), LOP=(1.42,5.6), YUL=(2.53,5.6), KSR=(3.96,5.6), TWW=(6.1,10.8),
+    MEF=(ML,12.3+G), NAC=(ML,14.9), AUS=(ML+1.92,17.42), ETS=(16.15,19.9), HUH=(CM-18.7,18.7), HOM=(21.9,17.2-G), TKW=(23,15.4), SUW=(23,13.8),
+    KAT=(23,12.2), DIH=(23,9.8+G), HIK=(20.0,8.2), TAW=(17.5+G,6.8), CKT=(19.1,5.5), STW=(20.63,5.5), CIO=(21.82,5.5), SHM=(22.87,5.5),
     TSH=(24.1,4.8), HEO=(24.8,4.1), MOS=(26.2,3.5), WKS=(27.6,3.5)))
 # ---------------- 東鐵綫：金鐘喺港島綫下面，過咗金鐘先斜上；紅磡同屯馬綫並排；大圍之後向東北去大學，再向西北去上水（分岔，雙圈）、羅湖 ----------------
 EA = IY + G
@@ -59,10 +65,10 @@ EA = IY + G
 RK = 0.5                      # 離東鐵綫幾遠
 RO = RK / math.sqrt(2)        # x、y 各移幾多
 RA, RB = (18.55, 4.15), (19.25, 3.45)   # 分出、駁返嘅位（站同站正中）
-line('EAL', [[(12.4,EA),(13.5,EA),(14.38,IY-0.7),(16.8,IY-0.7),(18.5,20.2),(18.5,17.7),(17.5,16.7),(17.5,5.2),(20.65,2.05),(18.0,-0.6),(15.0,-0.6),(14.3,-1.3)],
+line('EAL', [[(12.4,EA),(CE1-EA,EA),(CE1-21.5,21.5),(CE-21.5,21.5),(20.2,CE-20.2),(17.5,CE-20.2-2.7),(17.5,5.2),(20.65,2.05),(18.0,-0.6),(15.0,-0.6),(14.3,-1.3)],
              [(15.8,-0.6+G),(12.8,-0.6+G)],
              [RA, (RA[0]+RO,RA[1]+RO,0.3), (RB[0]+RO,RB[1]+RO,0.3), RB]], dict(
-    ADM=(12.4,EA), EXC=(15.8,IY-0.7), HUH=(18.5,18.66), MKK=(17.5,13.0), KOT=(17.5,9.8+G), TAW=(17.5,6.8), SHT=(18.2,4.5), FOT=(18.9,3.8),
+    ADM=(12.4,EA), EXC=(15.75,21.5), HUH=(CM-18.7-H,18.7-H), MKK=(17.5,13.0), KOT=(17.5,9.8+G), TAW=(17.5,6.8), SHT=(18.2,4.5), FOT=(18.9,3.8),
     UNI=(19.6,3.1), TAP=(19.5,0.9), TWO=(18.6,0.0), FAN=(17.2,-0.6), SHS=(15.8,-0.6), LOW=(14.3,-1.3), LMC=(12.8,-0.6+G),
     RAC=(18.9+RO,3.8+RO)), dashed=[2])
 DOUBLE['SHS'] = (15.8, -0.6+G)   # 落馬洲支綫
@@ -88,13 +94,13 @@ CD = CA + G*math.sqrt(2)   # 迪士尼綫貼住東涌綫嘅斜綫
 line('DRL', [[(3.3+H,CA-3.3+H),(4.6,CD-4.6,0.5),(4.6,17.6)]], dict(SUN=(3.3+H,CA-3.3+H), DIS=(4.6,17.6)))
 
 LABELS = dict(
-  CEN='s', ADM='sw', SKW='e', HFC='e', CHW='e',
-  TST='w', JOR='w', YMT='w', MOK='w', PRE='w', SSP='s', CSW='n', LCK='s', MEF='ne', LAK='n', KWF='e', KWH='e', TWH='e', TSW='n',
-  WHA='e', HOM='ne', SKM='e', KOT='nw', LOF='n', WTS='n', DIH='se', CHH='n', KOB='e', NTK='e', KWT='e', LAT='e', YAT='n', TIK='n',
+  CEN='s', ADM='s', SKW='e', HFC='e', CHW='e',
+  TST='w', JOR='w', YMT='w', MOK='w', PRE='w', SSP='s', CSW='s', LCK='s', MEF='ne', LAK='n', KWF='e', KWH='e', TWH='e', TSW='n',
+  WHA='e', HOM='n', SKM='e', KOT='nw', LOF='n', WTS='n', DIH='se', CHH='n', KOB='e', NTK='e', KWT='e', LAT='e', YAT='n', TIK='n',
   NOP='s', QUB='s', TKO='s', HAH='e', POA='e', LHP='e',
-  TUM='s', SIH='w', TIS='n', LOP='s', YUL='s', KSR='n', TWW='sw', NAC='e', AUS='ne', ETS='n', HUH='se', TKW='se', SUW='e', KAT='e',
-  HIK='n', TAW='w', CKT='s', STW='n', CIO='s', SHM='n', TSH='se', HEO='se', MOS='n', WKS='n',
-  EXC='n', MKK='e', SHT='nw', FOT='nw', UNI='nw', TAP='ne', TWO='ne', FAN='s', SHS='s', LOW='n', LMC='w',
+  TUM='s', SIH='w', TIS='n', LOP='n', YUL='n', KSR='n', TWW='sw', NAC='e', AUS='ne', ETS='s', HUH='se', TKW='w', SUW='w', KAT='w',
+  HIK='n', TAW='w', CKT='s', STW='s', CIO='s', SHM='s', TSH='se', HEO='se', MOS='n', WKS='n',
+  EXC='s', MKK='e', SHT='nw', FOT='nw', UNI='nw', TAP='ne', TWO='ne', FAN='s', SHS='s', LOW='n', LMC='w',
   OCP='e', WCH='s', LET='s', SOH='s',
   HOK='e', KOW='w', OLY='w', TSY='se', SUN='s', RAC='e', TUC='w', AIR='n', AWE='n', DIS='s',
 )
@@ -189,10 +195,21 @@ for s, r in rects.items():
                 if seg_hits_rect(path[i-1], path[i], r): errs.append(f'站名 {s} 壓住 {code} 綫'); break
             else: continue
             break
+    for a_, b_, _ in LINKS:
+        pa = min(((p, q) for _, p in st[a_] for _, q in st[b_]), key=lambda pq: d(*pq))
+        if seg_hits_rect(pa[0], pa[1], r, half=0.03): errs.append(f'站名 {s} 壓住 {a_}–{b_} 連接綫')
     for t, r2 in rects.items():
-        if t < s and rect_hit(r, r2): errs.append(f'站名 {s} 撞 {t}')
+        if t < s and rect_hit(r, r2, 0.15): errs.append(f'站名 {s} 撞 {t}（最少留 0.15）')
     for t in st:
         if t != s and rect_hit(r, box_of(t)): errs.append(f'站名 {s} 撞站 {t}')
+# 圖例範圍
+for code, l in L.items():
+    for path in l['paths']:
+        for i in range(1, len(path)):
+            if seg_hits_rect(path[i-1], path[i], LEGEND, half=0.3): errs.append(f'{code} 綫入咗圖例'); break
+for s, r in rects.items():
+    if rect_hit(r, LEGEND, 0.1): errs.append(f'站名 {s} 撞圖例')
+    if rect_hit(box_of(s), LEGEND, 0.1): errs.append(f'站 {s} 撞圖例')
 for e in errs: print('✗', e)
 print(f'{len(errs)} 個問題')
 
@@ -217,8 +234,10 @@ if '--ts' in sys.argv or '--write' in sys.argv:
         t = re.sub(r'(export const MTR_MAP_LABEL_GAP: Readonly<Record<string, number>> = )\{.*?\};', lambda m: m.group(1) + gap_ts + ';', t, count=1)
         dbl_ts = '{ ' + ', '.join(f'{k}: {P(v)}' for k, v in DOUBLE.items()) + ' }'
         t = re.sub(r'(export const MTR_MAP_DOUBLE: Readonly<Record<string, Pt>> = )\{.*?\};', lambda m: m.group(1) + dbl_ts + ';', t, count=1)
-        links_ts = '[' + ', '.join(f"['{a}', '{b}']" for a, b in LINKS) + ']'
-        t = re.sub(r'(export const MTR_MAP_LINKS: readonly \(readonly \[string, string\]\)\[\] = )\[.*?\];', lambda m: m.group(1) + links_ts + ';', t, count=1)
+        leg_ts = '{ ' + f'x: {LEGEND[0]}, y: {LEGEND[1]}, w: {LEGEND[2]}, h: {LEGEND[3]}' + ' }'
+        t = re.sub(r'(export const MTR_MAP_LEGEND = )\{.*?\}( as const;)', lambda m: m.group(1) + leg_ts + m.group(2), t, count=1)
+        links_ts = '[' + ', '.join(f"{{ a: '{a}', b: '{b}'" + (', dashed: true' if dsh else '') + ' }' for a, b, dsh in LINKS) + ']'
+        t = re.sub(r'(export const MTR_MAP_LINKS: readonly MtrMapLink\[\] = )\[.*?\];', lambda m: m.group(1) + links_ts + ';', t, count=1)
         open(tp, 'w').write(t)
         print('已寫入 src/mtr-map.ts；記得再行 mtr-water.py --write')
     else:
