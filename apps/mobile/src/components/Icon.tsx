@@ -29,7 +29,8 @@ export type IconName =
   | 'train'
   | 'minibus'
   | 'ferry'
-  | 'tram';
+  | 'tram'
+  | 'lrt';
 
 /** duo：雙色（線條實色 + 同色淺填色），常用工具等大圖示用 */
 export function Icon({ name, size = 22, color, duo = false }: { name: IconName; size?: number; color: string; duo?: boolean }) {
@@ -90,6 +91,17 @@ export function Icon({ name, size = 22, color, duo = false }: { name: IconName; 
           <>
             <Rect {...p} x={6} y={6.5} width={12} height={12} rx={2} />
             <Path {...p} d="M6 12.5h12M12 6.5V3.5M9 3.5h6M9 21l1-2.5M15 21l-1-2.5" />
+          </>
+        );
+      case 'lrt':
+        // 輕鐵：港鐵列車正面 + 人字形集電弓（同網頁一樣）
+        return (
+          <>
+            <Path {...p} d="M9.5 3h5M12 3l-2.4 3.8M12 3l2.4 3.8" />
+            <Rect {...p} x={5.5} y={6.8} width={13} height={11.7} rx={3} />
+            <Path {...p} d="M5.5 12.2h13M8.5 21l1.2-2.5M15.5 21l-1.2-2.5" />
+            <Circle {...dot} cx={9} cy={15.3} r={0.9} />
+            <Circle {...dot} cx={15} cy={15.3} r={0.9} />
           </>
         );
       case 'navigate':

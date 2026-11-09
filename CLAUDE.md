@@ -99,7 +99,8 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 
 ## 港鐵（重鐵）：路綫圖同到站時間
 
-「路線」分頁 →「港鐵・輕鐵」：自己畫嘅路綫圖，左上角切換港鐵／輕鐵（記住上次揀邊個：網頁 sessionStorage、App AsyncStorage `hknt.rail`），
+「路線」分頁 →「港鐵・輕鐵」：自己畫嘅路綫圖，左上角切換港鐵／輕鐵（記住上次揀邊個：網頁 sessionStorage、App AsyncStorage `hknt.rail`；
+2026-11 用戶覺得唔夠明顯：保留浮動但做大，有圖示 `train`／`lrt`（港鐵列車 + 人字形集電弓，同電車 `tram` 分開），揀咗嘅黃色），
 撳站或者搜尋睇到站時間（輕鐵見下面「輕鐵」）。網頁 `components/rail/{RailView,MtrMap,MtrStationSheet,RailSearch}.tsx`，
 App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/routes.tsx` 揀港鐵就出地圖，搜尋欄喺標題列；港鐵站、輕鐵站一齊搵，港鐵排先）。
 **港鐵、輕鐵共用**：網頁 `useMapView`（拖拉縮放、飛去個站、縮放掣；邊界唔計面板遮住嘅位，地圖邊嘅站都可以移到面板上面正中）、
@@ -172,7 +173,7 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
 - 站面板：經過嘅路線號碼、每個月台嘅班次（號碼、往邊、單／孖卡圖示、時間），30 秒更新；拉板同港鐵面板共用。
   路線號碼右邊「月台｜路線」切換（2026-11 用戶要求）：按路線 = core `lrtByRoute`，每條路線、每個目的地一組，每班寫「N 號月台」；
   揀咗記入設定 `Prefs.lrtGroup`（設定頁「輕鐵到站顯示」都改得）。
-  單／孖卡用自己畫嘅輕鐵車卡圖示（集電弓、斜車頭、車窗、車門、車轆；孖卡兩卡加連接器，唔抄官方圖示），
+  單／孖卡用自己畫嘅輕鐵車卡圖示（輕鐵列車顏色：銀白車身、車頂紅帶；集電弓、斜車頭、每卡兩道門、車轆；孖卡兩卡加連接器，唔抄官方圖示），
   網頁 `components/rail/LrtCars.tsx`、App `components/LrtCars.tsx` 同一套路徑，固定孖卡咁闊、單卡靠右，時間欄先對齊。
 - 車費：`/api/lrt/fare?from=`（`apps/web/lib/lrt-fares.json`，`tools/lrt-fares.py` 由港鐵開放數據 light_rail_fares.csv 生成，加價後重跑）。
   **介面先隱藏**（2026-11 用戶要求，`LrtStationSheet` 嘅 `SHOW_FARES`）。收費區地圖唔畫。

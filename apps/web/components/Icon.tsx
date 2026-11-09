@@ -30,7 +30,8 @@ export type IconName =
   | 'train'
   | 'minibus'
   | 'ferry'
-  | 'tram';
+  | 'tram'
+  | 'lrt';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home: <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1Z" />,
@@ -60,6 +61,16 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <rect x="6" y="6.5" width="12" height="12" rx="2" />
       <path d="M6 12.5h12M12 6.5V3.5M9 3.5h6M9 21l1-2.5M15 21l-1-2.5" />
+    </>
+  ),
+  /** 輕鐵：港鐵列車正面 + 人字形集電弓（同電車嘅 T 形桿分開） */
+  lrt: (
+    <>
+      <path d="M9.5 3h5M12 3l-2.4 3.8M12 3l2.4 3.8" />
+      <rect x="5.5" y="6.8" width="13" height="11.7" rx="3" />
+      <path d="M5.5 12.2h13M8.5 21l1.2-2.5M15.5 21l-1.2-2.5" />
+      <circle cx="9" cy="15.3" r="0.9" fill="currentColor" />
+      <circle cx="15" cy="15.3" r="0.9" fill="currentColor" />
     </>
   ),
   navigate: <path d="M4.5 11.2 19.5 4.5l-6.7 15-1.9-6.4-6.4-1.9Z" />,

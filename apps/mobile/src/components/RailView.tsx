@@ -129,18 +129,26 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
         <LrtMap key="lrt" selected={sta} onStation={onStation} focus={focus} inset={sta ? inset : NO_INSET} near={nearIds} />
       )}
       <View pointerEvents="box-none" style={{ position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        <View accessibilityRole="tablist" style={{ flexDirection: 'row', padding: 3, borderRadius: 999, backgroundColor: t.card, ...shadow }}>
-          {(['mtr', 'lrt'] as const).map((k) => (
-            <Pressable
-              key={k}
-              onPress={() => k !== kind && setKind(k)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: kind === k }}
-              style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: kind === k ? t.brand : 'transparent' }}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: kind === k ? t.onBrand : t.muted }}>{k === 'mtr' ? '港鐵' : '輕鐵'}</Text>
-            </Pressable>
-          ))}
+        {/* 港鐵／輕鐵切換：大過其他浮動掣，有圖示，揀咗嘅用黃色（同網頁 .rail-switch 一樣） */}
+        <View
+          accessibilityRole="tablist"
+          style={{ flexDirection: 'row', gap: 2, padding: 4, borderRadius: 999, borderWidth: 1, borderColor: t.line, backgroundColor: t.card, ...shadow, shadowOpacity: 0.16, shadowRadius: 7, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}
+        >
+          {(['mtr', 'lrt'] as const).map((k) => {
+            const on = kind === k;
+            return (
+              <Pressable
+                key={k}
+                onPress={() => k !== kind && setKind(k)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingLeft: 12, paddingRight: 16, borderRadius: 999, backgroundColor: on ? t.brand : 'transparent', opacity: on ? 1 : 0.6 }}
+              >
+                <Icon name={k === 'mtr' ? 'train' : 'lrt'} size={18} color={on ? t.onBrand : t.text} />
+                <Text style={{ fontSize: 16, fontWeight: '800', color: on ? t.onBrand : t.text }}>{k === 'mtr' ? '港鐵' : '輕鐵'}</Text>
+              </Pressable>
+            );
+          })}
         </View>
         {near[0] && (
           <Pressable

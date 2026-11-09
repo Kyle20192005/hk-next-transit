@@ -151,9 +151,11 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
       <div className="rail-overlay">
         <div className="rail-switch" role="tablist" aria-label="港鐵或者輕鐵">
           <button role="tab" aria-selected={kind === 'mtr'} onClick={() => kind !== 'mtr' && setKind('mtr')}>
+            <Icon name="train" size={18} />
             港鐵
           </button>
           <button role="tab" aria-selected={kind === 'lrt'} onClick={() => kind !== 'lrt' && setKind('lrt')}>
+            <Icon name="lrt" size={18} />
             輕鐵
           </button>
         </div>

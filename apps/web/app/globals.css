@@ -983,9 +983,11 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .rail-overlay { position: absolute; left: 10px; top: 10px; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: calc(100% - 20px); pointer-events: none; }
 .rail-overlay > * { pointer-events: auto; }
 .rail-overlay .mtr-near-pill { position: static; max-width: 100%; }
-.rail-switch { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--card); box-shadow: var(--shadow); }
-.rail-switch button { border: 0; background: transparent; padding: 6px 14px; border-radius: 999px; font: inherit; font-size: 0.875rem; font-weight: 700; color: var(--muted); cursor: pointer; }
-.rail-switch button[aria-selected='true'] { background: var(--brand); color: var(--on-brand); }
+/* 港鐵／輕鐵切換（地圖左上角）：大過其他浮動掣，有圖示，揀咗嘅用黃色 */
+.rail-switch { display: inline-flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--card); box-shadow: 0 4px 14px rgb(0 0 0 / 0.16), var(--shadow); border: 1px solid var(--line); }
+.rail-switch button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 8px 16px 8px 12px; border-radius: 999px; font: inherit; font-size: 1rem; font-weight: 800; color: var(--text); opacity: 0.6; cursor: pointer; }
+.rail-switch button:hover { opacity: 0.85; }
+.rail-switch button[aria-selected='true'] { background: var(--brand); color: var(--on-brand); opacity: 1; }
 .lrt-lane { fill: none; stroke-linecap: butt; stroke-linejoin: round; }
 .lrt-arrow { fill: none; stroke: #fff; stroke-width: 0.026px; stroke-linecap: round; stroke-linejoin: round; }
 .lrt-marker { fill: #fff; stroke: #1d1d1f; }
