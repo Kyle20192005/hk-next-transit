@@ -195,6 +195,7 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
   - 收藏：輕鐵站面板星號收藏成個站（`lrtFavorite`，`co: 'lrt'`、`route` 空白、`stopId` = 站 ID）；收藏頁「輕鐵站」卡、首頁大卡「收藏」一個站一張卡，
     每條路線每個目的地下一班（core `lrtDepartureRows`，路線色標籤、月台）。
   - 首頁大卡「下班車」：港鐵站卡（`mtrCardStations`）加 800 米內輕鐵站，按距離排，鐵路卡最多 3 張（core `railCardStations`），排位跟「交通工具優先」。
+    輕鐵站卡（下班車、收藏）左右色條一律輕鐵金色 `LRT_BRAND`（用戶要求；每行標籤照用路線色）。
   - 最近睇過：打開輕鐵站記低（core `lrtRecent`，`co: 'lrt'`），撳返開輕鐵圖。
   - 附近車站頁：巴士站、範圍內嘅港鐵站同輕鐵站按距離混埋排，鐵路站卡每條綫／路線每個方向下一班，撳入路綫圖。
   - 站面板路線號碼撳得：路綫圖標出成條路線（其他淡咗，core `lrtRouteStopIds`），左上角標籤「[610] 屯門碼頭 ↔ 元朗 ✕」（`lrtRouteName`）；

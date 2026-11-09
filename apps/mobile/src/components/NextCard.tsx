@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { busDepartureRows, favDepartureRows, favsForNow, formatDistance, groupFavorites, groupStopHeads, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrCardStations, mtrStationName, orderNearCards, radiusLabel, railCardStations, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
+import { busDepartureRows, favDepartureRows, favsForNow, formatDistance, groupFavorites, groupStopHeads, LRT_BRAND, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrCardStations, mtrStationName, orderNearCards, radiusLabel, railCardStations, type DepartureRow, type FavGroup, type StopHead } from '@hknt/core';
 import { api, type Co, type NearStop } from '@/lib/api';
 import { isLrtFav, isMtrFav, useFavorites, type Favorite } from '@/lib/favorites';
 import { openLrt, openMtr } from '@/lib/open-mtr';
@@ -154,7 +154,7 @@ function NearbyPane({ state, onLocate }: { state: NearbyState; onLocate: () => v
         </>
       )}
       action={(h) => ({ label: '更多', onPress: h.kind === 'bus' ? () => router.push('/nearby') : () => openRail(h.sta, h.kind === 'lrt') })}
-      card={(h) => <RowsCard rows={data[h.key]?.rows ?? null} now={data[h.key]?.now ?? 0} />}
+      card={(h) => <RowsCard rows={data[h.key]?.rows ?? null} now={data[h.key]?.now ?? 0} accent={h.kind === 'lrt' ? LRT_BRAND.color : undefined} />}
     />
   );
 }
@@ -311,7 +311,7 @@ function LrtFavCard({ sta, active }: { sta: string; active: boolean }) {
     const now = Date.now();
     setState({ rows: lrtDepartureRows(sta, body.platforms, now, ROWS), now });
   });
-  return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} />;
+  return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} accent={LRT_BRAND.color} />;
 }
 
 function FavCard({ group, active }: { group: FavGroup<Favorite>; active: boolean }) {
@@ -335,11 +335,11 @@ function FavCard({ group, active }: { group: FavGroup<Favorite>; active: boolean
   return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} />;
 }
 
-/** 一張到站卡：左右兩邊色條（第一班嘅公司色／綫色／輕鐵路線色），每行 標籤、往邊、（鐵路月台）、分鐘 */
-function RowsCard({ rows, now, empty = '暫時冇班次' }: { rows: DepartureRow[] | null; now: number; empty?: string }) {
+/** 一張到站卡：左右兩邊色條（第一班嘅公司色／綫色；輕鐵站一律輕鐵金色 accent），每行 標籤、往邊、（鐵路月台）、分鐘 */
+function RowsCard({ rows, now, empty = '暫時冇班次', accent: fixed }: { rows: DepartureRow[] | null; now: number; empty?: string; accent?: string }) {
   const t = useTheme();
   const { etaFormat } = usePrefs();
-  const accent = rows?.[0]?.badge.bg ?? t.line;
+  const accent = fixed ?? rows?.[0]?.badge.bg ?? t.line;
   return (
     <View style={{ minHeight: 172, justifyContent: 'center', paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: t.line, borderLeftWidth: 8, borderRightWidth: 8, borderLeftColor: accent, borderRightColor: accent, backgroundColor: t.card }}>
       {rows === null && <Text style={{ textAlign: 'center', color: t.muted }}>載入中…</Text>}

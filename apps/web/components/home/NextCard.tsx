@@ -6,6 +6,7 @@ import {
   favDepartureRows,
   formatDistance,
   favsForNow,
+  LRT_BRAND,
   lrtDepartureRows,
   lrtStopName,
   groupFavorites,
@@ -183,7 +184,7 @@ function NearbyPane({ state, onLocate, onMore, onMtr }: { state: NearbyState; on
         </>
       )}
       action={(h) => ({ label: '更多', onClick: h.kind === 'bus' ? onMore : () => onMtr(h.sta, h.kind === 'lrt') })}
-      card={(h) => <RowsCard rows={data[h.key]?.rows ?? null} now={data[h.key]?.now ?? 0} onMtr={onMtr} />}
+      card={(h) => <RowsCard rows={data[h.key]?.rows ?? null} now={data[h.key]?.now ?? 0} onMtr={onMtr} accent={h.kind === 'lrt' ? LRT_BRAND.color : undefined} />}
     />
   );
 }
@@ -365,7 +366,7 @@ function LrtFavCard({ sta, active, onMtr }: { sta: string; active: boolean; onMt
     const now = Date.now();
     setState({ rows: res.ok ? lrtDepartureRows(sta, body.platforms ?? [], now, ROWS) : [], now });
   });
-  return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} onMtr={onMtr} />;
+  return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} onMtr={onMtr} accent={LRT_BRAND.color} />;
 }
 
 /** active 時即刻 call 一次，之後每 30 秒 */
@@ -389,10 +390,10 @@ function usePoll(active: boolean, key: string, run: () => Promise<void>, onError
   }, [active, key]);
 }
 
-/** 一張到站卡：左右兩邊色條（第一班嘅公司色／綫色／輕鐵路線色），每行 標籤、往邊、（鐵路月台）、分鐘 */
-function RowsCard({ rows, now, empty = '暫時冇班次', onMtr }: { rows: DepartureRow[] | null; now: number; empty?: string; onMtr?: OnRail }) {
+/** 一張到站卡：左右兩邊色條（第一班嘅公司色／綫色；輕鐵站一律輕鐵金色 accent），每行 標籤、往邊、（鐵路月台）、分鐘 */
+function RowsCard({ rows, now, empty = '暫時冇班次', onMtr, accent: fixed }: { rows: DepartureRow[] | null; now: number; empty?: string; onMtr?: OnRail; accent?: string }) {
   const { etaFormat } = usePrefs();
-  const accent = rows?.[0]?.badge.bg ?? 'var(--line)';
+  const accent = fixed ?? rows?.[0]?.badge.bg ?? 'var(--line)';
   return (
     <div className="nc-card" style={{ ['--nc-accent' as string]: accent }}>
       {rows === null && <div className="nc-empty muted">載入中…</div>}
