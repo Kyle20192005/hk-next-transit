@@ -169,9 +169,11 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
   `nearestLrtStops`、`lrtTrainEta`：Departing「正在離開」、Arriving「即將到站」、「-」→「—」；`lrtCars` 單卡／孖卡）。
 - 到站：`rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule?station_id=`（同巴士 API 同一個 host，計埋上限）。網頁 `/api/lrt?sta=`、tracker `/api/lrt`、
   前端 `liveClient.lrt`（App `api.lrt`）。tracker 未部署到 `/api/lrt` 會 404，前端自動改問 Vercel。
-- 站面板：經過嘅路線號碼、每個月台嘅班次（號碼、往邊、單／孖卡、時間），30 秒更新；拉板同港鐵面板共用。
+- 站面板：經過嘅路線號碼、每個月台嘅班次（號碼、往邊、單／孖卡圖示、時間），30 秒更新；拉板同港鐵面板共用。
   路線號碼右邊「月台｜路線」切換（2026-11 用戶要求）：按路線 = core `lrtByRoute`，每條路線、每個目的地一組，每班寫「N 號月台」；
   揀咗記入設定 `Prefs.lrtGroup`（設定頁「輕鐵到站顯示」都改得）。
+  單／孖卡用自己畫嘅輕鐵車卡圖示（集電弓、斜車頭、車窗、車門、車轆；孖卡兩卡加連接器，唔抄官方圖示），
+  網頁 `components/rail/LrtCars.tsx`、App `components/LrtCars.tsx` 同一套路徑，固定孖卡咁闊、單卡靠右，時間欄先對齊。
 - 車費：`/api/lrt/fare?from=`（`apps/web/lib/lrt-fares.json`，`tools/lrt-fares.py` 由港鐵開放數據 light_rail_fares.csv 生成，加價後重跑）。
   **介面先隱藏**（2026-11 用戶要求，`LrtStationSheet` 嘅 `SHOW_FARES`）。收費區地圖唔畫。
 - 路綫圖：core `lrt-map.ts` 由 `packages/core/tools/lrt-layout.py --write` 生成（`--svg 預覽.svg` 出預覽、印出檢查結果），**唔好人手改**。

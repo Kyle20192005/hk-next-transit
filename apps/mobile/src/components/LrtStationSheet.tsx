@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, ScrollView, Text, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
-import { LIVE_REFRESH, hkClockSec, lrtCars, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtByRoute, lrtTrainEta, mtrXferOf, type LrtPlatform, type LrtTrain, type Prefs } from '@hknt/core';
+import { LIVE_REFRESH, hkClockSec, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtByRoute, lrtTrainEta, mtrXferOf, type LrtPlatform, type LrtTrain, type Prefs } from '@hknt/core';
 import { api } from '@/lib/api';
 import { haptic } from '@/lib/haptics';
 import { setPref, usePrefs } from '@/lib/prefs';
@@ -8,6 +8,7 @@ import { radius, shadowLg, tabular, useTheme, type Theme } from '@/lib/theme';
 import { Icon } from './Icon';
 import { SheetGrab, useRailSheet, type SheetSize } from './RailSheet';
 import { XferButton } from './XferButton';
+import { LrtCars } from './LrtCars';
 
 type Data = { sta: string; platforms: LrtPlatform[]; failed: boolean; at: number };
 type Fmt = Prefs['etaFormat'];
@@ -200,7 +201,7 @@ function TrainRow({ x, fmt, now, t, first, platform }: { x: LrtTrain; fmt: Fmt; 
       <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: '700', color: t.text }}>
         {platform === undefined ? `往 ${x.dest}` : `${platform} 號月台`}
       </Text>
-      <Text style={{ fontSize: 12, color: t.muted }}>{lrtCars(x.cars)}</Text>
+      <LrtCars n={x.cars} color={t.muted} />
       <View style={{ minWidth: 72, alignItems: 'flex-end' }}>
         <Text style={{ color: t.accent, ...tabular }}>
           <Text style={{ fontSize: e.now ? 16 : 20, fontWeight: '800' }}>{e.main}</Text>

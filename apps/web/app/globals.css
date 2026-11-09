@@ -1008,7 +1008,7 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 }
 .lrt-row { gap: 8px; }
 .lrt-row .mtr-next-dest { font-size: 0.9375rem; }
-.lrt-cars { flex: none; font-size: 0.75rem; }
+.lrt-cars { flex: none; display: inline-flex; justify-content: flex-end; color: var(--muted); }
 .lrt-row .mtr-next-eta { min-width: 72px; }
 .lrt-fare { border-radius: 14px; background: var(--surface-2); padding: 10px 12px; }
 .lrt-fare-pick { display: flex; align-items: center; gap: 10px; font-size: 0.875rem; font-weight: 700; }

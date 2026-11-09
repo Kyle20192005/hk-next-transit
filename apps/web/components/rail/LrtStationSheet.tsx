@@ -1,11 +1,12 @@
 'use client';
 import { forwardRef, useEffect, useMemo, useState } from 'react';
-import { LIVE_REFRESH, LRT_STOPS, hkClockSec, lrtCars, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtByRoute, lrtTrainEta, mtrXferOf, type LrtPlatform, type LrtTrain } from '@hknt/core';
+import { LIVE_REFRESH, LRT_STOPS, hkClockSec, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtByRoute, lrtTrainEta, mtrXferOf, type LrtPlatform, type LrtTrain } from '@hknt/core';
 import { liveClient } from '@/lib/buses';
 import { setPref, usePrefs } from '@/lib/prefs';
 import Icon from '../Icon';
 import { useSheetDrag } from './useSheetDrag';
 import { XferButton } from './XferButton';
+import LrtCars from './LrtCars';
 
 type Data = { sta: string; platforms: LrtPlatform[]; failed: boolean; at: number };
 /** 車費：[八達通成人, 小童, 長者, 殘疾, 學生, 樂悠咭, 單程成人, 單程小童, 單程長者] */
@@ -182,7 +183,7 @@ function TrainRow({ t, fmt, now, platform }: { t: LrtTrain; fmt: 'minutes' | 'cl
     <div className="mtr-next-row lrt-row">
       {platform === undefined && <RouteChip r={t.route} />}
       <span className="mtr-next-dest">{platform === undefined ? `往 ${t.dest}` : `${platform} 號月台`}</span>
-      <small className="muted lrt-cars">{lrtCars(t.cars)}</small>
+      <LrtCars n={t.cars} />
       <span className="mtr-next-eta">
         <span className={e.now ? 'mtr-eta now' : 'mtr-eta'}>
           <b>{e.main}</b>
