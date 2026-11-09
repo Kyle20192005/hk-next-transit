@@ -4,7 +4,7 @@ import Link from 'next/link';
 import CompanyTag from '@/components/CompanyTag';
 import type { Co } from '@/lib/data';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { formatDistance, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, radiusLabel, type Company, type NearbyCache, type NearMtr } from '@hknt/core';
+import { formatDistance, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrStationName, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, nearestLrtStops, parseNearbyCache, radiusLabel, type Company, type DepartureRow, type LrtPlatform, type MtrLineEtas, type NearbyCache, type NearMtr } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import EtaInline from '@/components/EtaInline';
@@ -135,9 +135,20 @@ export function useNearbyStops(auto = false) {
 }
 
 /** 附近車站（由首頁或者巴士路線頁撳入嚟，唔係分頁）：定位搵附近（設定範圍）嘅站，顯示每條路線下一班車 */
-export default function Nearby({ onBack }: { onBack: () => void }) {
+/** 附近車站頁一項：巴士站，或者範圍內嘅港鐵站、輕鐵站（按距離混埋排） */
+type NearItem = { kind: 'bus'; stop: NearStop; distance: number } | { kind: 'mtr' | 'lrt'; sta: string; distance: number };
+
+export default function Nearby({ onBack, onRail }: { onBack: () => void; onRail: (sta: string, lrt?: boolean) => void }) {
   const { state, locate } = useNearbyStops(true);
   const { nearbyRadius: radius } = usePrefs();
+  const items: NearItem[] =
+    state.kind === 'ok'
+      ? [
+          ...state.stops.map((s) => ({ kind: 'bus' as const, stop: s, distance: s.distance })),
+          ...state.mtr.filter((m) => m.distance <= radius).map((m) => ({ kind: 'mtr' as const, sta: m.sta, distance: m.distance })),
+          ...nearestLrtStops(state.lat, state.lng, radius, 6).map((m) => ({ kind: 'lrt' as const, sta: m.sta, distance: m.distance })),
+        ].sort((a, b) => a.distance - b.distance)
+      : [];
 
   const head = (
     <header className="app-bar">
@@ -146,7 +157,7 @@ export default function Nearby({ onBack }: { onBack: () => void }) {
       </button>
       <div className="app-title">
         <h1>附近車站</h1>
-        {state.kind === 'ok' && <span className="app-sub">{state.stops.length ? `${radiusLabel(radius)}內 ${state.stops.length} 個車站` : `${radiusLabel(radius)}內冇車站`}</span>}
+        {state.kind === 'ok' && <span className="app-sub">{items.length ? `${radiusLabel(radius)}內 ${items.length} 個車站` : `${radiusLabel(radius)}內冇車站`}</span>}
       </div>
       {state.kind === 'ok' && (
         <button className="bar-btn" onClick={locate} aria-label="重新定位">
@@ -164,7 +175,7 @@ export default function Nearby({ onBack }: { onBack: () => void }) {
           <span className="empty-icon">
             <Icon name="pin" size={32} />
           </span>
-          <p>搵你附近 {radiusLabel(radius)}內嘅巴士站，同埋每條路線下一班車。</p>
+          <p>搵你附近 {radiusLabel(radius)}內嘅巴士站、港鐵站同輕鐵站，同埋每條路線下一班車。</p>
           {state.kind === 'error' && <p className="error">{state.message}</p>}
           <button className="primary-btn" onClick={locate} disabled={state.kind === 'locating'}>
             <Icon name="locate" size={20} />
@@ -180,12 +191,87 @@ export default function Nearby({ onBack }: { onBack: () => void }) {
       {head}
       <div className="nearby">
         <ul className="nearby-list">
-          {state.stops.map((s, i) => (
-            <NearbyStop key={`${s.co}-${s.id}`} stop={s} autoLoad={i < AUTO_LOAD} />
-          ))}
+          {items.map((it, i) =>
+            it.kind === 'bus' ? (
+              <NearbyStop key={`${it.stop.co}-${it.stop.id}`} stop={it.stop} autoLoad={i < AUTO_LOAD} />
+            ) : (
+              <NearbyRail key={`${it.kind}-${it.sta}`} kind={it.kind} sta={it.sta} distance={it.distance} autoLoad={i < AUTO_LOAD} onRail={onRail} />
+            ),
+          )}
         </ul>
       </div>
     </>
+  );
+}
+
+/** 附近嘅港鐵站／輕鐵站：每條綫（路線）每個方向下一班，撳一行或者「開路綫圖」入路綫圖嗰個站 */
+function NearbyRail({ kind, sta, distance, autoLoad, onRail }: { kind: 'mtr' | 'lrt'; sta: string; distance: number; autoLoad: boolean; onRail: (sta: string, lrt?: boolean) => void }) {
+  const { etaFormat } = usePrefs();
+  const [open, setOpen] = useState(autoLoad);
+  const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
+  const lrt = kind === 'lrt';
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const now = Date.now();
+        if (lrt) {
+          const res = await liveClient.lrt(sta);
+          const body = (await res.json()) as { platforms?: LrtPlatform[] };
+          if (!cancelled) setState({ rows: res.ok ? lrtDepartureRows(sta, body.platforms ?? [], now, 8) : [], now });
+        } else {
+          const res = await liveClient.mtr(sta);
+          const body = (await res.json()) as { lines?: MtrLineEtas[] };
+          if (!cancelled) setState({ rows: res.ok ? mtrDepartureRows(sta, body.lines ?? [], 8) : [], now });
+        }
+      } catch {
+        /* 下次再試 */
+      }
+    };
+    void tick();
+    const t = setInterval(tick, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [open, sta, lrt]);
+  const name = `${lrt ? '輕鐵' : '港鐵'}${lrt ? lrtStopName(sta) : mtrStationName(sta)}站`;
+  return (
+    <li className="nearby-stop card">
+      <button className="nearby-stop-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span className="nearby-stop-name">
+          <Icon name={lrt ? 'lrt' : 'train'} size={18} />
+          {name}
+        </span>
+        <span className="distance-chip">{formatDistance(distance)}</span>
+        <Icon name="chevron-down" size={18} className={`nearby-chevron${open ? ' open' : ''}`} />
+      </button>
+      {open && (
+        <div className="nearby-routes nearby-rail">
+          {state === null && <p className="muted nearby-rail-note">…</p>}
+          {state?.rows.length === 0 && <p className="muted nearby-rail-note">暫時冇班次</p>}
+          {state?.rows.map((r) => (
+            <button key={r.key} className="nearby-rail-row" onClick={() => onRail(sta, lrt)}>
+              <span className="nc-badge" style={{ background: r.badge.bg, color: r.badge.ink }}>
+                {r.badge.text}
+              </span>
+              <span className="nc-dest">往{r.dest}</span>
+              {r.platform && (
+                <span className="nc-plat" style={{ background: r.badge.bg, color: r.badge.ink }} aria-label={`${r.platform} 號月台`}>
+                  {r.platform}
+                </span>
+              )}
+              <span className={r.nowText ? 'nc-min nc-now' : 'nc-min'}>{r.nowText ?? minutesLabel(r.at, state.now, etaFormat)}</span>
+            </button>
+          ))}
+          <button className="nearby-rail-open" onClick={() => onRail(sta, lrt)}>
+            喺路綫圖打開
+            <Icon name="chevron-right" size={16} />
+          </button>
+        </div>
+      )}
+    </li>
   );
 }
 

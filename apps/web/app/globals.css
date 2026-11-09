@@ -347,14 +347,14 @@ button.nc-row { width: 100%; border: 0; background: none; font: inherit; text-al
 .hh-btn { margin-left: 6px; opacity: 0; pointer-events: none; }
 .hh-bar:not(:has(.hh-pill)) .hh-btn { margin-left: auto; }
 .hh-loc { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 6px; }
-.hh-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 2.375rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; transform-origin: 50% 50%; will-change: transform, opacity; }
+.hh-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 3rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; transform-origin: 50% 50%; will-change: transform, opacity; }
 .hh-rest { display: flex; flex-direction: column; align-items: center; will-change: transform, opacity; }
 .hh-rest .hero-retry { pointer-events: auto; }
 .hh-search { pointer-events: auto; transform-origin: 50% 50%; will-change: transform, opacity; }
 .hh-search-inner { display: flex; align-items: center; width: 100%; min-width: 0; }
 .hero-loc { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; text-align: center; }
-.hero-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 2.375rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; }
-.hero-en { margin-top: -2px; font-size: 1.125rem; font-weight: 800; letter-spacing: 0.01em; opacity: 0.85; }
+.hero-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 3rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; }
+.hero-en { margin-top: -4px; font-size: 1.25rem; font-weight: 800; letter-spacing: 0.01em; opacity: 0.85; }
 .hero-sub { margin-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 0.875rem; font-weight: 600; opacity: 0.75; }
 .hero-line { display: inline-flex; align-items: center; gap: 4px; }
 .hero-mtr { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; pointer-events: auto; }
@@ -457,6 +457,11 @@ svg[data-duo] [fill="currentColor"] { fill-opacity: 1; }
 .nearby-chevron { color: var(--muted); transition: transform 0.2s ease; }
 .nearby-chevron.open { transform: rotate(180deg); }
 .nearby-routes { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+/* 附近嘅港鐵站、輕鐵站：每行 綫／路線、往邊、月台、時間 */
+.nearby-rail-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 16px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.nearby-rail-row .nc-dest { flex: 1; min-width: 0; }
+.nearby-rail-note { margin: 0; padding: 10px 16px; }
+.nearby-rail-open { display: flex; align-items: center; justify-content: center; gap: 2px; width: 100%; padding: 10px; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 700; font-size: 0.875rem; cursor: pointer; }
 .nearby-route { display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: var(--text); border-bottom: 1px solid var(--line); }
 .nearby-route:active { background: var(--surface-2); }
 .nearby-routes li:last-child .nearby-route { border-bottom: 0; }
@@ -989,6 +994,13 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .rail-switch button:hover { opacity: 0.85; }
 .rail-switch button[aria-selected='true'] { background: var(--brand); color: var(--on-brand); opacity: 1; }
 .lrt-lane { fill: none; stroke-linecap: butt; stroke-linejoin: round; }
+/* 標出一條路線（站面板撳路線號碼）：其他淡咗，唔阻撳站 */
+.lrt-hl { pointer-events: none; }
+.lrt-hl-dim { fill: var(--card); opacity: 0.78; }
+.lrt-chip-btn { padding: 0; border: 0; background: none; border-radius: 999px; cursor: pointer; font: inherit; }
+.lrt-chip-btn.on .lrt-chip { box-shadow: 0 0 0 1px #1d1d1f, 0 0 0 3px var(--accent); }
+.lrt-route-tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 6px 6px 8px; border-radius: 999px; background: var(--card); box-shadow: 0 4px 14px rgb(0 0 0 / 0.16), var(--shadow); border: 1px solid var(--line); font-size: 0.875rem; font-weight: 700; color: var(--text); }
+.lrt-route-tag button { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--muted); cursor: pointer; }
 .lrt-arrow { fill: none; stroke: #fff; stroke-width: 0.026px; stroke-linecap: round; stroke-linejoin: round; }
 .lrt-marker { fill: #fff; stroke: #1d1d1f; }
 .lrt-sta.on .lrt-marker { fill: var(--brand); }

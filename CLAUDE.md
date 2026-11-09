@@ -191,7 +191,15 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
   - 兩條或以上色綫經過嘅站係膠囊（白底黑邊）；只得一條嘅係圓點。單方向色綫有白色箭咀。
   - 終點站號碼（`CAPS`）：一律同條綫對正中，喺度完嘅綫入站前散開。盡頭站（元朗、屯門碼頭）號碼排一行／兩行，白色膠囊喺後面沿號碼方向拉長；
     兆康、天逸（`PILL_COVERS_CAPS`）、天水圍站膠囊拉長包埋號碼；田景號碼蓋喺站；三聖、友愛係圓點，號碼蓋喺上面；天水圍 705／706 兩邊散開穿過自己個號碼。
-- 未做：輕鐵收藏、首頁大卡（附近輕鐵站）、最近睇過。
+- **首頁、收藏、附近**（2026-11）：
+  - 收藏：輕鐵站面板星號收藏成個站（`lrtFavorite`，`co: 'lrt'`、`route` 空白、`stopId` = 站 ID）；收藏頁「輕鐵站」卡、首頁大卡「收藏」一個站一張卡，
+    每條路線每個目的地下一班（core `lrtDepartureRows`，路線色標籤、月台）。
+  - 首頁大卡「下班車」：港鐵站卡（`mtrCardStations`）加 800 米內輕鐵站，按距離排，鐵路卡最多 3 張（core `railCardStations`），排位跟「交通工具優先」。
+  - 最近睇過：打開輕鐵站記低（core `lrtRecent`，`co: 'lrt'`），撳返開輕鐵圖。
+  - 附近車站頁：巴士站、範圍內嘅港鐵站同輕鐵站按距離混埋排，鐵路站卡每條綫／路線每個方向下一班，撳入路綫圖。
+  - 站面板路線號碼撳得：路綫圖標出成條路線（其他淡咗，core `lrtRouteStopIds`），左上角標籤「[610] 屯門碼頭 ↔ 元朗 ✕」（`lrtRouteName`）；
+    網頁 SVG 蓋一層半透明再畫返嗰條路線，App 每個主題 + 路線錄一張 SkPicture 疊喺 overlay。轉圖、搜尋、轉乘就取消。
+- 未做：收費區、車費（數據有，介面收埋）。
 
 ## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）
 
@@ -307,9 +315,10 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   記住上次分頁（網頁 sessionStorage）；闊螢幕分頁列移去頂部黃色區，變成一條頂部欄：左邊品牌（`.tab-brand`，logo 下一程 NextLeg）、
   右邊分頁，對齊 1100px；闊螢幕各分頁自己嘅品牌標題行（`.app-title:has(> .logo)`）同首頁 header 頂部一行（`.hh-bar`）收埋，唔好重複。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
-    黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」，`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
+    黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」；2026-11 用戶嫌唔夠大：網頁 `.hh-name` 3rem、App `NAME_SIZE` 48；`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
     quarter 權重 1.4、屋苑 3.5，村名只喺 1.2 公里內冇其他地區名先用；冇地區數據就用最近站頭名），
-    下面兩行「最近港鐵站：X ●● · N 米」（2 公里內，`/api/nearby` 回傳 `mtr`，core `nearestMtrStations`，唔計馬場；綫色圓點；撳入路綫圖嗰個站）同「最近巴士站：X · N 米」。**頂部一行 + 大字 + 搜尋欄係同一個 component `HomeHeader`**（網頁 `components/home/HomeHeader.tsx`、
+    下面兩行：鐵路站一行（港鐵站同輕鐵站**邊個近出邊個，唔好兩個都出**，2026-11 用戶要求；core `nearestRailStation`：「最近港鐵站：X ●●」或者「最近輕鐵站：X ●●」· N 米，
+    2 公里內，港鐵用 `/api/nearby` 回傳嘅 `mtr`（core `nearestMtrStations`，唔計馬場），輕鐵前端計；綫色／路線色圓點；撳入路綫圖嗰個站）同「最近巴士站：X · N 米」。**頂部一行 + 大字 + 搜尋欄係同一個 component `HomeHeader`**（網頁 `components/home/HomeHeader.tsx`、
     App `src/components/HomeHeader.tsx`），浮喺捲動區上面（網頁放捲動區入面一個高度 0 嘅 sticky 外框，後面 spacer 留位；App 絕對定位 +
     `contentContainerStyle.paddingTop`）。捲上去時黃色底同捲動 1:1 收起（內容黐住佢底，唔會捲入佢下面、唔會留空白黃色），收到剩頂部一行；
     收到頂部一行**上下留一樣嘅位（`PAD` 12px，同 CSS padding-top 一致）**，膠囊同搜尋掣喺 header 正中。**停喺收縮一半會自動捲去收埋或者展開**（跟最後捲動方向，似 iPhone 大標題；網頁 scroll 停 140ms 而且手指離開先捲，只限手機有頂部一行；App 用 onScrollEndDrag／onMomentumScrollEnd + `onRange`）。收縮期間**變形唔淡走**：大字中心移去頂部右邊地區膠囊、縮到膠囊字咁大（最後 10% 先同真膠囊交接）；英文名同最近巴士站跟黃色底收走、早啲淡出；

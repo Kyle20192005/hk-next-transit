@@ -5,10 +5,11 @@ import MtrStationSheet from './MtrStationSheet';
 import LrtMap from './LrtMap';
 import LrtStationSheet from './LrtStationSheet';
 import type { MapFocus, MapInset } from './useMapView';
-import { formatDistance, lrtStopName, mtrCardStations, mtrRecent, mtrStationName, nearestLrtStops } from '@hknt/core';
+import { formatDistance, lrtRecent, lrtRouteName, lrtStopName, mtrCardStations, mtrRecent, mtrStationName, nearestLrtStops } from '@hknt/core';
 import Icon from '../Icon';
 import { useNearbyStops } from '../home/Nearby';
 import { addRecent } from '@/lib/recent';
+import { RouteChip } from './LrtStationSheet';
 
 /** 由首頁、搜尋揀咗嘅站：lrt = 輕鐵站（站 ID），否則港鐵站代號 */
 export type RailPick = { sta: string; lrt?: boolean };
@@ -52,9 +53,12 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
   const wrap = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
   const [inset, setInset] = useState<MapInset>({ right: 0, bottom: 0 });
+  /** 輕鐵：喺圖上標出嘅路線（站面板撳路線號碼） */
+  const [route, setRoute] = useState<string | null>(null);
 
   const saveKind = (k: Kind) => {
     setKindState(k);
+    setRoute(null);
     try {
       sessionStorage.setItem(KIND_KEY, k);
     } catch {
@@ -112,9 +116,9 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
   }, []);
   const onClose = useCallback(() => setSta(null), []);
 
-  // 打開咗嘅港鐵站記入首頁「最近睇過」
+  // 打開咗嘅港鐵站、輕鐵站記入首頁「最近睇過」
   useEffect(() => {
-    if (sta && kind === 'mtr') addRecent(mtrRecent(sta));
+    if (sta) addRecent(kind === 'lrt' ? lrtRecent(sta) : mtrRecent(sta));
   }, [sta, kind]);
 
   // 面板遮住咗嘅位：手機喺下面（量高度），闊螢幕喺右邊（量闊度）
@@ -146,7 +150,7 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
       {kind === 'mtr' ? (
         <MtrMap key="mtr" selected={sta} onStation={onStation} focus={focus} inset={inset} near={nearIds} />
       ) : (
-        <LrtMap key="lrt" selected={sta} onStation={onStation} focus={focus} inset={inset} near={nearIds} />
+        <LrtMap key="lrt" selected={sta} onStation={onStation} focus={focus} inset={inset} near={nearIds} route={route} />
       )}
       <div className="rail-overlay">
         <div className="rail-switch" role="tablist" aria-label="港鐵或者輕鐵">
@@ -159,6 +163,15 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
             輕鐵
           </button>
         </div>
+        {kind === 'lrt' && route && (
+          <span className="lrt-route-tag">
+            <RouteChip r={route} />
+            {lrtRouteName(route)}
+            <button onClick={() => setRoute(null)} aria-label="唔再標出路線">
+              <Icon name="close" size={14} />
+            </button>
+          </span>
+        )}
         {near[0] && (
           <button
             className="mtr-near-pill"
@@ -175,7 +188,7 @@ export default function RailView({ pick }: { pick: RailPick | null }) {
         )}
       </div>
       {sta && kind === 'mtr' && <MtrStationSheet ref={panel} sta={sta} onClose={onClose} tab={tab} onTab={setTab} all={all} onAll={setAll} sheet={sheet} onXfer={(s) => jump('lrt', s)} />}
-      {sta && kind === 'lrt' && <LrtStationSheet ref={panel} sta={sta} onClose={onClose} all={all} onAll={setAll} sheet={sheet} onXfer={(s) => jump('mtr', s)} />}
+      {sta && kind === 'lrt' && <LrtStationSheet ref={panel} sta={sta} onClose={onClose} all={all} onAll={setAll} sheet={sheet} onXfer={(s) => jump('mtr', s)} route={route} onRoute={setRoute} />}
     </div>
   );
 }

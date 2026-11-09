@@ -3,6 +3,7 @@ import { forwardRef, useEffect, useMemo, useState } from 'react';
 import { LIVE_REFRESH, LRT_STOPS, hkClockSec, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtByRoute, lrtTrainEta, mtrXferOf, type LrtPlatform, type LrtTrain } from '@hknt/core';
 import { liveClient } from '@/lib/buses';
 import { setPref, usePrefs } from '@/lib/prefs';
+import { lrtFavorite, useFavorite } from '@/lib/favorites';
 import Icon from '../Icon';
 import { useSheetDrag } from './useSheetDrag';
 import { XferButton } from './XferButton';
@@ -34,8 +35,11 @@ const SHOW_FARES = false;
  * 輕鐵站面板（撳輕鐵路綫圖個站或者搜尋）：每個月台嘅班次（路線號碼、往邊、單／孖卡、幾分鐘），30 秒更新。
  * 車費（八達通各種、單程票）暫時隱藏（SHOW_FARES）。手機貼底拉板、闊螢幕右邊面板（同港鐵面板共用）。
  */
-const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => void; all: boolean; onAll: (all: boolean) => void; sheet: boolean; onXfer: (mtrSta: string) => void }>(function LrtStationSheet(
-  { sta, onClose, all, onAll, sheet, onXfer },
+const LrtStationSheet = forwardRef<
+  HTMLElement,
+  { sta: string; onClose: () => void; all: boolean; onAll: (all: boolean) => void; sheet: boolean; onXfer: (mtrSta: string) => void; route: string | null; onRoute: (route: string | null) => void }
+>(function LrtStationSheet(
+  { sta, onClose, all, onAll, sheet, onXfer, route, onRoute },
   ref,
 ) {
   const { etaFormat, lrtGroup } = usePrefs();
@@ -90,14 +94,18 @@ const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => vo
             <span className="muted">{lrtStopEn(sta)}</span>
           </div>
           {mtrXferOf(sta) && <XferButton to="mtr" sta={mtrXferOf(sta)!} onPick={onXfer} />}
+          <FavButton sta={sta} />
           <button className="drawer-close" onClick={onClose} aria-label="關閉">
             <Icon name="close" size={20} />
           </button>
         </header>
         <div className="lrt-sub">
-          <div className="lrt-routes" aria-label="經過路線">
+          {/* 撳路線號碼：路綫圖標出成條路線（再撳一次取消） */}
+          <div className="lrt-routes" aria-label="經過路線（撳號碼喺圖上標出成條路線）">
             {routes.map((r) => (
-              <RouteChip key={r} r={r} />
+              <button key={r} className={route === r ? 'lrt-chip-btn on' : 'lrt-chip-btn'} onClick={() => onRoute(route === r ? null : r)} aria-pressed={route === r} aria-label={`喺圖上標出 ${r} 號`}>
+                <RouteChip r={r} />
+              </button>
             ))}
           </div>
           {/* 班次按月台定按路線排（記入設定，設定頁都改得） */}
@@ -166,6 +174,17 @@ const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => vo
   );
 });
 export default LrtStationSheet;
+
+/** 收藏呢個輕鐵站（成個站所有路線；收藏頁、首頁大卡「收藏」會出） */
+function FavButton({ sta }: { sta: string }) {
+  const [on, toggle] = useFavorite(lrtFavorite(sta));
+  const what = `輕鐵${lrtStopName(sta)}站`;
+  return (
+    <button className={on ? 'drawer-close mtr-fav on' : 'drawer-close mtr-fav'} onClick={toggle} aria-pressed={on} aria-label={on ? `取消收藏${what}` : `收藏${what}`} title={on ? `取消收藏${what}` : `收藏${what}`}>
+      <Icon name={on ? 'star-fill' : 'star'} size={20} />
+    </button>
+  );
+}
 
 /** 路線號碼（路線色邊、白底），同路綫圖嘅號碼一樣 */
 export function RouteChip({ r }: { r: string }) {

@@ -1,15 +1,15 @@
 'use client';
 import { useCallback, useSyncExternalStore } from 'react';
-import { mtrLine, mtrStationName, type Company } from '@hknt/core';
+import { lrtStopName, mtrLine, mtrStationName, type Company } from '@hknt/core';
 import type { Co } from './data';
 
 /**
- * 收藏：路線（某個方向）、路線上嘅某個站，或者港鐵站（co = 'mtr'，stopId = 站代號，成個站所有綫）。
+ * 收藏：路線（某個方向）、路線上嘅某個站，港鐵綫 + 站（co = 'mtr'），或者輕鐵站（co = 'lrt'，stopId = 站 ID，成個站所有路線）。
  * 存喺瀏覽器 localStorage（唔使登入，只喺呢部機）。
  * localStorage 可能用唔到（私密瀏覽、封鎖網站資料），所以讀寫都 try/catch，用唔到就只喺記憶體。
  */
 export interface Favorite {
-  co: Co | 'mtr';
+  co: Co | 'mtr' | 'lrt';
   route: string;
   dir: 'O' | 'I';
   /** 往邊度（顯示用） */
@@ -43,6 +43,12 @@ export const mtrFavorite = (sta: string, line: string): Omit<Favorite, 'at'> => 
   stopName: mtrStationName(sta),
 });
 export const isMtrFav = (f: Pick<Favorite, 'co'>): f is Favorite & { co: 'mtr' } => f.co === 'mtr';
+
+/** 輕鐵收藏（輕鐵站面板撳星號）：成個站（route 空白），顯示經過嘅路線下一班 */
+export const lrtFavorite = (sta: string): Omit<Favorite, 'at'> => ({ co: 'lrt', route: '', dir: 'O', dest: '輕鐵', companies: [], stopId: sta, stopName: lrtStopName(sta) });
+export const isLrtFav = (f: Pick<Favorite, 'co'>): f is Favorite & { co: 'lrt' } => f.co === 'lrt';
+/** 鐵路收藏（港鐵、輕鐵）：撳入路綫圖，唔係巴士路線頁 */
+export const isRailFav = (f: Pick<Favorite, 'co'>) => f.co === 'mtr' || f.co === 'lrt';
 
 export const favKey = (f: Pick<Favorite, 'co' | 'route' | 'dir' | 'stopId'>) => `${f.co}/${f.route}/${f.dir}/${f.stopId ?? ''}`;
 

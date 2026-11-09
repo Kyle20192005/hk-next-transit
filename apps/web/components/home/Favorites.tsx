@@ -8,6 +8,10 @@ import {
   favGroupWindowLabel,
   favsInGroup,
   groupFavsByRoute,
+  LRT_BRAND,
+  lrtDepartureRows,
+  lrtRoute,
+  lrtStopRoutes,
   minutesLabel,
   mtrDepartureRows,
   mtrLine,
@@ -17,12 +21,13 @@ import {
   type Eta,
   type FavGroupDef,
   type FavRouteGroup,
+  type LrtPlatform,
   type MtrLineEtas,
 } from '@hknt/core';
 import CompanyTag from '@/components/CompanyTag';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
-import { favKey, isMtrFav, removeFavorite, setFavoriteGroup, useFavorites, type Favorite } from '@/lib/favorites';
+import { favKey, isLrtFav, isMtrFav, removeFavorite, setFavoriteGroup, useFavorites, type Favorite } from '@/lib/favorites';
 import { usePrefs } from '@/lib/prefs';
 import type { Co } from '@/lib/data';
 import { deleteFavGroup, saveFavGroup, useFavGroups } from '@/lib/fav-groups';
@@ -31,12 +36,15 @@ import { liveClient } from '@/lib/buses';
 
 const REFRESH_MS = 30_000;
 
+/** 打開路綫圖嗰個站（lrt = 輕鐵） */
+type OnRail = (sta: string, lrt?: boolean) => void;
+
 /**
- * 收藏：按路線分組（巴士路線、港鐵綫一張卡，core groupFavsByRoute），卡入面列收藏咗嘅站：
- * 巴士站直接顯示下一班；成條路線一撳就入；港鐵站顯示嗰條綫兩個方向下一班（撳入路綫圖）。
+ * 收藏：按路線分組（巴士路線、港鐵綫、輕鐵一張卡，core groupFavsByRoute），卡入面列收藏咗嘅站：
+ * 巴士站直接顯示下一班；成條路線一撳就入；港鐵站顯示嗰條綫兩個方向下一班；輕鐵站顯示每條路線下一班（撳入路綫圖）。
  * 分組（例如「返工」「返屋企」，core fav-groups.ts）：頂部一行揀組，預設揀而家時段嘅組；每個收藏下面揀放入邊組。
  */
-export default function Favorites({ onBrowse, onMtr }: { onBrowse: () => void; onMtr: (sta: string) => void }) {
+export default function Favorites({ onBrowse, onMtr }: { onBrowse: () => void; onMtr: OnRail }) {
   const list = useFavorites();
   const groups = useFavGroups();
   const [picked, setPicked] = useState<string | null>(null);
@@ -62,7 +70,7 @@ export default function Favorites({ onBrowse, onMtr }: { onBrowse: () => void; o
           <p>
             喺路線頁撳標題列嘅 <Icon name="star" size={16} /> 收藏路線，
             <br />
-            或者打開一個站撳「收藏呢個站」；港鐵站喺路綫圖撳站再撳 <Icon name="star" size={16} />。
+            或者打開一個站撳「收藏呢個站」；港鐵站、輕鐵站喺路綫圖撳站再撳 <Icon name="star" size={16} />。
           </p>
           <p className="muted">收藏咗嘅站會喺度直接顯示下一班車（只儲存喺呢部機）</p>
           <button className="primary-btn" onClick={onBrowse}>
@@ -120,12 +128,19 @@ export default function Favorites({ onBrowse, onMtr }: { onBrowse: () => void; o
 }
 
 /** 一條路線（或者港鐵綫）一張卡：頂部路線號碼／綫，下面每行一個收藏咗嘅站 */
-function FavRouteCard({ g, groups, onMtr }: { g: FavRouteGroup<Favorite>; groups: FavGroupDef[]; onMtr: (sta: string) => void }) {
+function FavRouteCard({ g, groups, onMtr }: { g: FavRouteGroup<Favorite>; groups: FavGroupDef[]; onMtr: OnRail }) {
   const f0 = g.favs[0]!;
   const line = isMtrFav(f0) && f0.route ? mtrLine(f0.route) : undefined;
   return (
     <section className="fav-route card">
-      {isMtrFav(f0) ? (
+      {isLrtFav(f0) ? (
+        <header className="fav-route-head">
+          <span className="fav-route-bar" style={{ background: LRT_BRAND.color }} />
+          <Icon name="lrt" size={20} />
+          <strong className="fav-route-line">輕鐵站</strong>
+          <span className="muted fav-route-sub">輕鐵</span>
+        </header>
+      ) : isMtrFav(f0) ? (
         <header className="fav-route-head">
           {line ? (
             <>
@@ -157,8 +172,9 @@ function FavRouteCard({ g, groups, onMtr }: { g: FavRouteGroup<Favorite>; groups
 }
 
 /** 路線卡入面一行：收藏咗嘅站（站名、往邊、下一班），或者成條路線 */
-export function FavItem({ f, groups = [], onMtr }: { f: Favorite; groups?: FavGroupDef[]; onMtr: (sta: string) => void }) {
+export function FavItem({ f, groups = [], onMtr }: { f: Favorite; groups?: FavGroupDef[]; onMtr: OnRail }) {
   if (isMtrFav(f)) return <MtrFavItem f={f} groups={groups} onMtr={onMtr} />;
+  if (isLrtFav(f)) return <LrtFavItem f={f} groups={groups} onMtr={onMtr} />;
   const co = f.co as Co;
   const href = `/${co}/${f.route}?dir=${f.dir}${f.stopId ? `&stop=${f.stopId}` : ''}`;
   return (
@@ -206,7 +222,7 @@ function GroupPick({ f, groups, label }: { f: Favorite; groups: FavGroupDef[]; l
 }
 
 /** 收藏咗嘅港鐵站：站名，下面嗰條綫兩個方向下一班（舊版成個站收藏：所有綫，最多 4 行）；撳入路綫圖嗰個站 */
-function MtrFavItem({ f, groups, onMtr }: { f: Favorite; groups: FavGroupDef[]; onMtr: (sta: string) => void }) {
+function MtrFavItem({ f, groups, onMtr }: { f: Favorite; groups: FavGroupDef[]; onMtr: OnRail }) {
   const sta = f.stopId!;
   const { etaFormat } = usePrefs();
   const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
@@ -270,6 +286,71 @@ function MtrFavItem({ f, groups, onMtr }: { f: Favorite; groups: FavGroupDef[]; 
         <Icon name="star-fill" size={20} />
       </button>
       <GroupPick f={f} groups={groups} label={`${f.stopName}站`} />
+    </li>
+  );
+}
+
+/** 收藏咗嘅輕鐵站：站名同經過嘅路線，下面每條路線每個目的地下一班（最多 4 行，有月台）；撳入輕鐵路綫圖嗰個站 */
+function LrtFavItem({ f, groups, onMtr }: { f: Favorite; groups: FavGroupDef[]; onMtr: OnRail }) {
+  const sta = f.stopId!;
+  const { etaFormat } = usePrefs();
+  const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await liveClient.lrt(sta);
+        const body = (await res.json()) as { platforms?: LrtPlatform[] };
+        const now = Date.now();
+        if (!cancelled && res.ok) setState({ rows: lrtDepartureRows(sta, body.platforms ?? [], now, 4), now });
+      } catch {
+        /* 下次再試 */
+      }
+    };
+    void tick();
+    const t = setInterval(tick, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [sta]);
+  return (
+    <li className="fav fav-mtr">
+      <button className="fav-main" onClick={() => onMtr(sta, true)}>
+        <span className="fav-mtr-name">
+          <Icon name="lrt" size={18} />
+          <strong>{f.stopName}</strong>
+          <span className="fav-mtr-lines">
+            {lrtStopRoutes(sta).map((r) => (
+              <span key={r} className="mtr-chip" style={{ background: lrtRoute(r)?.color, color: lrtRoute(r)?.ink }}>
+                {r}
+              </span>
+            ))}
+          </span>
+        </span>
+        <span className="fav-mtr-rows">
+          {state === null && <span className="muted">…</span>}
+          {state?.rows.length === 0 && <span className="muted">暫時冇班次</span>}
+          {state?.rows.map((r) => (
+            <span key={r.key} className="fav-mtr-row">
+              <span className="nc-badge" style={{ background: r.badge.bg, color: r.badge.ink }}>
+                {r.badge.text}
+              </span>
+              <span className="nc-dest">往{r.dest}</span>
+              {r.platform && (
+                <span className="nc-plat" style={{ background: r.badge.bg, color: r.badge.ink }}>
+                  {r.platform}
+                </span>
+              )}
+              <span className={r.nowText ? 'nc-min nc-now' : 'nc-min'}>{r.nowText ?? minutesLabel(r.at, state.now, etaFormat)}</span>
+            </span>
+          ))}
+        </span>
+      </button>
+      <button className="fav-remove" onClick={() => removeFavorite(f)} aria-label={`取消收藏輕鐵${f.stopName}站`}>
+        <Icon name="star-fill" size={20} />
+      </button>
+      <GroupPick f={f} groups={groups} label={`輕鐵${f.stopName}站`} />
     </li>
   );
 }

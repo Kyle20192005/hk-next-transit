@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { DashPathEffect, Group, RoundedRect, Skia, StrokeCap, StrokeJoin, createPicture, type SkCanvas, type SkPicture } from '@shopify/react-native-skia';
-import { LRT_MAP_ARROWS, LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_LEGEND, LRT_MAP_SIZE as S, LRT_MAP_STATIONS, LRT_MAP_VIEW, lrtRoute, lrtStopEn, lrtStopName, mtrLine, type LrtMapStation } from '@hknt/core';
+import { DashPathEffect, Group, Picture, RoundedRect, Skia, StrokeCap, StrokeJoin, createPicture, type SkCanvas, type SkPicture } from '@shopify/react-native-skia';
+import { LRT_MAP_ARROWS, LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_LEGEND, LRT_MAP_SIZE as S, LRT_MAP_STATIONS, LRT_MAP_VIEW, lrtRoute, lrtRouteStopIds, lrtStopEn, lrtStopName, mtrLine, type LrtMapStation } from '@hknt/core';
 import { useTheme, type Theme } from '@/lib/theme';
 import { alpha, drawText, makePaint } from '@/lib/skia-draw';
 import { SchematicMap, type MapFocus, type MapInset } from './SchematicMap';
@@ -137,6 +137,39 @@ function mapPicture(t: Theme): SkPicture {
   return p;
 }
 
+/**
+ * 標出一條路線（站面板撳路線號碼，同網頁 RouteHighlight 一樣）：底色半透明蓋住成幅圖，再畫返呢條路線嘅色綫（有黑邊）、
+ * 經過嘅站、呢條路線嘅號碼、站名。每個主題 + 路線錄一次，疊喺 overlay（同地圖一齊變形）。
+ */
+const routePictures = new WeakMap<Theme, Map<string, SkPicture>>();
+function routePicture(t: Theme, route: string): SkPicture {
+  let byRoute = routePictures.get(t);
+  if (!byRoute) routePictures.set(t, (byRoute = new Map()));
+  let p = byRoute.get(route);
+  if (!p) {
+    const { minX, minY, width, height } = LRT_MAP_VIEW;
+    const stops = new Set(lrtRouteStopIds(route));
+    p = createPicture(
+      (c) => {
+        c.drawRect(Skia.XYWHRect(minX - 50, minY - 50, width + 100, height + 100), makePaint(alpha(t.card, 0.78)));
+        const lanes = LRT_MAP_LANES.filter((l) => l.r === route).map((l) => Skia.Path.MakeFromSVGString(l.d));
+        for (const p2 of lanes) if (p2) c.drawPath(p2, makePaint(INK, { stroke: S.lane - S.sep + 2 * S.casing, join: StrokeJoin.Round }));
+        for (const p2 of lanes) if (p2) c.drawPath(p2, makePaint(color(route), { stroke: S.lane - S.sep, join: StrokeJoin.Round }));
+        for (const s of LRT_MAP_STATIONS) {
+          if (!stops.has(s.id)) continue;
+          drawMarker(c, s);
+          for (const cap of LRT_MAP_CAPS) if (cap.sta === s.id && cap.r === route) drawCap(c, cap.r, cap.x, cap.y);
+          drawText(c, [{ text: lrtStopName(s.id), size: S.zh, weight: 700, color: t.text }], s.lx, s.zy, s.an, { halo: t.card });
+          drawText(c, [{ text: lrtStopEn(s.id), size: S.en, weight: 500, color: t.muted }], s.lx, s.ey, s.an, { halo: t.card });
+        }
+      },
+      Skia.XYWHRect(minX - 50, minY - 50, width + 100, height + 100),
+    );
+    byRoute.set(route, p);
+  }
+  return p;
+}
+
 // ---------------------------------------------------------------------------
 // 地圖元件
 // ---------------------------------------------------------------------------
@@ -164,11 +197,28 @@ function ringRect(s: LrtMapStation) {
  * 輕鐵路綫圖（同網頁 components/rail/LrtMap.tsx 一樣嘅 core 資料同畫法）：一隻手指拖、兩隻手指縮放、撳站。
  * 成幅圖錄一次（mapPicture），拖拉縮放同港鐵路綫圖共用 SchematicMap。
  */
-export function LrtMap({ selected, onStation, focus = null, inset, near }: { selected: string | null; onStation: (sta: string) => void; focus?: MapFocus | null; inset?: MapInset; near?: string[] }) {
+export function LrtMap({
+  selected,
+  onStation,
+  focus = null,
+  inset,
+  near,
+  route = null,
+}: {
+  selected: string | null;
+  onStation: (sta: string) => void;
+  focus?: MapFocus | null;
+  inset?: MapInset;
+  near?: string[];
+  /** 標出呢條路線（其他淡咗）：站面板撳路線號碼 */
+  route?: string | null;
+}) {
   const t = useTheme();
   const picture = useMemo(() => mapPicture(t), [t]);
+  const hl = useMemo(() => (route ? routePicture(t, route) : null), [t, route]);
   const overlay = (sel: string | null, nearIds: string[]) => (
     <>
+      {hl && <Picture picture={hl} />}
       {nearIds.map((id) => {
         const s = BY_ID.get(id);
         if (!s) return null;

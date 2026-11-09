@@ -1,15 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useSyncExternalStore } from 'react';
-import { mtrLine, mtrStationName, type Company } from '@hknt/core';
+import { lrtStopName, mtrLine, mtrStationName, type Company } from '@hknt/core';
 import type { Co } from './api';
 import { haptic } from './haptics';
 
 /**
- * 收藏（同網頁版 lib/favorites.ts 一樣嘅格式）：路線（某個方向）、路線上嘅某個站，或者港鐵站（co = 'mtr'，stopId = 站代號）。
+ * 收藏（同網頁版 lib/favorites.ts 一樣嘅格式）：路線（某個方向）、路線上嘅某個站，港鐵綫 + 站（co = 'mtr'），或者輕鐵站（co = 'lrt'，成個站）。
  * 存喺 AsyncStorage（只喺呢部機）；開 App 時讀一次入記憶體，之後同步更新。
  */
 export interface Favorite {
-  co: Co | 'mtr';
+  co: Co | 'mtr' | 'lrt';
   route: string;
   dir: 'O' | 'I';
   dest: string;
@@ -41,6 +41,10 @@ export const mtrFavorite = (sta: string, line: string): Omit<Favorite, 'at'> => 
   stopName: mtrStationName(sta),
 });
 export const isMtrFav = (f: Pick<Favorite, 'co'>): f is Favorite & { co: 'mtr' } => f.co === 'mtr';
+
+/** 輕鐵收藏（輕鐵站面板撳星號）：成個站（route 空白），顯示經過嘅路線下一班（同網頁一樣） */
+export const lrtFavorite = (sta: string): Omit<Favorite, 'at'> => ({ co: 'lrt', route: '', dir: 'O', dest: '輕鐵', companies: [], stopId: sta, stopName: lrtStopName(sta) });
+export const isLrtFav = (f: Pick<Favorite, 'co'>): f is Favorite & { co: 'lrt' } => f.co === 'lrt';
 
 export const favKey = (f: Pick<Favorite, 'co' | 'route' | 'dir' | 'stopId'>) => `${f.co}/${f.route}/${f.dir}/${f.stopId ?? ''}`;
 

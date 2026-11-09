@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
-import { COMPANIES, filterNews, formatDistance, groupStopHeads, mtrLine, mtrStationLines, mtrStationName, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
+import { COMPANIES, filterNews, formatDistance, groupStopHeads, LRT_BRAND, lrtRoute, lrtStopName, lrtStopRoutes, mtrLine, mtrStationLines, mtrStationName, nearestRailStation, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
 import { Icon } from '@/components/Icon';
 import { HomeHeader } from '@/components/HomeHeader';
 import { useNearbyStops } from '@/components/Nearby';
@@ -10,7 +10,7 @@ import { ToolTile } from '@/components/ToolTile';
 import { NewsChips, NewsList } from '@/components/NewsList';
 import { useNews, useTools } from '@/lib/news';
 import { warmRoute } from '@/lib/prefetch';
-import { openMtr } from '@/lib/open-mtr';
+import { openLrt, openMtr } from '@/lib/open-mtr';
 import { useRecent } from '@/lib/recent';
 import { usePrefs } from '@/lib/prefs';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
@@ -40,19 +40,21 @@ export default function HomeTab() {
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
-  const mtrNear = state.kind === 'ok' ? state.mtr[0] : undefined;
-  const mtrLineEl = mtrNear && (
-    <Pressable onPress={() => openMtr(mtrNear.sta)} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-      <Icon name="train" size={14} color={t.onBrand} />
+  // 最近鐵路站（2 公里內）：港鐵站同輕鐵站邊個近出邊個，只出一行（同網頁一樣，2026-11 用戶要求）
+  const railNear = state.kind === 'ok' ? nearestRailStation(state.mtr, state.lat, state.lng) : null;
+  const railLrt = railNear?.kind === 'lrt';
+  const mtrLineEl = railNear && (
+    <Pressable onPress={() => (railLrt ? openLrt(railNear.sta) : openMtr(railNear.sta))} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <Icon name={railLrt ? 'lrt' : 'train'} size={14} color={t.onBrand} />
       <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
-        最近港鐵站：{mtrStationName(mtrNear.sta)}
+        {railLrt ? `最近輕鐵站：${lrtStopName(railNear.sta)}` : `最近港鐵站：${mtrStationName(railNear.sta)}`}
       </Text>
       <View style={{ flexDirection: 'row', gap: 2, marginLeft: 2 }}>
-        {mtrStationLines(mtrNear.sta).map((l) => (
-          <View key={l} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: mtrLine(l)?.color, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' }} />
+        {(railLrt ? lrtStopRoutes(railNear.sta).slice(0, 5).map((r) => lrtRoute(r)?.color) : mtrStationLines(railNear.sta).map((l) => mtrLine(l)?.color)).map((c, i) => (
+          <View key={i} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' }} />
         ))}
       </View>
-      <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>· {formatDistance(mtrNear.distance)}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>· {formatDistance(railNear.distance)}</Text>
     </Pressable>
   );
   // 首頁 header（HomeHeader，一件嘢，會收縮；同網頁一樣）：浮喺捲動區上面，捲動內容頂留返 header 咁高
@@ -139,12 +141,31 @@ export default function HomeTab() {
           )}
         </Section>
 
-        {/* 最近睇過：巴士路線同港鐵站；未有記錄都出，話俾人知點樣先會記低 */}
+        {/* 最近睇過：巴士路線、港鐵站同輕鐵站；未有記錄都出，話俾人知點樣先會記低 */}
         <Section title="最近睇過">
           <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
-            {recent.length === 0 && <Text style={{ padding: 14, color: t.muted, lineHeight: 20 }}>未有記錄：打開巴士路線或者港鐵站就會喺度見到，方便再開。</Text>}
+            {recent.length === 0 && <Text style={{ padding: 14, color: t.muted, lineHeight: 20 }}>未有記錄：打開巴士路線、港鐵站或者輕鐵站就會喺度見到，方便再開。</Text>}
             {recent.slice(0, RECENT_SHOWN).map((r, i) => {
               const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: t.line };
+              if (r.co === 'lrt')
+                return (
+                  <Pressable key={`lrt-${r.route}`} onPress={() => openLrt(r.route)} accessibilityRole="link" style={row}>
+                    <View style={{ minWidth: 56, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: 'center', backgroundColor: LRT_BRAND.color }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: LRT_BRAND.ink }}>輕鐵</Text>
+                    </View>
+                    <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: '600', color: t.text }}>
+                      {r.dest}站
+                    </Text>
+                    <View style={{ flex: 1, flexDirection: 'row', gap: 3 }}>
+                      {lrtStopRoutes(r.route)
+                        .slice(0, 5)
+                        .map((x) => (
+                          <View key={x} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: lrtRoute(x)?.color }} />
+                        ))}
+                    </View>
+                    <Icon name="chevron-right" size={18} color={t.muted} />
+                  </Pressable>
+                );
               if (r.co === 'mtr')
                 return (
                   <Pressable key={`mtr-${r.route}`} onPress={() => openMtr(r.route)} accessibilityRole="link" style={row}>

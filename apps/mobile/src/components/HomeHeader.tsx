@@ -5,6 +5,9 @@ import { radius, shadow, useTheme } from '@/lib/theme';
 import { Icon } from './Icon';
 import { Brand, BRAND_ROW } from './ui';
 
+/** 大字（地區名）大細；收起時縮到地區膠囊字（14）咁大（2026-11 用戶話唔夠大：38 → 48，同網頁 .hh-name 3rem 一樣） */
+const NAME_SIZE = 48;
+
 /** 頂部一行上下嘅空位 */
 const PAD = 12;
 
@@ -66,7 +69,7 @@ export function HomeHeader({
   const pillAbs = { x: bar.x + pillB.x, y: bar.y + pillB.y };
   const nameDx = pillAbs.x + pillB.w / 2 - (nameAbs.x + nameB.w / 2);
   const nameDy = pillAbs.y + pillB.h / 2 - (nameAbs.y + nameB.h / 2);
-  const nameScale = 14 / 38;
+  const nameScale = 14 / NAME_SIZE;
   const hasPill = !!pill;
   // 搜尋欄 → 搜尋掣
   const btnAbs = { x: bar.x + btnB.x, y: bar.y + btnB.y };
@@ -101,7 +104,7 @@ export function HomeHeader({
           onLayout={(e) => setNameB(box(e))}
           numberOfLines={1}
           style={{
-            fontSize: 38,
+            fontSize: NAME_SIZE,
             fontWeight: '900',
             color: t.onBrand,
             letterSpacing: 0.5,
@@ -115,7 +118,7 @@ export function HomeHeader({
         </Animated.Text>
         {/* 英文名、最近巴士站：跟黃色底收走，淡得快啲唔好同縮緊嘅大字疊埋 */}
         <Animated.View pointerEvents="box-none" style={{ alignItems: 'center', opacity: between(0, Math.max(1, (restTop - bar.y - bar.h) * 0.45), 1, 0), transform: [{ translateY: lerp(-D, false) }] }}>
-          {en && <Text style={{ marginTop: -2, fontSize: 18, fontWeight: '800', color: t.onBrand, opacity: 0.85 }}>{en}</Text>}
+          {en && <Text style={{ marginTop: -4, fontSize: 20, fontWeight: '800', color: t.onBrand, opacity: 0.85 }}>{en}</Text>}
           <View style={{ marginTop: 4 }}>{sub}</View>
         </Animated.View>
       </View>

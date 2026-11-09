@@ -8,8 +8,8 @@ import type { Co } from './data';
  * 讀寫 try/catch（私密瀏覽等用唔到就只喺記憶體）。App 版 apps/mobile/src/lib/recent.ts。
  */
 export interface RecentRoute {
-  /** 'mtr' = 港鐵站（route = 站代號，dest = 站名；core mtrRecent） */
-  co: Co | 'mtr';
+  /** 'mtr' = 港鐵站（route = 站代號，dest = 站名；core mtrRecent）；'lrt' = 輕鐵站（route = 站 ID；core lrtRecent） */
+  co: Co | 'mtr' | 'lrt';
   route: string;
   dir: 'O' | 'I';
   dest: string;

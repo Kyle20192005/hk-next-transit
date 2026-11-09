@@ -70,7 +70,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
     <main className={`home tab-${view ? view.kind : tab}`}>
       <div className="home-body">
         {view?.kind === 'nearby' ? (
-          <Nearby onBack={() => setView(null)} />
+          <Nearby onBack={() => setView(null)} onRail={openMtr} />
         ) : view?.kind === 'news' ? (
           <News pos={view.pos} onBack={() => setView(null)} />
         ) : view?.kind === 'tools' ? (

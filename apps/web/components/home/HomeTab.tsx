@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { COMPANIES, DEFAULT_TOOLS, filterNews, formatDistance, groupStopHeads, mtrLine, mtrStationLines, mtrStationName, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
+import { COMPANIES, DEFAULT_TOOLS, filterNews, formatDistance, groupStopHeads, LRT_BRAND, lrtRoute, lrtStopName, lrtStopRoutes, mtrLine, mtrStationLines, mtrStationName, nearestRailStation, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import { useRecent } from '@/lib/recent';
@@ -19,10 +19,10 @@ const NEWS_SHOWN = 3;
 
 /**
  * 首頁（NextLeg 入口，參考港鐵 App）：
- * 黃色區大字顯示地區名，下面最近港鐵站（2 公里內，撳入路綫圖）同最近巴士站；「想去邊度？」（導航）同交通消息燈號；常用工具（可以揀）；大卡（下班車／收藏）；
+ * 黃色區大字顯示地區名，下面最近鐵路站（港鐵站同輕鐵站邊個近出邊個，2 公里內，撳入路綫圖）同最近巴士站；「想去邊度？」（導航）同交通消息燈號；常用工具（可以揀）；大卡（下班車／收藏）；
  * 交通消息（全部／附近／港鐵）；最近睇過。App 版 apps/mobile/src/app/(tabs)/index.tsx。
  */
-export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, pos?: { lat: number; lng: number } | null) => void; onEditTools: () => void; onMtr: (sta: string) => void }) {
+export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, pos?: { lat: number; lng: number } | null) => void; onEditTools: () => void; onMtr: (sta: string, lrt?: boolean) => void }) {
   const recent = useRecent();
   const prefs = usePrefs();
   const { state, locate } = useNearbyStops(true);
@@ -34,17 +34,17 @@ export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, p
 
   const head = state.kind === 'ok' ? groupStopHeads(state.stops)[0] : undefined;
   const area = state.kind === 'ok' ? state.area : null;
-  const mtrNear = state.kind === 'ok' ? state.mtr[0] : undefined;
-  // 最近港鐵站（2 公里內）：撳入路綫圖嗰個站
-  const mtrLineEl = mtrNear && (
-    <button className="hero-line hero-mtr" onClick={() => onMtr(mtrNear.sta)}>
-      <Icon name="train" size={14} /> 最近港鐵站：{mtrStationName(mtrNear.sta)}
+  // 最近鐵路站（2 公里內）：港鐵站同輕鐵站邊個近出邊個，只出一行（2026-11 用戶要求）；撳入路綫圖嗰個站
+  const railNear = state.kind === 'ok' ? nearestRailStation(state.mtr, state.lat, state.lng) : null;
+  const mtrLineEl = railNear && (
+    <button className="hero-line hero-mtr" onClick={() => onMtr(railNear.sta, railNear.kind === 'lrt')}>
+      <Icon name={railNear.kind === 'lrt' ? 'lrt' : 'train'} size={14} /> {railNear.kind === 'lrt' ? `最近輕鐵站：${lrtStopName(railNear.sta)}` : `最近港鐵站：${mtrStationName(railNear.sta)}`}
       <span className="hero-mtr-dots" aria-hidden="true">
-        {mtrStationLines(mtrNear.sta).map((l) => (
-          <i key={l} style={{ background: mtrLine(l)?.color }} />
+        {(railNear.kind === 'lrt' ? lrtStopRoutes(railNear.sta).slice(0, 5).map((r) => lrtRoute(r)?.color) : mtrStationLines(railNear.sta).map((l) => mtrLine(l)?.color)).map((c, i) => (
+          <i key={i} style={{ background: c }} />
         ))}
       </span>
-      · {formatDistance(mtrNear.distance)}
+      · {formatDistance(railNear.distance)}
     </button>
   );
   const scroller = useRef<HTMLDivElement>(null);
@@ -106,16 +106,37 @@ export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, p
           onFavs={() => go('favs')}
           notice={nearNews[0] ? { text: nearNews[0].title, onClick: () => go('news', pos) } : undefined}
         />
-        {/* 最近睇過：巴士路線同港鐵站；未有記錄都出，話俾人知點樣先會記低 */}
+        {/* 最近睇過：巴士路線、港鐵站同輕鐵站；未有記錄都出，話俾人知點樣先會記低 */}
         <section className="feed-section feed-recent">
           <div className="feed-head">
             <h2>最近睇過</h2>
           </div>
           {recent.length === 0 ? (
-            <p className="feed-hint card">未有記錄：打開巴士路線或者港鐵站就會喺度見到，方便再開。</p>
+            <p className="feed-hint card">未有記錄：打開巴士路線、港鐵站或者輕鐵站就會喺度見到，方便再開。</p>
           ) : (
             <ul className="recent-list card">
               {recent.slice(0, RECENT_SHOWN).map((r) => {
+                if (r.co === 'lrt')
+                  return (
+                    <li key={`lrt-${r.route}`}>
+                      <button className="recent-row" onClick={() => onMtr(r.route, true)}>
+                        <span className="nc-badge recent-mtr" style={{ background: LRT_BRAND.color, color: LRT_BRAND.ink }}>
+                          輕鐵
+                        </span>
+                        <span className="route-to recent-sta">
+                          {r.dest}站
+                          <span className="hero-mtr-dots" aria-hidden="true">
+                            {lrtStopRoutes(r.route)
+                              .slice(0, 5)
+                              .map((x) => (
+                                <i key={x} style={{ background: lrtRoute(x)?.color }} />
+                              ))}
+                          </span>
+                        </span>
+                        <Icon name="chevron-right" size={18} className="muted" />
+                      </button>
+                    </li>
+                  );
                 if (r.co === 'mtr')
                   return (
                     <li key={`mtr-${r.route}`}>

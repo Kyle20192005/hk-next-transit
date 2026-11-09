@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { minutesLabel, mtrDepartureRows, mtrLine, mtrStationLines, type DepartureRow, type Eta, type FavGroupDef, type FavRouteGroup } from '@hknt/core';
+import { LRT_BRAND, lrtDepartureRows, lrtRoute, lrtStopRoutes, minutesLabel, mtrDepartureRows, mtrLine, mtrStationLines, type DepartureRow, type Eta, type FavGroupDef, type FavRouteGroup } from '@hknt/core';
 import { api, type Co } from '@/lib/api';
-import { isMtrFav, removeFavorite, type Favorite } from '@/lib/favorites';
-import { openMtr } from '@/lib/open-mtr';
+import { isLrtFav, isMtrFav, removeFavorite, type Favorite } from '@/lib/favorites';
+import { openLrt, openMtr } from '@/lib/open-mtr';
 import { usePrefs } from '@/lib/prefs';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { warmRoute } from '@/lib/prefetch';
@@ -15,8 +15,8 @@ import { EtaInline } from './EtaInline';
 const REFRESH_MS = 30_000;
 
 /**
- * 收藏頁：一條路線（港鐵綫）一張卡（同網頁 FavRouteCard 一樣，core groupFavsByRoute）：
- * 頂部路線號碼同公司（撳入路線）或者綫色 + 綫名，下面每行一個收藏咗嘅站。
+ * 收藏頁：一條路線（港鐵綫、輕鐵）一張卡（同網頁 FavRouteCard 一樣，core groupFavsByRoute）：
+ * 頂部路線號碼同公司（撳入路線）或者綫色 + 綫名（輕鐵：「輕鐵站」），下面每行一個收藏咗嘅站。
  */
 export function FavRouteCard({ g, groups, onPickGroup }: { g: FavRouteGroup<Favorite>; groups: FavGroupDef[]; onPickGroup: (f: Favorite) => void }) {
   const t = useTheme();
@@ -25,7 +25,14 @@ export function FavRouteCard({ g, groups, onPickGroup }: { g: FavRouteGroup<Favo
   const co = f0.co as Co;
   return (
     <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
-      {isMtrFav(f0) ? (
+      {isLrtFav(f0) ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: t.line }}>
+          <View style={{ width: 6, height: 22, borderRadius: 3, backgroundColor: LRT_BRAND.color }} />
+          <Icon name="lrt" size={20} color={t.text} />
+          <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: t.text }}>輕鐵站</Text>
+          <Text style={{ fontSize: 13, color: t.muted }}>輕鐵</Text>
+        </View>
+      ) : isMtrFav(f0) ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: t.line }}>
           {line ? <View style={{ width: 6, height: 22, borderRadius: 3, backgroundColor: line.color }} /> : <Icon name="train" size={20} color={t.text} />}
           <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: t.text }}>{line ? line.zh : '港鐵站'}</Text>
@@ -56,7 +63,73 @@ export function FavRouteCard({ g, groups, onPickGroup }: { g: FavRouteGroup<Favo
 /** 路線卡入面一行：收藏咗嘅站（站名、往邊、下一班），成條路線，或者港鐵站（嗰條綫兩個方向下一班） */
 export function FavItem({ f, groups = [], onPickGroup }: { f: Favorite; groups?: FavGroupDef[]; onPickGroup?: () => void }) {
   if (isMtrFav(f)) return <MtrFavItem f={f} groups={groups} onPickGroup={onPickGroup} />;
+  if (isLrtFav(f)) return <LrtFavItem f={f} groups={groups} onPickGroup={onPickGroup} />;
   return <BusFavItem f={f} groups={groups} onPickGroup={onPickGroup} />;
+}
+
+/** 收藏咗嘅輕鐵站：站名同經過嘅路線，下面每條路線每個目的地下一班（最多 4 行，有月台）；撳入輕鐵路綫圖（同網頁 LrtFavItem 一樣） */
+function LrtFavItem({ f, groups, onPickGroup }: { f: Favorite; groups: FavGroupDef[]; onPickGroup?: () => void }) {
+  const t = useTheme();
+  const sta = f.stopId!;
+  const { etaFormat } = usePrefs();
+  const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const body = await api.lrt(sta);
+        const now = Date.now();
+        if (!cancelled) setState({ rows: lrtDepartureRows(sta, body.platforms, now, 4), now });
+      } catch {
+        /* 下次再試 */
+      }
+    };
+    void tick();
+    const id = setInterval(tick, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [sta]);
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        <Pressable onPress={() => openLrt(sta)} accessibilityRole="link" style={{ flex: 1, gap: 8, paddingVertical: 12, paddingLeft: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <Icon name="lrt" size={18} color={t.text} />
+            <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>{f.stopName}</Text>
+            {lrtStopRoutes(sta).map((r) => (
+              <View key={r} style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, backgroundColor: lrtRoute(r)?.color }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: lrtRoute(r)?.ink }}>{r}</Text>
+              </View>
+            ))}
+          </View>
+          {state === null && <Text style={{ color: t.muted }}>…</Text>}
+          {state?.rows.length === 0 && <Text style={{ color: t.muted }}>暫時冇班次</Text>}
+          {state?.rows.map((r) => (
+            <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ minWidth: 50, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: r.badge.bg, alignItems: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: r.badge.ink }}>{r.badge.text}</Text>
+              </View>
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: '600', color: t.text }}>
+                往{r.dest}
+              </Text>
+              {r.platform ? (
+                <View style={{ width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: r.badge.bg }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: r.badge.ink }}>{r.platform}</Text>
+                </View>
+              ) : null}
+              <Text style={{ minWidth: 64, textAlign: 'right', fontSize: r.nowText ? 14 : 16, fontWeight: '800', color: t.text, ...tabular }}>{r.nowText ?? minutesLabel(r.at, state.now, etaFormat)}</Text>
+            </View>
+          ))}
+        </Pressable>
+        <Pressable onPress={() => removeFavorite(f)} accessibilityLabel={`取消收藏輕鐵${f.stopName}站`} hitSlop={6} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 4, marginTop: 4 }}>
+          <Icon name="star-fill" size={20} color={t.brand} />
+        </Pressable>
+      </View>
+      <GroupPick f={f} groups={groups} label={`輕鐵${f.stopName}站`} onPickGroup={onPickGroup} />
+    </View>
+  );
 }
 
 function BusFavItem({ f, groups, onPickGroup }: { f: Favorite; groups: FavGroupDef[]; onPickGroup?: () => void }) {

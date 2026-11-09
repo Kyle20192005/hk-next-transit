@@ -1,6 +1,8 @@
+import type { DepartureRow } from './departures';
 import { metresBetween } from './geo';
 import { LRT_ROUTE_STOPS, LRT_STOPS } from './lrt-data';
 import { LRT_STOP_LL } from './lrt-geo';
+import { LRT_MAP_LEGEND } from './lrt-map';
 import { hkClock, type Prefs } from './prefs';
 
 /**
@@ -185,3 +187,58 @@ export function nearestLrtStops(lat: number, lng: number, maxM = 2000, limit = 3
     .sort((a, b) => a.distance - b.distance)
     .slice(0, limit);
 }
+
+/**
+ * 輕鐵站到站卡嘅行（首頁大卡、收藏）：每條路線每個目的地下一班（lrtByRoute），按時間排，最多 limit 行；
+ * 標籤用路線號碼同路線色，有月台；正在離開／即將到站用字。撳落去開輕鐵路綫圖嗰個站（link.co = 'lrt'）。
+ */
+export function lrtDepartureRows(sta: string, platforms: readonly LrtPlatform[], now: number, limit = 4): DepartureRow[] {
+  return lrtByRoute(platforms)
+    .map((g) => {
+      const t = g.trains[0]!;
+      const info = lrtRoute(g.route);
+      return {
+        key: `lrt-${sta}-${g.route}-${g.dest}`,
+        badge: { text: g.route, bg: info?.color ?? '#888', ink: info?.ink ?? '#fff' },
+        dest: g.dest,
+        at: t.mins === null ? null : now + t.mins * 60_000,
+        platform: t.platform || undefined,
+        nowText: t.status === 'departing' ? '正在離開' : t.status === 'arriving' ? '即將到站' : undefined,
+        link: { co: 'lrt', route: g.route, dir: 'O' as const, stop: sta },
+      } satisfies DepartureRow;
+    })
+    .sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity))
+    .slice(0, limit);
+}
+
+/** 「最近睇過」入面嘅輕鐵站（route = 站 ID，co = 'lrt'） */
+export const lrtRecent = (sta: string) => ({ co: 'lrt' as const, route: sta, dir: 'O' as const, dest: lrtStopName(sta), companies: [] });
+
+/**
+ * 首頁大字下面嘅鐵路站：港鐵站同輕鐵站邊個近就出邊個（maxM 內），只出一行。
+ * mtr = `/api/nearby` 嘅 mtr（由近到遠）；輕鐵站喺前端計（core LRT_STOP_LL）。
+ */
+export function nearestRailStation(mtr: readonly { sta: string; distance: number }[], lat: number, lng: number, maxM = 2000): { kind: 'mtr' | 'lrt'; sta: string; distance: number } | null {
+  const m = mtr.find((x) => x.distance <= maxM);
+  const l = nearestLrtStops(lat, lng, maxM, 1)[0];
+  if (m && (!l || m.distance <= l.distance)) return { kind: 'mtr', sta: m.sta, distance: m.distance };
+  return l ? { kind: 'lrt', sta: l.sta, distance: l.distance } : null;
+}
+
+/**
+ * 首頁大卡「下班車」嘅鐵路站卡：港鐵站（mtrCardStations 揀好）加 800 米內輕鐵站，按距離排，最多 max 張。
+ * 屯門、元朗、天水圍一帶輕鐵站好密，所以輕鐵只計 800 米內。
+ */
+export function railCardStations(mtrCards: readonly { sta: string; distance: number }[], lat: number, lng: number, nearM = 800, max = 3): { kind: 'mtr' | 'lrt'; sta: string; distance: number }[] {
+  const lrt = nearestLrtStops(lat, lng, nearM, 2).map((s) => ({ kind: 'lrt' as const, ...s }));
+  return [...mtrCards.map((s) => ({ kind: 'mtr' as const, sta: s.sta, distance: s.distance })), ...lrt].sort((a, b) => a.distance - b.distance).slice(0, max);
+}
+
+/** 一條路線經過嘅站 ID（兩個方向合埋，唔重複）：路綫圖撳路線號碼標出成條路線用 */
+export function lrtRouteStopIds(route: string): string[] {
+  return [...new Set(Object.values(LRT_ROUTE_STOPS[route] ?? {}).flat())];
+}
+
+/** 路線起訖（同路綫圖圖例一樣，例如「屯門碼頭 ↔ 元朗」「天水圍循環綫」） */
+export const lrtRouteName = (route: string): string => LRT_MAP_LEGEND.rows.find((r) => r[0] === route)?.[1] ?? '';
+

@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { LRT_MAP_ARROWS, LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_LEGEND, LRT_MAP_SIZE as S, LRT_MAP_STATIONS, LRT_MAP_VIEW, lrtRoute, lrtStopEn, lrtStopName, mtrLine, type LrtMapStation } from '@hknt/core';
+import { LRT_MAP_ARROWS, LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_LEGEND, LRT_MAP_SIZE as S, LRT_MAP_STATIONS, LRT_MAP_VIEW, lrtRoute, lrtRouteStopIds, lrtStopEn, lrtStopName, mtrLine, type LrtMapStation } from '@hknt/core';
 import Icon from '../Icon';
 import { useMapView, type MapFocus, type MapInset } from './useMapView';
 
@@ -20,6 +20,7 @@ export default function LrtMap({
   focus = null,
   inset = { right: 0, bottom: 0 },
   near = [],
+  route = null,
 }: {
   selected: string | null;
   onStation: (sta: string) => void;
@@ -27,6 +28,8 @@ export default function LrtMap({
   inset?: MapInset;
   /** 附近嘅站（藍色虛綫框） */
   near?: string[];
+  /** 標出呢條路線（其他淡咗）：站面板撳路線號碼 */
+  route?: string | null;
 }) {
   const byId = useMemo(() => new Map(LRT_MAP_STATIONS.map((s) => [s.id, s])), []);
   const under = useMemo(() => LRT_MAP_LANES.filter((l) => !l.o), []);
@@ -63,6 +66,8 @@ export default function LrtMap({
           {LRT_MAP_ARROWS.map((a, i) => (
             <path key={`a${i}`} d="M-0.035 -0.042 L0.025 0 L-0.035 0.042" className="lrt-arrow" transform={`translate(${a.x} ${a.y}) rotate(${a.a})`} />
           ))}
+          {/* 標出一條路線：成幅圖蓋一層半透明底色，再喺上面畫返呢條路線嘅色綫、站、號碼、站名（唔接收撳，撳照落到下面嘅站） */}
+          {route && <RouteHighlight route={route} />}
           {near.map((id) => {
             const s = byId.get(id);
             return s ? <Ring key={`near-${id}`} s={s} className="mtr-near" /> : null;
@@ -103,6 +108,38 @@ export default function LrtMap({
         </button>
       </div>
     </div>
+  );
+}
+
+/** 標出一條路線：底色半透明蓋住成幅圖，再畫返呢條路線（色綫有黑邊、經過嘅站、號碼、站名） */
+function RouteHighlight({ route }: { route: string }) {
+  const lanes = LRT_MAP_LANES.filter((l) => l.r === route);
+  const stops = new Set(lrtRouteStopIds(route));
+  const V = LRT_MAP_VIEW;
+  return (
+    <g className="lrt-hl" aria-hidden="true">
+      <rect x={V.minX - 50} y={V.minY - 50} width={V.width + 100} height={V.height + 100} className="lrt-hl-dim" />
+      {lanes.map((l, i) => (
+        <path key={`c${i}`} d={l.d} className="lrt-lane" stroke={INK} strokeWidth={S.lane - S.sep + 2 * S.casing} />
+      ))}
+      {lanes.map((l, i) => (
+        <path key={`l${i}`} d={l.d} className="lrt-lane" stroke={color(route)} strokeWidth={S.lane - S.sep} />
+      ))}
+      {LRT_MAP_STATIONS.filter((s) => stops.has(s.id)).map((s) => (
+        <g key={s.id}>
+          <Marker s={s} />
+          {LRT_MAP_CAPS.filter((c) => c.sta === s.id && c.r === route).map((c) => (
+            <Cap key={c.r} r={c.r} x={c.x} y={c.y} />
+          ))}
+          <text x={s.lx} y={s.zy} textAnchor={s.an} className="mtr-zh">
+            {lrtStopName(s.id)}
+          </text>
+          <text x={s.lx} y={s.ey} textAnchor={s.an} className="mtr-en">
+            {lrtStopEn(s.id)}
+          </text>
+        </g>
+      ))}
+    </g>
   );
 }
 

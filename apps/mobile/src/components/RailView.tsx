@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatDistance, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, mtrCardStations, mtrLine, mtrRecent, mtrStationEn, mtrStationLines, mtrStationName, nearestLrtStops, searchLrtStops, searchMtrStations } from '@hknt/core';
+import { formatDistance, lrtRecent, lrtRoute, lrtRouteName, lrtStopEn, lrtStopName, lrtStopRoutes, mtrCardStations, mtrLine, mtrRecent, mtrStationEn, mtrStationLines, mtrStationName, nearestLrtStops, searchLrtStops, searchMtrStations } from '@hknt/core';
 import { Icon } from './Icon';
 import { useNearbyStops } from './Nearby';
 import { addRecent } from '@/lib/recent';
@@ -9,7 +9,7 @@ import { radius, shadow, shadowLg, useTheme } from '@/lib/theme';
 import { MtrMap } from './MtrMap';
 import { LrtMap } from './LrtMap';
 import { MtrStationSheet } from './MtrStationSheet';
-import { LrtStationSheet } from './LrtStationSheet';
+import { LrtStationSheet, RouteChip } from './LrtStationSheet';
 import type { MapFocus, MapInset } from './SchematicMap';
 
 type Kind = 'mtr' | 'lrt';
@@ -46,8 +46,11 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
       .catch(() => {});
   }, []);
   const [movedNear, setMovedNear] = useState<Kind | null>(null);
+  /** 輕鐵：喺圖上標出嘅路線（站面板撳路線號碼；轉圖就取消） */
+  const [route, setRoute] = useState<string | null>(null);
   const setKind = (k: Kind) => {
     setKindState(k);
+    setRoute(null);
     setSta(null);
     setFocus(null);
     setMovedNear(null);
@@ -75,6 +78,7 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
     setSeenOpen(openKey);
     if (open) {
       setKindState(open.lrt ? 'lrt' : 'mtr');
+      setRoute(null);
       setMovedNear(open.lrt ? 'lrt' : 'mtr');
       setSta(open.sta);
       setFocus({ sta: open.sta, zoom: true });
@@ -94,6 +98,7 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
   /** 轉去某幅圖嘅站（搜尋、面板「轉乘」）：飛去（放大置中）再打開 */
   const jump = (k: Kind, s: string) => {
     setKindState(k);
+    setRoute(null);
     setMovedNear(k);
     AsyncStorage.setItem(KIND_KEY, k).catch(() => {});
     setSta(s);
@@ -106,9 +111,9 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
     jump(h.lrt ? 'lrt' : 'mtr', h.sta);
   };
   const close = useCallback(() => setSta(null), []);
-  // 打開咗嘅港鐵站記入首頁「最近睇過」
+  // 打開咗嘅港鐵站、輕鐵站記入首頁「最近睇過」
   useEffect(() => {
-    if (sta && kind === 'mtr') addRecent(mtrRecent(sta));
+    if (sta) addRecent(kind === 'lrt' ? lrtRecent(sta) : mtrRecent(sta));
   }, [sta, kind]);
 
   const onPanelLayout = (e: LayoutChangeEvent) => {
@@ -126,7 +131,7 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
       {kind === 'mtr' ? (
         <MtrMap key="mtr" selected={sta} onStation={onStation} focus={focus} inset={sta ? inset : NO_INSET} near={nearIds} />
       ) : (
-        <LrtMap key="lrt" selected={sta} onStation={onStation} focus={focus} inset={sta ? inset : NO_INSET} near={nearIds} />
+        <LrtMap key="lrt" selected={sta} onStation={onStation} focus={focus} inset={sta ? inset : NO_INSET} near={nearIds} route={route} />
       )}
       <View pointerEvents="box-none" style={{ position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         {/* 港鐵／輕鐵切換：大過其他浮動掣，有圖示，揀咗嘅用黃色（同網頁 .rail-switch 一樣） */}
@@ -150,6 +155,15 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
             );
           })}
         </View>
+        {kind === 'lrt' && route && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5, paddingLeft: 8, paddingRight: 5, borderRadius: 999, borderWidth: 1, borderColor: t.line, backgroundColor: t.card, ...shadow }}>
+            <RouteChip r={route} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: t.text }}>{lrtRouteName(route)}</Text>
+            <Pressable onPress={() => setRoute(null)} accessibilityRole="button" accessibilityLabel="唔再標出路線" hitSlop={6} style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
+              <Icon name="close" size={14} color={t.muted} />
+            </Pressable>
+          </View>
+        )}
         {near[0] && (
           <Pressable
             onPress={() => {
@@ -167,7 +181,7 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
         )}
       </View>
       {sta && kind === 'mtr' && <MtrStationSheet sta={sta} onClose={close} tab={tab} onTab={setTab} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} onXfer={(s) => jump('lrt', s)} />}
-      {sta && kind === 'lrt' && <LrtStationSheet sta={sta} onClose={close} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} onXfer={(s) => jump('mtr', s)} />}
+      {sta && kind === 'lrt' && <LrtStationSheet sta={sta} onClose={close} all={all} onAll={setAll} onLayout={onPanelLayout} sheet={sheetSize} style={panelStyle} onXfer={(s) => jump('mtr', s)} route={route} onRoute={setRoute} />}
       {query.trim() !== '' && (
         <View style={{ position: 'absolute', top: 8, left: 12, right: 12, maxHeight: '70%', borderRadius: radius.m, backgroundColor: t.card, ...shadowLg }}>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 6 }}>

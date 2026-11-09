@@ -3,14 +3,15 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { formatDistance, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, type NearbyCache, type NearMtr } from '@hknt/core';
+import { formatDistance, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrStationName, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, type DepartureRow, type NearbyCache, type NearMtr } from '@hknt/core';
 import { api, type NearStop } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { warmRoute } from '@/lib/prefetch';
 import { CompanyTag, ScheduledTag } from './ui';
 import { Icon } from './Icon';
 import { EtaInline } from './EtaInline';
-import { getPrefs } from '@/lib/prefs';
+import { getPrefs, usePrefs } from '@/lib/prefs';
+import { openLrt, openMtr } from '@/lib/open-mtr';
 
 const REFRESH_MS = 30_000;
 
@@ -109,6 +110,75 @@ export function useNearbyStops(auto = false) {
 }
 
 /** 一個附近嘅站：撳開顯示每條線下一班（同網頁 components/home/Nearby.tsx 一樣） */
+/** 附近嘅港鐵站／輕鐵站（同網頁 NearbyRail 一樣）：每條綫（路線）每個方向下一班，撳入路綫圖嗰個站 */
+export function NearbyRail({ kind, sta, distance, autoLoad }: { kind: 'mtr' | 'lrt'; sta: string; distance: number; autoLoad: boolean }) {
+  const t = useTheme();
+  const { etaFormat } = usePrefs();
+  const [open, setOpen] = useState(autoLoad);
+  const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
+  const lrt = kind === 'lrt';
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const now = Date.now();
+        const rows = lrt ? lrtDepartureRows(sta, (await api.lrt(sta)).platforms, now, 8) : mtrDepartureRows(sta, (await api.mtr(sta)).lines, 8);
+        if (!cancelled) setState({ rows, now });
+      } catch {
+        /* 下次再試 */
+      }
+    };
+    void tick();
+    const id = setInterval(tick, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [open, sta, lrt]);
+  const go = () => (lrt ? openLrt(sta) : openMtr(sta));
+  return (
+    <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
+      <Pressable onPress={() => setOpen((o) => !o)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingLeft: 16, paddingRight: 14 }}>
+        <Icon name={lrt ? 'lrt' : 'train'} size={18} color={t.accent} />
+        <Text style={{ flex: 1, fontWeight: '700', fontSize: 16, color: t.text }}>{`${lrt ? '輕鐵' : '港鐵'}${lrt ? lrtStopName(sta) : mtrStationName(sta)}站`}</Text>
+        <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: 'hidden', backgroundColor: t.surface2, color: t.muted, fontSize: 12, fontWeight: '700', ...tabular }}>
+          {formatDistance(distance)}
+        </Text>
+        <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+          <Icon name="chevron-down" size={18} color={t.muted} />
+        </View>
+      </Pressable>
+      {open && (
+        <View style={{ borderTopWidth: 1, borderTopColor: t.line }}>
+          {state === null && <Text style={{ padding: 12, paddingLeft: 16, color: t.muted }}>…</Text>}
+          {state?.rows.length === 0 && <Text style={{ padding: 12, paddingLeft: 16, color: t.muted }}>暫時冇班次</Text>}
+          {state?.rows.map((r) => (
+            <Pressable key={r.key} onPress={go} accessibilityRole="link" style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: t.line, backgroundColor: pressed ? t.surface2 : 'transparent' })}>
+              <View style={{ minWidth: 50, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: r.badge.bg, alignItems: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: r.badge.ink }}>{r.badge.text}</Text>
+              </View>
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: '600', color: t.text }}>
+                往{r.dest}
+              </Text>
+              {r.platform ? (
+                <View accessibilityLabel={`${r.platform} 號月台`} style={{ width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: r.badge.bg }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: r.badge.ink }}>{r.platform}</Text>
+                </View>
+              ) : null}
+              <Text style={{ minWidth: 64, textAlign: 'right', fontSize: r.nowText ? 14 : 16, fontWeight: '800', color: t.text, ...tabular }}>{r.nowText ?? minutesLabel(r.at, state.now, etaFormat)}</Text>
+            </Pressable>
+          ))}
+          <Pressable onPress={go} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 10 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>喺路綫圖打開</Text>
+            <Icon name="chevron-right" size={16} color={t.accent} />
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
   const t = useTheme();
   const [open, setOpen] = useState(autoLoad);

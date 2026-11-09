@@ -4,6 +4,7 @@ import { LIVE_REFRESH, hkClockSec, lrtRoute, lrtStopEn, lrtStopName, lrtStopRout
 import { api } from '@/lib/api';
 import { haptic } from '@/lib/haptics';
 import { setPref, usePrefs } from '@/lib/prefs';
+import { lrtFavorite, useFavorite } from '@/lib/favorites';
 import { radius, shadowLg, tabular, useTheme, type Theme } from '@/lib/theme';
 import { Icon } from './Icon';
 import { SheetGrab, useRailSheet, type SheetSize } from './RailSheet';
@@ -26,6 +27,8 @@ export function LrtStationSheet({
   onLayout,
   sheet,
   onXfer,
+  route,
+  onRoute,
 }: {
   sta: string;
   onClose: () => void;
@@ -37,6 +40,9 @@ export function LrtStationSheet({
   sheet: SheetSize | null;
   /** 「轉乘港鐵」：轉去港鐵圖嘅站 */
   onXfer: (mtrSta: string) => void;
+  /** 圖上標出嘅路線（撳路線號碼，再撳一次取消） */
+  route: string | null;
+  onRoute: (route: string | null) => void;
 }) {
   const t = useTheme();
   const { etaFormat, lrtGroup } = usePrefs();
@@ -90,15 +96,33 @@ export function LrtStationSheet({
             <Text style={{ fontSize: 14, color: t.muted }}>{lrtStopEn(sta)}</Text>
           </View>
           {mtrXferOf(sta) && <XferButton to="mtr" sta={mtrXferOf(sta)!} onPick={onXfer} />}
+          <FavButton sta={sta} />
           <Pressable onPress={onClose} accessibilityLabel="關閉" style={{ width: 32, height: 32, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
             <Icon name="close" size={18} color={t.muted} />
           </Pressable>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingLeft: 16, paddingRight: 12, paddingBottom: 10 }}>
           <View accessibilityLabel="經過路線" style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 5 }}>
-            {lrtStopRoutes(sta).map((r) => (
-              <RouteChip key={r} r={r} />
-            ))}
+            {/* 撳路線號碼：路綫圖標出成條路線（再撳一次取消；同網頁一樣） */}
+            {lrtStopRoutes(sta).map((r) => {
+              const on = route === r;
+              return (
+                <Pressable
+                  key={r}
+                  onPress={() => {
+                    haptic.tap();
+                    onRoute(on ? null : r);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={`喺圖上標出 ${r} 號`}
+                  hitSlop={3}
+                  style={{ borderRadius: 999, padding: 2, margin: -2, borderWidth: 2, borderColor: on ? t.accent : 'transparent' }}
+                >
+                  <RouteChip r={r} />
+                </Pressable>
+              );
+            })}
           </View>
           {/* 班次按月台定按路線排（記入設定，設定頁都改得；同網頁一樣） */}
           <View accessibilityRole="tablist" accessibilityLabel="班次排法" style={{ flexDirection: 'row', padding: 2, borderRadius: 999, backgroundColor: t.surface2 }}>
@@ -179,6 +203,18 @@ export function LrtStationSheet({
         </Pressable>
       </View>
     </Animated.View>
+  );
+}
+
+/** 收藏呢個輕鐵站（成個站所有路線；同網頁一樣） */
+function FavButton({ sta }: { sta: string }) {
+  const t = useTheme();
+  const [on, toggle] = useFavorite(lrtFavorite(sta));
+  const what = `輕鐵${lrtStopName(sta)}站`;
+  return (
+    <Pressable onPress={toggle} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={on ? `取消收藏${what}` : `收藏${what}`} style={{ width: 32, height: 32, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
+      <Icon name={on ? 'star-fill' : 'star'} size={18} color={on ? t.brand : t.muted} />
+    </Pressable>
   );
 }
 
