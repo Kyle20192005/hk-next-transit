@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-「下一程」（NextLeg）：香港公共交通實時到站 App（名嘅意思：下一班 + 旅程，將來有導航）。目前做城巴、九巴（連龍運）、聯營線、新大嶼山巴士同港鐵巴士，網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
-App 同網頁版功能一致（四間公司、分頁、收藏、走法、地圖、時間線、巴士位置、班次表）。舊 App 用嘅 `/api/ctb` 保留。
+「下一程」（NextLeg）：香港公共交通實時到站 App（名嘅意思：下一班 + 旅程，將來有導航）。目前做城巴、九巴（連龍運）、聯營線、新大嶼山巴士、港鐵巴士同港鐵（重鐵路綫圖 + 到站），網頁版（Next.js）同 App（Expo）共用同一套核心邏輯。
+App 同網頁版功能一致（四間公司、分頁、收藏、走法、地圖、時間線、巴士位置、班次表、港鐵路綫圖）。舊 App 用嘅 `/api/ctb` 保留。
 
 ## 結構
 
@@ -96,6 +96,35 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 - 九巴就算要求唔同 service_type，都可能回傳同一批車（例如 107 嘅 1 同 2），只係改咗 `service_type` 欄，
   所以唔可以靠呢欄分走法；`etasAtStop` 會將同公司、同方向、同到站時間嘅班次去重，保留正常走法。
 - 九巴 API 冇分開某啲短途特別班（例如 101 嘅特別班都係 service_type 1），呢啲九巴班次當係正常走法（confidence likely）。
+
+## 港鐵（重鐵）：路綫圖同到站時間
+
+「路線」分頁 →「港鐵・輕鐵」：自己畫嘅路綫圖，撳站睇到站時間（輕鐵未做）。網頁 `components/rail/{RailView,MtrMap,MtrStationSheet}.tsx`，
+App `src/components/{MtrMap,MtrStationSheet}.tsx`（`(tabs)/routes.tsx` 揀港鐵就出地圖）。
+
+- 站同綫：core `mtr-data.ts`（港鐵開放數據 `mtr_lines_and_stations.csv` 生成，「茘」→「荔」；馬場 `RAC` CSV 冇，人手加，
+  `mtrStationLines('RAC')` = 東鐵綫）、`mtr.ts`（`MTR_LINES` 綫色、`mtrTermini`）。
+- 到站：`rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=&sta=`（同巴士 API 同一個 host，計埋 `UPSTREAM_RPS` 上限）。
+  core `parseMtrSchedule`：拎走 `valid: N`、`ttnt > 120`（聽日頭班車）、總站空嘅方向；`mtrStationEtas` 一個站問晒所有綫，
+  回傳 `{lines, failed}`。網頁 `/api/mtr?sta=`（有 failed 就 no-store）、tracker 都有 `/api/mtr`，前端 `liveClient.mtr`（tracker 優先）。
+  同一方向去唔同地方（東鐵羅湖／落馬洲、將軍澳寶琳／康城）逐班列；馬場冇車寫「只喺賽馬日開放」。
+- 路綫圖數據 core `mtr-map.ts`，**唔好人手改座標**：
+  - `packages/core/tools/mtr-layout.py [csv] --write`：喺 Python 入面定義每條綫嘅轉角同站位，檢查晒先寫入 `MTR_MAP_LINES`／`LABELS`／`LABEL_GAP`／
+    `DOUBLE`／`LINKS`／`LEGEND`。檢查：只行橫直 45°；轉彎 45°、90°（兩個 45° 夾短斜綫一律改做一個 90°）或者 135°（迪士尼綫）；
+    彎位係圓弧，統一半徑 `R` 0.7（`MTR_MAP_RADIUS`），並排綫一齊轉彎外面嗰條半徑加 `G`（點寫 `(x, y, 半徑)`），同心先會一直貼住；
+    段長夠放彎位；站喺直綫部分；轉車站嘅點喺同一條橫、直或者 45° 綫上、相隔 `G`；站名唔撞綫、唔撞站、站名之間最少 0.15；冇嘢入圖例。
+  - 之後一定要行 `packages/core/tools/mtr-water.py [快取目錄] --write`：OSM 海岸綫 → 海水格仔 → 用每個站（示意圖 ↔ OSM 真實位置）做
+    moving least squares 變形 → 簡化多邊形（`MTR_MAP_WATER`，第一個環係外框，畫嘅時候 `fillRule="evenodd"`）。真實座標唔入 repo。
+  - 站位置參考真實地理（OSM 站點，市區放大、新界收細），但係自己排：**唔好照抄港鐵官方路綫圖**（版權）；用 OSM 數據所以地圖要註明「© OpenStreetMap 貢獻者」。
+- 畫法（網頁 SVG、App react-native-svg 一樣）：綫闊 = 並排距離 `G` 0.18（貼住）；站 = 黑邊白圈（圈心喺綫正中，`MTR_MAP_DOT_R` 0.17）；
+  轉車站每條綫一個圈，重疊成「8」字，圈入面綫色短棒（每條長 `G`，相鄰黐埋）；上水、將軍澳係分岔站，雙圈冇短棒
+  （主綫用上面個圈，支綫由下面個圈出，`MTR_MAP_DOUBLE`）；香港 ↔ 中環黑色實綫（閘內轉乘）、尖沙咀 ↔ 尖東黑色虛綫（出閘轉乘），`MTR_MAP_LINKS`；
+  東鐵綫沙田至大學經馬場一段虛綫（`dashed`）；左上角圖例（`MTR_MAP_LEGEND`）。轉角用 core `mtrLinePathD`（SVG 圓弧），海用 `mtrRoundPathD`。
+- 用戶定落嘅排法（2026-11，改之前問清楚）：荃灣綫荔景之後向北；屯馬綫南昌、美孚直上、喺荃灣綫上面轉西去荃灣西；東涌綫、機場快綫南昌北面
+  90° 轉西貼住荃灣綫底經荔景，青衣喺西南斜綫上（轉車站打斜），之後扭一扭交換位置、貼住經欣澳，過咗小蠔灣先分開（機場喺東涌北面）；
+  迪士尼綫先貼住東涌綫向東北再屈落；香港站喺中環正上方、上下排；紅磡東鐵、屯馬一齊向東北斜（屯馬東南邊），何文田屯馬喺觀塘綫上面水平並排。
+- 手勢：網頁 viewBox 平移縮放（pointer、兩指、滑鼠轆）；App `PanResponder`（最新狀態放 `useLayoutEffect` 更新嘅 ref，`Svg pointerEvents="none"`，
+  觸點用 `locationX`），一隻手指拖、兩隻手指縮放、輕撳搵站圈範圍。
 
 ## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）
 
@@ -357,11 +386,11 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   `unknown`（「冇時間表資料」，灰色），唔好寫「今日沒有班次」；「班次」掣只計有時間表嘅走法。
 - 賽馬日改路等按事件嘅走法：政府數據冇。
 - ETA `seq` 規律只喺 38 號驗證過。
-- 港鐵、輕鐵、小巴、電車、渡輪、導航（點到點）未做。介面已經預留（2026-11，用戶要求）：底部分頁「首頁／路線／導航／收藏／設定」，
+- 輕鐵、小巴、電車、渡輪、導航（點到點）未做（港鐵重鐵做咗，見上面「港鐵」）。介面已經預留（2026-11，用戶要求）：底部分頁「首頁／路線／導航／收藏／設定」，
   導航顯示「功能即將推出」（將來做好，首頁「你想去邊？」直接用）；「路線」標題下面、搜尋欄上面一行交通工具分類（core `TRANSPORT_MODES`，`ready: false` 嘅揀咗就收埋搜尋欄同鍵盤，
   只顯示「功能即將推出」）。網頁 `components/home/{ComingSoon,Navigation,Settings}.tsx`，App `src/app/(tabs)/{navigation,settings}.tsx` + `ui.tsx` 嘅 `ComingSoon`。
   加新交通工具：喺 `TRANSPORT_MODES` 改 `ready: true` 再接返列表。附近同收藏將來包埋所有交通工具；首頁標題「下一程」。
   App 用 Expo Router typed routes：加／改路由檔之後要開一次 `expo start` 先會更新 `.expo/types`，否則 tsc 話路徑唔存在。
 - 「附近」：聯營線只列喺城巴站下面（避免同一條線喺相鄰嘅九巴站同城巴站出兩次）。
 - App 未喺實機或者模擬器測試過：確認到 iOS／Android bundle 到（`npx expo export --platform ios --platform android`），
-  介面用 Expo web 預覽截圖驗證過（地圖除外）。
+  介面用 Expo web 預覽截圖驗證過（巴士地圖除外；港鐵路綫圖有 web 預覽，雙指縮放未喺實機試過）。
