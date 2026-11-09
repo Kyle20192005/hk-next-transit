@@ -197,3 +197,34 @@ describe('mtr map geometry', () => {
     }
   });
 });
+
+describe('mtr search + eta text', () => {
+  it('finds stations by Chinese, English, code', async () => {
+    const { searchMtrStations } = await import('./mtr');
+    expect(searchMtrStations('旺角')[0]).toBe('MOK');
+    expect(searchMtrStations('旺角站')[0]).toBe('MOK');
+    expect(searchMtrStations('mong kok')[0]).toBe('MOK');
+    expect(searchMtrStations('MongKok')[0]).toBe('MOK');
+    expect(searchMtrStations('tko')[0]).toBe('TKO');
+    expect(searchMtrStations('茘景')[0]).toBe('LAK');
+    expect(searchMtrStations('kok')).toContain('MOK');
+    expect(searchMtrStations('馬場')[0]).toBe('RAC');
+    expect(searchMtrStations('  ')).toEqual([]);
+    expect(searchMtrStations('zzzz')).toEqual([]);
+  });
+  it('formats train times like station displays', async () => {
+    const { mtrTrainEta } = await import('./mtr');
+    const time = '2026-11-09T09:05:00+08:00';
+    expect(mtrTrainEta({ mins: 0, time }, 'minutes').main).toBe('正在離開');
+    expect(mtrTrainEta({ mins: 1, time }, 'minutes').main).toBe('即將到站');
+    expect(mtrTrainEta({ mins: 4, time }, 'minutes')).toEqual({ main: '4', unit: '分鐘', now: false });
+    expect(mtrTrainEta({ mins: 4, time }, 'clock').main).toBe('09:05');
+  });
+});
+
+describe('mtr no data', () => {
+  it('marks a line with no schedule data (curr_time "-") as noData, not empty', () => {
+    const r = parseMtrSchedule({ sys_time: '-', curr_time: '-', data: { 'KTL-KOT': { curr_time: '-', sys_time: '-' } }, isdelay: 'N', status: 1 }, 'KTL', 'KOT');
+    expect(r).toEqual({ line: 'KTL', dirs: [], delayed: false, noData: true });
+  });
+});

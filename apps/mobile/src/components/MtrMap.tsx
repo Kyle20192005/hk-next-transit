@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { Linking, PanResponder, Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText, TSpan } from 'react-native-svg';
 import {
@@ -27,6 +27,10 @@ import { radius, shadow, useTheme, type Theme } from '@/lib/theme';
 import { Icon } from './Icon';
 
 type MapView = { x: number; y: number; w: number };
+/** 要飛去嘅站（每次新 object 就做一次）：zoom = 搜尋（放大置中），否則只係睇唔到先移 */
+export type MtrFocus = { sta: string; zoom: boolean };
+/** 面板遮住咗嘅位（px） */
+export type MtrInset = { right: number; bottom: number };
 type Size = { w: number; h: number };
 /** 一格幾多 px 先睇得清（開頁用）；縮放範圍（一格 px）。同網頁 MtrMap 一樣 */
 const START_PX = 34;
@@ -34,6 +38,7 @@ const MIN_PX = 9;
 const MAX_PX = 90;
 const RING = '#23262b';
 const STATIONS = mtrMapStations();
+const NO_INSET: MtrInset = { right: 0, bottom: 0 };
 /** Expo web 預覽 SVG 字預設係襯線體；手機 App 唔設（用系統字） */
 const FONT = Platform.OS === 'web' ? 'system-ui, -apple-system, "PingFang HK", sans-serif' : undefined;
 
@@ -56,20 +61,74 @@ function zoomAt(v: MapView, s: Size, factor: number, px: number, py: number): Ma
 }
 
 /** 手勢 callback 用嘅最新值（PanResponder 只建一次） */
-type Live = { view: MapView | null; size: Size; setView: (v: MapView) => void; onStation: (sta: string) => void };
+type Live = { view: MapView | null; size: Size; setView: (v: MapView) => void; onStation: (sta: string) => void; stopAnim: () => void };
 
 /**
  * 港鐵路綫圖（同網頁 components/rail/MtrMap.tsx 一樣嘅 core 資料同畫法）：一隻手指拖、兩隻手指放大縮細、撳站。
  * 用 viewBox 做平移縮放（每次郁都重畫，站名喺任何大細都清楚）；地圖內容 memo 住，郁嘅時候 React 唔使再砌。
  */
-export function MtrMap({ selected, onStation }: { selected: string | null; onStation: (sta: string) => void }) {
+export function MtrMap({
+  selected,
+  onStation,
+  focus = null,
+  inset = NO_INSET,
+}: {
+  selected: string | null;
+  onStation: (sta: string) => void;
+  focus?: MtrFocus | null;
+  inset?: MtrInset;
+}) {
   const t = useTheme();
   const [size, setSize] = useState<Size>({ w: 0, h: 0 });
   const [view, setView] = useState<MapView | null>(null);
-  const live = useRef<Live>({ view, size, setView, onStation });
+  const anim = useRef<number>(0);
+  const live = useRef<Live>({ view, size, setView, onStation, stopAnim: () => cancelAnimationFrame(anim.current) });
   useLayoutEffect(() => {
-    live.current = { view, size, setView, onStation };
+    live.current = { ...live.current, view, size, setView, onStation };
   }, [view, size, onStation]);
+
+  // 飛去某個站（同網頁一樣）：搜尋就放大置中；撳站只喺俾面板遮住先移；面板高度變（載入完）只喺揀站 1.5 秒內跟
+  const handled = useRef<{ focus: MtrFocus; at: number } | null>(null);
+  const ready = view !== null;
+  useEffect(() => {
+    const v = live.current.view;
+    if (!focus || !v || !size.w) return;
+    const s = STATIONS.find((x) => x.code === focus.sta);
+    if (!s) return;
+    const first = handled.current?.focus !== focus;
+    if (!first && Date.now() - handled.current!.at > 1500) return;
+    if (first) handled.current = { focus, at: Date.now() };
+    const cx = s.box.x + s.box.w / 2;
+    const cy = s.box.y + s.box.h / 2;
+    const visW = Math.max(80, size.w - inset.right);
+    const visH = Math.max(80, size.h - inset.bottom);
+    const w = focus.zoom ? Math.min(v.w, size.w / START_PX) : v.w;
+    if (!focus.zoom) {
+      const k = size.w / v.w;
+      const sx = (cx - v.x) * k;
+      const sy = (cy - v.y) * k;
+      if (sx > 48 && sx < visW - 48 && sy > 48 && sy < visH - 48) return;
+    }
+    const k = w / size.w;
+    const target = clamp({ x: cx - (visW / 2) * k, y: cy - (visH / 2) * k, w }, size);
+    const from = v;
+    const fc = { x: from.x + (visW / 2) * (from.w / size.w), y: from.y + (visH / 2) * (from.w / size.w) };
+    const tc = { x: target.x + (visW / 2) * k, y: target.y + (visH / 2) * k };
+    const t0 = Date.now();
+    cancelAnimationFrame(anim.current);
+    const step = () => {
+      const p = Math.min(1, (Date.now() - t0) / 380);
+      const e = 1 - (1 - p) ** 3;
+      const ww = from.w * (target.w / from.w) ** e;
+      const c = { x: fc.x + (tc.x - fc.x) * e, y: fc.y + (tc.y - fc.y) * e };
+      const nv = { x: c.x - (visW / 2) * (ww / size.w), y: c.y - (visH / 2) * (ww / size.w), w: ww };
+      live.current.view = nv;
+      setView(nv);
+      if (p < 1) anim.current = requestAnimationFrame(step);
+    };
+    anim.current = requestAnimationFrame(step);
+  }, [focus, inset.right, inset.bottom, size, ready]);
+  useEffect(() => () => cancelAnimationFrame(anim.current), []);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -83,8 +142,12 @@ export function MtrMap({ selected, onStation }: { selected: string | null; onSta
   };
 
   const aspect = size.w ? size.h / size.w : 1;
-  const zoomBtn = (f: number) => view && setView(zoomAt(view, size, f, size.w / 2, size.h / 2));
+  const zoomBtn = (f: number) => {
+    cancelAnimationFrame(anim.current);
+    if (view) setView(zoomAt(view, size, f, (size.w - inset.right) / 2, (size.h - inset.bottom) / 2));
+  };
   const fitAll = () => {
+    cancelAnimationFrame(anim.current);
     const w = Math.max(MTR_MAP_VIEW.width, MTR_MAP_VIEW.height / aspect);
     setView(clamp({ x: MTR_MAP_VIEW.minX + MTR_MAP_VIEW.width / 2 - w / 2, y: MTR_MAP_VIEW.minY + MTR_MAP_VIEW.height / 2 - (w * aspect) / 2, w }, size));
   };
@@ -97,15 +160,26 @@ export function MtrMap({ selected, onStation }: { selected: string | null; onSta
           // pointerEvents none：觸點一律落喺外面嗰層（locationX 先係相對地圖）
           <Svg width={size.w} height={size.h} viewBox={`${view.x} ${view.y} ${view.w} ${view.w * aspect}`} pointerEvents="none">
             <MapContent t={t} />
-            {/* 揀咗嘅站：白心變黃 */}
+            {/* 揀咗嘅站：重點色光圈 + 白心變黃 */}
+            {sel && (
+              <Circle
+                cx={sel.box.x + sel.box.w / 2}
+                cy={sel.box.y + sel.box.h / 2}
+                r={Math.max(sel.box.w, sel.box.h) / 2 + 0.22}
+                fill={t.accent}
+                fillOpacity={0.16}
+                stroke={t.accent}
+                strokeWidth={0.05}
+              />
+            )}
             {sel?.pts.map((p, i) => <Circle key={i} cx={p[0]} cy={p[1]} r={MTR_MAP_DOT_R - MTR_MAP_RING} fill={t.brand} />)}
           </Svg>
         )}
       </GestureSurface>
-      <Pressable onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')} style={{ position: 'absolute', left: 10, bottom: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: t.card + 'cc' }}>
+      <Pressable onPress={() => Linking.openURL('https://www.openstreetmap.org/copyright')} style={{ position: 'absolute', left: 10, bottom: 8 + inset.bottom, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: t.card + 'cc' }}>
         <Text style={{ fontSize: 11, color: t.muted }}>© OpenStreetMap 貢獻者</Text>
       </Pressable>
-      <View style={{ position: 'absolute', right: 12, bottom: 12, gap: 6 }}>
+      <View style={{ position: 'absolute', right: 12 + inset.right, bottom: 12 + inset.bottom, gap: 6 }}>
         <ZoomButton t={t} onPress={() => zoomBtn(1.4)} label="放大">
           <Icon name="plus" size={18} color={t.text} />
         </ZoomButton>
@@ -140,6 +214,7 @@ function GestureSurface({ live, children }: { live: RefObject<Live>; children: R
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
+        live.current.stopAnim();
         moved = 0;
         pinch = null;
         last = start = pt(e);

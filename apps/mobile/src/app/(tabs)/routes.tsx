@@ -5,8 +5,7 @@ import { TRANSPORT_MODES, orderedModes, placeMatches, radiusLabel, type PlaceMat
 import { api, type Co } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { AppBar, Brand, BRAND_ROW, ComingSoon, CompanyTag } from '@/components/ui';
-import { MtrMap } from '@/components/MtrMap';
-import { MtrStationSheet } from '@/components/MtrStationSheet';
+import { RailView } from '@/components/RailView';
 import { Icon } from '@/components/Icon';
 import { Keypad } from '@/components/Keypad';
 import { preloadRoute, warmRoute } from '@/lib/prefetch';
@@ -43,9 +42,9 @@ export default function RoutesTab() {
   }
   // 港鐵路綫圖網頁版做咗，App 版未做：App 暫時當未 ready（顯示「功能即將推出」）
   const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
-  // 港鐵：路綫圖（唔使搜尋欄同鍵盤）
+  // 港鐵：路綫圖 + 車站搜尋（唔使號碼鍵盤）
   const rail = mode === 'rail';
-  const [railSta, setRailSta] = useState<string | null>(null);
+  const [railQ, setRailQ] = useState('');
   const list = useRef<FlatList<PlaceMatch<Route>>>(null);
 
   const fetchRoutes = () => api.routes().then((r) => setRoutes(r.routes)).catch((e: Error) => setError(e.message));
@@ -117,6 +116,27 @@ export default function RoutesTab() {
             );
           })}
         </ScrollView>
+        {rail && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingLeft: 14, paddingRight: 8, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
+            <Icon name="search" size={20} color={t.muted} />
+            <TextInput
+              value={railQ}
+              onChangeText={setRailQ}
+              placeholder="搜尋車站，例如 旺角、Mong Kok"
+              placeholderTextColor={t.muted}
+              returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="none"
+              accessibilityLabel="搜尋港鐵站"
+              style={{ flex: 1, fontSize: 17, color: t.text, paddingVertical: 12 }}
+            />
+            {railQ !== '' && (
+              <Pressable onPress={() => setRailQ('')} accessibilityLabel="清除" style={{ width: 34, height: 34, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
+                <Icon name="close" size={18} color={t.muted} />
+              </Pressable>
+            )}
+          </View>
+        )}
         {modeInfo.ready && !rail && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingLeft: 14, paddingRight: 8, borderRadius: radius.m, backgroundColor: t.card, ...shadow }}>
           <Icon name="search" size={20} color={t.muted} />
@@ -149,10 +169,7 @@ export default function RoutesTab() {
       </AppBar>
 
       {rail ? (
-        <>
-          <MtrMap selected={railSta} onStation={setRailSta} />
-          {railSta && <MtrStationSheet sta={railSta} onClose={() => setRailSta(null)} />}
-        </>
+        <RailView query={railQ} onPicked={() => setRailQ('')} />
       ) : !modeInfo.ready ? (
         <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
       ) : error ? (

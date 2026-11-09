@@ -1,121 +1,216 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { LIVE_REFRESH, mtrLine, mtrStationEn, mtrStationLines, mtrStationName, type MtrLineEtas } from '@hknt/core';
+import { forwardRef, useEffect, useState } from 'react';
+import { LIVE_REFRESH, hkClockSec, mtrLine, mtrStationEn, mtrStationLines, mtrStationName, mtrTrainEta, type MtrDirection, type MtrLineEtas, type MtrTrain } from '@hknt/core';
 import { liveClient } from '@/lib/buses';
-import EtaInline from '../EtaInline';
+import { usePrefs } from '@/lib/prefs';
 import Icon from '../Icon';
 
+type Data = { sta: string; lines: MtrLineEtas[]; failed: string[]; at: number };
+
 /**
- * 港鐵站到站時間（撳路綫圖個站彈出）：每條綫兩個方向，每班車分鐘同月台；轉車站列晒所有綫。
- * 30 秒更新一次（先問 tracker，出錯退返 /api/mtr）。
+ * 港鐵站到站時間面板（撳路綫圖個站或者搜尋）：唔遮成幅圖（手機喺下面、闊螢幕喺右邊），地圖會移去嗰個站。
+ * 頂部按綫分頁（分頁頂有綫色）；每個方向先顯示下班車（目的地、月台、正在離開／N 分鐘），
+ * 「所有班次」展開成個表（目的地｜月台｜下班車，按方向分組）。30 秒更新一次，底部顯示最後更新時間。
  */
-export default function MtrStationSheet({ sta, onClose }: { sta: string; onClose: () => void }) {
-  const [data, setData] = useState<{ sta: string; lines: MtrLineEtas[]; failed: string[] } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+const MtrStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => void; tab: string | null; onTab: (line: string) => void; all: boolean; onAll: (all: boolean) => void }>(
+  function MtrStationSheet({ sta, onClose, tab, onTab, all, onAll }, ref) {
+    const { etaFormat } = usePrefs();
+    const [data, setData] = useState<Data | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [nonce, setNonce] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const res = await liveClient.mtr(sta);
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error ?? res.statusText);
-        if (!cancelled) {
-          setData(body);
-          setError(null);
+    useEffect(() => {
+      let cancelled = false;
+      const load = async () => {
+        try {
+          const res = await liveClient.mtr(sta);
+          const body = await res.json();
+          if (!res.ok) throw new Error(body.error ?? res.statusText);
+          if (!cancelled) {
+            setData({ ...body, sta, at: Date.now() });
+            setError(null);
+          }
+        } catch (e) {
+          if (!cancelled) setError((e as Error).message);
         }
-      } catch (e) {
-        if (!cancelled) setError((e as Error).message);
-      }
-      if (!cancelled) setNow(Date.now());
-    };
-    void tick();
-    const t = setInterval(tick, LIVE_REFRESH.etaMs);
-    return () => {
-      cancelled = true;
-      clearInterval(t);
-    };
-  }, [sta]);
+        if (!cancelled) setLoading(false);
+      };
+      void load();
+      const id = setInterval(load, LIVE_REFRESH.etaMs);
+      return () => {
+        cancelled = true;
+        clearInterval(id);
+      };
+      // nonce：撳「重新整理」即刻再攞
+    }, [sta, nonce]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    useEffect(() => {
+      const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+      document.addEventListener('keydown', onKey);
+      return () => document.removeEventListener('keydown', onKey);
+    }, [onClose]);
 
-  const lines = data?.sta === sta ? data.lines : null;
-  return (
-    <div className="sheet-backdrop mtr-backdrop" onClick={onClose}>
-      <div className="sheet card mtr-sheet" role="dialog" aria-label={`${mtrStationName(sta)}站到站時間`} onClick={(e) => e.stopPropagation()}>
-        <header className="mtr-sheet-head">
-          <div>
+    const codes = mtrStationLines(sta);
+    // 記住上次揀嘅綫（沿住一條綫睇落去）；呢個站冇就揀第一條
+    const line = tab && codes.includes(tab) ? tab : codes[0]!;
+    const fresh = data?.sta === sta ? data : null;
+    const etas = fresh?.lines.find((l) => l.line === line);
+    const failed = fresh?.failed.includes(line);
+    const info = mtrLine(line)!;
+    const empty = sta === 'RAC' ? '暫時冇班次（只喺賽馬日開放）' : '暫時冇班次';
+
+    return (
+      <aside ref={ref} className="mtr-panel card" aria-label={`${mtrStationName(sta)}站到站時間`} style={{ ['--mline' as string]: info.color, ['--mline-ink' as string]: info.ink }}>
+        <header className="mtr-panel-head">
+          <div className="mtr-panel-title">
             <h2>{mtrStationName(sta)}</h2>
             <span className="muted">{mtrStationEn(sta)}</span>
-          </div>
-          <div className="mtr-chips">
-            {mtrStationLines(sta).map((c) => {
-              const l = mtrLine(c)!;
-              return (
-                <span key={c} className="mtr-chip" style={{ background: l.color, color: l.ink }}>
-                  {l.zh}
-                </span>
-              );
-            })}
           </div>
           <button className="drawer-close" onClick={onClose} aria-label="關閉">
             <Icon name="close" size={20} />
           </button>
         </header>
-        {error && <p className="muted">載入失敗：{error}</p>}
-        {!lines && !error && <p className="muted">載入中…</p>}
-        {lines?.map((l) => {
-          const info = mtrLine(l.line)!;
-          return (
-            <section key={l.line} className="mtr-line-block" style={{ ['--line' as string]: info.color }}>
-              <h3>
-                <span className="mtr-line-bar" />
-                {info.zh}
-                {l.delayed && <span className="badge special">延誤</span>}
-              </h3>
-              {l.dirs.map((d) => {
-                const plats = [...new Set(d.trains.map((t) => t.plat))];
-                const dests = [...new Set(d.trains.map((t) => t.dest))];
-                return (
-                  <div key={d.dir} className="mtr-dir">
-                    <div className="mtr-dir-head">
-                      <b>{d.label}</b>
-                      {plats.length === 1 && <span className="mtr-plat">{plats[0]} 號月台</span>}
-                    </div>
-                    {!d.trains.length ? (
-                      <div className="muted">{sta === 'RAC' ? '暫時冇班次（只喺賽馬日開放）' : '暫時冇班次'}</div>
-                    ) : dests.length === 1 && plats.length === 1 ? (
-                      <div className="mtr-etas">
-                        <EtaInline ats={d.trains.map((t) => Date.parse(t.time))} now={now} />
-                      </div>
-                    ) : (
-                      // 同一方向去唔同地方（例如東鐵羅湖／落馬洲）：逐班列
-                      <ul className="mtr-trains">
+
+        <div className="mtr-tabs" role="tablist" aria-label="路綫">
+          {codes.map((c) => {
+            const l = mtrLine(c)!;
+            return (
+              <button key={c} role="tab" aria-selected={c === line} className="mtr-tab" style={{ ['--tab' as string]: l.color }} onClick={() => onTab(c)}>
+                {l.zh}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mtr-panel-body" role="tabpanel">
+          {etas?.delayed && (
+            <p className="mtr-delay">
+              <Icon name="warning" size={16} />
+              {info.zh}而家有延誤
+            </p>
+          )}
+          {!fresh && !error && <p className="muted mtr-loading">載入中…</p>}
+          {!fresh && error && <p className="eta-failed">載入失敗：{error}</p>}
+          {fresh && (failed || !etas) && <p className="eta-failed">{info.zh}資料暫時攞唔到，稍後會自動再試</p>}
+
+          {etas?.noData && <p className="muted mtr-nodata">港鐵暫時冇提供{info.zh}嘅到站時間，列車可能照常行駛。</p>}
+          {etas && !etas.noData && (
+            <>
+              <section className="mtr-next" aria-label="下班車">
+                <h3>下班車</h3>
+                {etas.dirs.map((d) => (
+                  <NextRow key={d.dir} d={d} empty={empty} fmt={etaFormat} />
+                ))}
+              </section>
+
+              {etas.dirs.some((d) => d.trains.length > 1) && (
+                <button className="mtr-more" aria-expanded={all} onClick={() => onAll(!all)}>
+                  {all ? '收埋班次表' : '所有班次'}
+                  <Icon name="chevron-down" size={18} />
+                </button>
+              )}
+              {all && etas.dirs.some((d) => d.trains.length) && (
+                <table className="mtr-table">
+                  <thead>
+                    <tr>
+                      <th>目的地</th>
+                      <th>月台</th>
+                      <th>下班車</th>
+                    </tr>
+                  </thead>
+                  {etas.dirs
+                    .filter((d) => d.trains.length)
+                    .map((d) => (
+                      <tbody key={d.dir}>
+                        <tr className="mtr-table-dir">
+                          <th colSpan={3}>{d.label}</th>
+                        </tr>
                         {d.trains.map((t, i) => (
-                          <li key={i}>
-                            <span className="mtr-etas">
-                              <EtaInline ats={[Date.parse(t.time)]} now={now} />
-                            </span>
-                            <span>往 {t.destName}{t.viaRacecourse ? '（經馬場）' : ''}</span>
-                            {plats.length > 1 && <span className="mtr-plat">{t.plat} 號月台</span>}
-                          </li>
+                          <tr key={i}>
+                            <td>
+                              {t.destName}
+                              {t.viaRacecourse && <small className="muted">（經馬場）</small>}
+                            </td>
+                            <td>
+                              <Plat n={t.plat} />
+                            </td>
+                            <td>
+                              <EtaText t={t} fmt={etaFormat} />
+                            </td>
+                          </tr>
                         ))}
-                      </ul>
-                    )}
-                  </div>
-                );
-              })}
-            </section>
-          );
-        })}
-        {data?.failed.length ? <p className="eta-failed">{data.failed.map((c) => mtrLine(c)?.zh ?? c).join('、')}資料暫時攞唔到，稍後會自動再試</p> : null}
-        <p className="muted mtr-source">資料來源：港鐵公司（DATA.GOV.HK）。路綫圖係簡化示意圖。</p>
+                      </tbody>
+                    ))}
+                </table>
+              )}
+            </>
+          )}
+        </div>
+
+        <footer className="mtr-panel-foot">
+          <span className="muted">{fresh ? `最後更新 ${hkClockSec(fresh.at)}` : ' '}</span>
+          <button className="mtr-refresh" onClick={() => {
+            setLoading(true);
+            setNonce((n) => n + 1);
+          }} disabled={loading} aria-label="重新整理">
+            <Icon name="refresh" size={16} className={loading ? 'spin' : undefined} />
+            重新整理
+          </button>
+        </footer>
+      </aside>
+    );
+  },
+);
+export default MtrStationSheet;
+
+/** 下班車：一個方向一行（目的地、月台圈、時間）；後面一班細字 */
+function NextRow({ d, empty, fmt }: { d: MtrDirection; empty: string; fmt: 'minutes' | 'clock' }) {
+  const [first, second] = d.trains;
+  if (!first)
+    return (
+      <div className="mtr-next-row">
+        <span className="mtr-next-dest">{d.label}</span>
+        <span className="muted mtr-next-empty">{empty}</span>
       </div>
+    );
+  const after = second && mtrTrainEta(second, fmt);
+  return (
+    <div className="mtr-next-row">
+      <span className="mtr-next-dest">
+        往 {first.destName}
+        {first.viaRacecourse && <small className="muted">（經馬場）</small>}
+      </span>
+      <Plat n={first.plat} />
+      <span className="mtr-next-eta">
+        <EtaText t={first} fmt={fmt} />
+        {after && (
+          <small className="muted">
+            之後 {after.main}
+            {after.unit && ` ${after.unit}`}
+          </small>
+        )}
+      </span>
     </div>
+  );
+}
+
+function EtaText({ t, fmt }: { t: MtrTrain; fmt: 'minutes' | 'clock' }) {
+  const e = mtrTrainEta(t, fmt);
+  return (
+    <span className={e.now ? 'mtr-eta now' : 'mtr-eta'}>
+      <b>{e.main}</b>
+      {e.unit && <small> {e.unit}</small>}
+    </span>
+  );
+}
+
+/** 月台：綫色圓圈入面一個數字 */
+function Plat({ n }: { n: string }) {
+  if (!n) return <span className="mtr-plat-circle empty" />;
+  return (
+    <span className="mtr-plat-circle" aria-label={`${n} 號月台`} title={`${n} 號月台`}>
+      {n}
+    </span>
   );
 }

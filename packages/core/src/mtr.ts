@@ -1,4 +1,5 @@
 import { MTR_LINE_STATIONS, MTR_STATION_NAMES } from './mtr-data';
+import { hkClock, type Prefs } from './prefs';
 
 /**
  * 港鐵（重鐵）：綫、站、實時到站（data.gov.hk「港鐵列車到站時間」API）。
@@ -78,6 +79,8 @@ export interface MtrLineEtas {
   dirs: MtrDirection[];
   /** 港鐵話延誤（isdelay = Y） */
   delayed: boolean;
+  /** 港鐵成條綫暫時冇提供到站資料（API 回應 curr_time「-」、冇 UP／DOWN），唔等於冇車 */
+  noData?: boolean;
 }
 
 interface RawTrain {
@@ -99,10 +102,12 @@ const dirLabel = (codes: string[]) => `往 ${codes.map(mtrStationName).join('／
  * 終點站有一邊冇車，嗰邊唔出。
  */
 export function parseMtrSchedule(body: unknown, line: string, sta: string): MtrLineEtas | null {
-  const b = body as { status?: number; isdelay?: string; data?: Record<string, { UP?: RawTrain[]; DOWN?: RawTrain[] }> };
+  const b = body as { status?: number; isdelay?: string; data?: Record<string, { UP?: RawTrain[]; DOWN?: RawTrain[]; curr_time?: string }> };
   if (!b || b.status !== 1) return null;
   const d = b.data?.[`${line}-${sta}`];
   if (!d) return null;
+  // 2026-11-09 早上觀塘綫成條綫都係咁（列車照行）：唔好寫「暫時冇班次」
+  if (!d.UP && !d.DOWN && d.curr_time === '-') return { line, dirs: [], delayed: b.isdelay === 'Y', noData: true };
   const t = mtrTermini(line);
   const dirs: MtrDirection[] = (['UP', 'DOWN'] as const).flatMap((dir) => {
     const ends = (dir === 'UP' ? t.up : t.down).filter((c) => c !== sta);
@@ -135,4 +140,48 @@ export async function mtrStationEtas(sta: string, fetcher: typeof fetch): Promis
     }),
   );
   return { lines: results.flatMap((r) => (r.etas ? [r.etas] : [])), failed: results.filter((r) => !r.etas).map((r) => r.line) };
+}
+
+/**
+ * 一班車點顯示（港鐵慣例）：0 分鐘 =「正在離開」（列車喺月台）、1 分鐘 =「即將到站」，其他「N 分鐘」或者鐘數（設定「到站時間顯示」）。
+ * 用 API 俾嘅分鐘數（ttnt，按港鐵伺服器時間計），唔自己減時間，同車站顯示屏一致。
+ */
+export function mtrTrainEta(t: Pick<MtrTrain, 'mins' | 'time'>, fmt: Prefs['etaFormat']): { main: string; unit: string; now: boolean } {
+  if (t.mins <= 0) return { main: '正在離開', unit: '', now: true };
+  if (t.mins === 1) return { main: '即將到站', unit: '', now: true };
+  return fmt === 'clock' ? { main: hkClock(Date.parse(t.time)), unit: '', now: false } : { main: String(t.mins), unit: '分鐘', now: false };
+}
+
+/** 搜尋用：拎走空格、標點，統一大細楷同異體字（茘 → 荔） */
+const searchKey = (s: string) =>
+  s
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/茘/g, '荔')
+    .replace(/[\s\-'’.,()（）]/g, '');
+
+/**
+ * 搵港鐵站（路綫圖頂搜尋欄）：中文、英文（唔理大細楷同空格）或者站代號（例如 TKO）。
+ * 排序：完全一樣 → 開頭一樣 → 英文某個字開頭 → 中間有；同分按站名長短。尾「站」／「station」會拎走。
+ */
+export function searchMtrStations(query: string, limit = 8): string[] {
+  const q = searchKey(query).replace(/(站|station)$/, '');
+  if (!q) return [];
+  const hits: { code: string; score: number; len: number }[] = [];
+  for (const [code, [zh, en]] of Object.entries(MTR_STATION_NAMES)) {
+    const z = searchKey(zh);
+    const e = searchKey(en);
+    const words = en.toLowerCase().split(/[\s-]+/);
+    let score: number;
+    if (z === q || e === q || code.toLowerCase() === q) score = 0;
+    else if (z.startsWith(q) || e.startsWith(q)) score = 1;
+    else if (words.some((w) => w.startsWith(q))) score = 2;
+    else if (z.includes(q) || e.includes(q)) score = 3;
+    else continue;
+    hits.push({ code, score, len: zh.length });
+  }
+  return hits
+    .sort((a, b) => a.score - b.score || a.len - b.len || a.code.localeCompare(b.code))
+    .slice(0, limit)
+    .map((h) => h.code);
 }

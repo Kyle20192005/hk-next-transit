@@ -99,8 +99,17 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 
 ## 港鐵（重鐵）：路綫圖同到站時間
 
-「路線」分頁 →「港鐵・輕鐵」：自己畫嘅路綫圖，撳站睇到站時間（輕鐵未做）。網頁 `components/rail/{RailView,MtrMap,MtrStationSheet}.tsx`，
-App `src/components/{MtrMap,MtrStationSheet}.tsx`（`(tabs)/routes.tsx` 揀港鐵就出地圖）。
+「路線」分頁 →「港鐵・輕鐵」：自己畫嘅路綫圖，撳站或者搜尋睇到站時間（輕鐵未做）。網頁 `components/rail/{RailView,MtrMap,MtrStationSheet,MtrSearch}.tsx`，
+App `src/components/{RailView,MtrMap,MtrStationSheet}.tsx`（`(tabs)/routes.tsx` 揀港鐵就出地圖，搜尋欄喺標題列）。
+
+- **到站面板**（2026-11，參考港鐵 App 嘅資訊排法，用自己嘅樣式）：唔係彈出視窗，唔遮成幅圖：手機浮喺下面（最高 58%）、闊螢幕（≥ 768px）喺右邊 380px。
+  面板量自己遮咗幾多（`inset`）俾地圖：撳站只喺俾面板遮住先移；搜尋就放大（最少開頁大細）再置中喺淨低嘅地方；面板啱啱載入完變高（1.5 秒內）先跟住調整，
+  之後用戶自己拖開就唔好扯返轉頭。揀咗嘅站有重點色光圈。面板頂按綫分頁（分頁頂有綫色，轉站記住揀咗邊條綫）→「下班車」每個方向一行
+  （目的地、綫色月台圈、時間 + 細字「之後 N 分鐘」）→「所有班次」展開成個表（目的地｜月台｜下班車，按方向分組；闊螢幕預設展開）→ 底部「最後更新 HH:MM:SS」同重新整理。
+  時間用 core `mtrTrainEta`：API 分鐘數 0 =「正在離開」、1 =「即將到站」，其他 N 分鐘（跟設定可以顯示鐘數）。
+- **車站搜尋**：core `searchMtrStations`（中文、英文唔理大細楷同空格、站代號；「茘」當「荔」；尾「站」拎走）。網頁下拉結果（上下鍵、Enter），App 結果浮喺地圖頂。
+- 港鐵間中成條綫冇到站資料（2026-11-09 早上觀塘綫：`curr_time` 係「-」、冇 UP／DOWN），`parseMtrSchedule` 回傳 `noData`，
+  寫「港鐵暫時冇提供 XX 嘅到站時間，列車可能照常行駛」，唔好寫「暫時冇班次」。
 
 - 站同綫：core `mtr-data.ts`（港鐵開放數據 `mtr_lines_and_stations.csv` 生成，「茘」→「荔」；馬場 `RAC` CSV 冇，人手加，
   `mtrStationLines('RAC')` = 東鐵綫）、`mtr.ts`（`MTR_LINES` 綫色、`mtrTermini`）。

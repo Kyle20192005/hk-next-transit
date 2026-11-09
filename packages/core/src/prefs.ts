@@ -52,6 +52,11 @@ export function hkClock(ms: number): string {
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
+/** 香港時間 HH:MM:SS（「最後更新」） */
+export function hkClockSec(ms: number): string {
+  return `${hkClock(ms)}:${String(new Date(ms).getUTCSeconds()).padStart(2, '0')}`;
+}
+
 /**
  * 一班車嘅到站時間點顯示：main = 大字，unit = 細字單位。
  * minutes：「5」+「分」，0 分鐘 =「即將」；clock：「18:32」（0 分鐘都係「即將」）。

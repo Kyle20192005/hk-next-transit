@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { TRANSPORT_MODES, orderedModes, placeMatches, radiusLabel, type PlaceMatch, type RouteIndex, type StopRouteHit, type TransportMode } from '@hknt/core';
 import ComingSoon from './ComingSoon';
 import RailView from '../rail/RailView';
+import MtrSearch from '../rail/MtrSearch';
 import Keypad from './Keypad';
 import Logo from '@/components/Logo';
 import Icon from '@/components/Icon';
@@ -37,6 +38,7 @@ export default function RouteBrowser({
 }) {
   const [code, setCode] = useState(''); // 路線號碼（鍵盤）
   const [place, setPlace] = useState<string | null>(null); // 地點搜尋（null = 用緊號碼鍵盤）
+  const [railPick, setRailPick] = useState<{ sta: string } | null>(null); // 港鐵站搜尋揀咗邊個站
   const [shown, setShown] = useState(PAGE);
   const modeInfo = TRANSPORT_MODES.find((m) => m.id === mode)!;
   const { priority, nearbyRadius } = usePrefs();
@@ -103,7 +105,7 @@ export default function RouteBrowser({
 
   // 實體鍵盤（電腦、iPad 鍵盤）：直接打路線號碼；打緊地點時唔理
   useEffect(() => {
-    if (place !== null) return;
+    if (place !== null || mode === 'rail') return;
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
@@ -122,7 +124,7 @@ export default function RouteBrowser({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [place, nextChars]);
+  }, [place, nextChars, mode]);
 
   const usePlace = () => {
     setPlace('');
@@ -146,7 +148,9 @@ export default function RouteBrowser({
             </button>
           ))}
         </div>
-        {!modeInfo.ready || mode === 'rail' ? null : place === null ? (
+        {!modeInfo.ready ? null : mode === 'rail' ? (
+          <MtrSearch onPick={(sta) => setRailPick({ sta })} />
+        ) : place === null ? (
           <button className="search-field" onClick={usePlace} aria-label="搜尋路線">
             <Icon name="search" size={20} className="search-icon" />
             <span className={code ? 'search-code' : 'search-placeholder'}>{code || '輸入路線號碼'}</span>
@@ -185,7 +189,7 @@ export default function RouteBrowser({
       {!modeInfo.ready ? (
         <ComingSoon icon="route" title={`${modeInfo.label}到站`} text="巴士做好咗先，其他交通工具陸續加入。" />
       ) : mode === 'rail' ? (
-        <RailView />
+        <RailView pick={railPick} />
       ) : (
       <>
       <ul className="route-list" ref={listRef}>
