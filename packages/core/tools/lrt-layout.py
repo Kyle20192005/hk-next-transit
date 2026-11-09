@@ -86,10 +86,11 @@ put('河田', ZX, 26.5, 'v')
 # 505 經山景／經鳴琴：山景兩個站喺石排—鳴琴旁邊行一條平行綫，兩邊喺建安會合（似港鐵地圖嘅細圈）
 XS = XW + 0.75
 put('石排', XW, 24.2, 'v')
+put_join('J505N', XW, 24.5, 'v')  # 山景嗰邊喺石排南面併返入主綫
 put('鳴琴', XW, 25.85, 'v')
 put('山景(北)', XS, 26.05, 'v')
 put('山景(南)', XS, 26.7, 'v')
-put_join('J505', XS, 27.7, 'v')   # 兩邊喺度併返一條紅綫
+put_join('J505S', XS, 27.7, 'v')   # 兩邊喺度併返一條紅綫
 put('建安', XS, 28.15, 'v')
 YK = 28.95                     # 建安 → 屯門
 YT = YK + 0.8                  # 屯門
@@ -130,8 +131,8 @@ BENDS = {
     ('澤豐', '銀圍'): [(ZX, RY)],
     ('澤豐', '蔡意橋'): [(ZX, RY)],
     ('銀圍', '蔡意橋'): [(ZX, RY)],
-    ('石排', '山景(北)'): [(XW, 24.75), (XS, 25.5)],
-    ('鳴琴', 'J505'): [(XW, 26.4), (XS, 27.15)],
+    ('J505N', '山景(北)'): [(XW, 24.72), (XS, 25.47)],
+    ('鳴琴', 'J505S'): [(XW, 26.4), (XS, 27.15)],
     ('建安', '屯門'): [(XS, YK), (ZX, YK)],
     ('市中心', '杯渡'): [(ZX, YP)],
     ('杯渡', '何福堂'): [(KX, YP)],
@@ -142,7 +143,8 @@ BENDS = {
     ('兆禧', '屯門碼頭'): [(XW, DS2 - XW)],
 }
 # 唔停站經過（615 青松 → 兆康 經麒麟唔停）
-VIA = {('青松', '兆康'): ['麒麟'], ('鳴琴', '建安'): ['J505'], ('山景(南)', '建安'): ['J505']}
+VIA = {('青松', '兆康'): ['麒麟'], ('鳴琴', '建安'): ['J505S'], ('山景(南)', '建安'): ['J505S'],
+       ('石排', '鳴琴'): ['J505N'], ('山景(北)', '石排'): ['J505N']}
 # 指定色綫次序：沿住呢串站行，由左至右
 CHAIN_ORDER = [
     (['濕地公園', '天秀', '天悅', '天榮', '銀座', '天湖', '天慈', '天水圍'], ['751', '705', '706']),
@@ -151,6 +153,7 @@ CHAIN_ORDER = [
     (['蔡意橋', '河田', '屯門'], ['751', '507']),
     (['屯門', '市中心'], ['751', '507', '505']),
     (['安定', '兆麟'], ['505', '614P', '614', '507']),
+    (['石排', 'J505N', '鳴琴'], ['505', '610', '615P', '615']),
 ]
 # 終點站路線號碼：extend = 色綫穿過個站再散開；split = 穿過個站之後左右分兩邊打直排；n／s／e／w = 放喺站嗰邊
 CAPS = {'元朗': 'extend', '三聖': 'extend', '屯門碼頭': 'split', '友愛': 'e', '田景': 's', '兆康': 'e', '天逸': 'e', '天水圍': 'w'}
@@ -239,7 +242,7 @@ for e in edges:
     for s, a, b, c in ((u, g[0], g[1], g[2] if len(g) > 2 else None), (v, g[-1], g[-2], g[-3] if len(g) > 2 else None)):
         d, L = unit(a, b)
         if abs(cross(d, AX[AXIS[s]])) > 1e-6: errors.append(f'{nm}：出入 {nm_(s)} 唔係沿軸（{AXIS[s]}）')
-        need = STRAIGHT + (tan_len(a, b, c) if c else 0)
+        need = (0 if s in VIRTUAL else STRAIGHT) + (tan_len(a, b, c) if c else 0)
         if L < need - 1e-6: errors.append(f'{nm}：出入 {nm_(s)} 直綫得 {L:.2f}，要 {need:.2f}')
     for i in range(1, len(g) - 2):
         need = tan_len(g[i - 1], g[i], g[i + 1]) + tan_len(g[i], g[i + 1], g[i + 2])
@@ -283,8 +286,17 @@ for (s, side), lst in side_edges.items():
     pos = sum(len(edges[e]) for _, e in lst) * G / 2
     for _, e in lst:
         n = len(edges[e])
-        port_base[(s, e)] = 0.0 if s in VIRTUAL else pos - n * G / 2
+        port_base[(s, e)] = pos - n * G / 2
         pos -= n * G
+    if s in VIRTUAL:
+        main = max((e for _, e in lst), key=lambda e: len(edges[e]))
+        mo = lane_order(s, other(main, s))
+        for _, e in lst:
+            port_base[(s, e)] = 0.0
+            if e == main: continue
+            own = lane_order(s, other(e, s))
+            r = next((r for r in own if r in mo), None)
+            if r: port_base[(s, e)] = ((len(mo) - 1) / 2 - mo.index(r)) * G - ((len(own) - 1) / 2 - own.index(r)) * G
 
 # 站嘅橫移：令每段路軌兩頭嘅出站位一致（色綫一路平行，轉彎同心）。
 # 由最大嘅站開始，先跟直路軌、再跟同其他路軌共用彎位嘅、最後其他，咁樣對唔齊嘅只會喺普通彎位處理。
