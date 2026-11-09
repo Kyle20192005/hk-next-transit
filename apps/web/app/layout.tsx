@@ -2,15 +2,19 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { THEME_SCRIPT } from '@/lib/prefs';
 import OfflineBanner from '@/components/OfflineBanner';
+import PwaSetup from '@/components/PwaSetup';
+import { PWA_SCRIPT } from '@/lib/pwa-script';
 
 export const metadata: Metadata = {
   applicationName: '下一程',
-  appleWebApp: { title: '下一程' },
+  // 加至主畫面（PWA）：全螢幕開；狀態列跟 theme-color（黃色、深色字），內容由狀態列下面開始
+  appleWebApp: { capable: true, title: '下一程', statusBarStyle: 'default' },
   title: { default: '下一程 NextLeg｜香港交通實時到站', template: '%s｜下一程' },
   description: '下一程：香港巴士實時到站時間、巴士位置、特別班次走法同車費。城巴、九巴、龍運、新大嶼山巴士、港鐵巴士。',
 };
 
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#ffc72c' };
+// viewport-fit=cover：主畫面版底部分頁列要避開 Home 條（CSS 用 env(safe-area-inset-*)）
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#ffc72c', viewportFit: 'cover' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,9 +22,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* 深色模式設定：載入前先寫 data-theme，唔會閃 */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* PWA：安裝提示可能喺 React 載入前就出，先捉住 */}
+        <script dangerouslySetInnerHTML={{ __html: PWA_SCRIPT }} />
       </head>
       <body>
         <OfflineBanner />
+        <PwaSetup />
         {children}
       </body>
     </html>

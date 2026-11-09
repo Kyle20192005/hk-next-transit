@@ -68,6 +68,12 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   const [railPick, setRailPick] = useState<RailPick | null>(null);
 
   useEffect(() => {
+    // 主畫面圖示長撳嘅捷徑（app/manifest.ts）：/?tab=favs、/?view=nearby；用完清走，重新整理唔會再跳
+    const q = new URLSearchParams(window.location.search);
+    const qt = q.get('tab');
+    if (qt || q.get('view')) window.history.replaceState(null, '', window.location.pathname);
+    if (TABS.some((x) => x.id === qt)) return pick(qt as Tab);
+    if (q.get('view') === 'nearby') return setView({ kind: 'nearby' });
     try {
       const t = sessionStorage.getItem(TAB_KEY);
       if (TABS.some((x) => x.id === t)) setTab(t as Tab);

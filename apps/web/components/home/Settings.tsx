@@ -5,6 +5,8 @@ import { clearFavorites, useFavorites } from '@/lib/favorites';
 import { saveTools } from '@/lib/news';
 import { setPref, usePrefs } from '@/lib/prefs';
 import { clearRecent, useRecent } from '@/lib/recent';
+import { useInstall } from '@/lib/pwa';
+import Icon from '@/components/Icon';
 
 /**
  * 設定（每項都真係有作用）：外觀、交通、首頁、資料、關於。設定存 localStorage `hknt.prefs`（core `Prefs`），
@@ -117,6 +119,8 @@ export default function Settings({ updated }: { updated: string | null }) {
           </div>
         </Group>
 
+        <InstallGroup onDone={flash} />
+
         <Group title="關於">
           <div className="settings-row">
             <span>版本</span>
@@ -140,6 +144,41 @@ export default function Settings({ updated }: { updated: string | null }) {
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * 加至主畫面（PWA，lib/pwa.ts）：Chrome／Edge／Android 一撳安裝；iPhone／iPad 教用 Safari 分享選單；
+ * 已經喺主畫面開緊就話已安裝；其他瀏覽器唔支援就成組收埋（唔好擺個用唔到嘅掣）。
+ */
+function InstallGroup({ onDone }: { onDone: (msg: string) => void }) {
+  const { state, install } = useInstall();
+  if (state === 'unsupported') return null;
+  return (
+    <Group title="App">
+      {state === 'prompt' ? (
+        <Action label="安裝到主畫面" hint="好似 App 咁由主畫面全螢幕開，冇網絡都開到（到站時間要上網）。" button="安裝" onClick={() => void install().then((ok) => ok && onDone('已經安裝到主畫面'))} />
+      ) : state === 'ios' ? (
+        <div className="settings-row">
+          <div className="settings-text">
+            <span>加至主畫面</span>
+            <small className="muted install-steps">
+              用 Safari 撳底部
+              <Icon name="share" size={15} />
+              「分享」，再揀「加至主畫面」，之後由主畫面圖示全螢幕開。
+            </small>
+          </div>
+        </div>
+      ) : (
+        <div className="settings-row">
+          <div className="settings-text">
+            <span>主畫面 App</span>
+            <small className="muted">已經由主畫面打開緊。</small>
+          </div>
+          <Icon name="check" size={20} />
+        </div>
+      )}
+    </Group>
   );
 }
 
