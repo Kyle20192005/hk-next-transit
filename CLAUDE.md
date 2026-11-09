@@ -100,7 +100,7 @@ Vercel function 放喺香港（`apps/web/vercel.json` 嘅 `regions: ["hkg1"]`）
 ## 港鐵（重鐵）：路綫圖同到站時間
 
 「路線」分頁 →「港鐵・輕鐵」：自己畫嘅路綫圖，撳站或者搜尋睇到站時間（輕鐵未做）。網頁 `components/rail/{RailView,MtrMap,MtrStationSheet,MtrSearch}.tsx`，
-App `src/components/{RailView,MtrMap,MtrStationSheet}.tsx`（`(tabs)/routes.tsx` 揀港鐵就出地圖，搜尋欄喺標題列）。
+App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/routes.tsx` 揀港鐵就出地圖，搜尋欄喺標題列）。
 
 - **到站面板**（2026-11，參考港鐵 App 嘅資訊排法，用自己嘅樣式）：唔係彈出視窗，唔遮成幅圖。
   手機（< 768px）係**貼底拉板**（有拉柄）：半開（自動高度，最高 `max(58%, min(100% - 120px, 380px))`）顯示站名、綫分頁、下班車；
@@ -137,11 +137,14 @@ App `src/components/{RailView,MtrMap,MtrStationSheet}.tsx`（`(tabs)/routes.tsx`
 - 用戶定落嘅排法（2026-11，改之前問清楚）：荃灣綫荔景之後向北；屯馬綫南昌、美孚直上、喺荃灣綫上面轉西去荃灣西；東涌綫、機場快綫南昌北面
   90° 轉西貼住荃灣綫底經荔景，青衣喺西南斜綫上（轉車站打斜），之後扭一扭交換位置、貼住經欣澳，過咗小蠔灣先分開（機場喺東涌北面）；
   迪士尼綫先貼住東涌綫向東北再屈落；香港站喺中環正上方、上下排；紅磡東鐵、屯馬一齊向東北斜（屯馬東南邊），何文田屯馬喺觀塘綫上面水平並排。
-- 手勢：網頁 viewBox 平移縮放（pointer、兩指、滑鼠轆）；App `PanResponder`（最新狀態放 `useLayoutEffect` 更新嘅 ref，`Svg pointerEvents="none"`，
+- 手勢：網頁 viewBox 平移縮放（pointer、兩指、滑鼠轆）；App `PanResponder`（最新狀態放 `useLayoutEffect` 更新嘅 ref，Skia `Canvas pointerEvents="none"`，
   觸點用 `locationX`），一隻手指拖、兩隻手指縮放、輕撳搵站圈範圍。
-  **App 唔好逐格改 viewBox**（react-native-svg 會喺手機重畫成幅圖，好卡）：手勢、飛去個站、縮放掣期間只改外框嘅 `Animated` transform（`effView`／`xfFor` 換算），
-  放手或者動畫完先用新範圍重畫一次；SVG 四邊多畫 30%（`OVERSCAN`），拖出已畫範圍或者放大過 1.6 倍先中途重畫（最多 0.25 秒一次）；
-  重畫完 `useLayoutEffect` 將 transform 換算返相對新範圍（唔會跳）。一格細過 22px 唔畫英文站名（`EN_MIN_PX`）。
+  **App 地圖用 Skia**（`MtrMapSkia.tsx`；`@shopify/react-native-skia` + `react-native-reanimated`，Expo Go 有）：成幅圖記錄一次做 `SkPicture`（每個主題一份，
+  模組層級 cache，成個 App 開住只錄一次，約 0.1–0.3 秒），拖、縮放、飛去個站、縮放掣只改 `Group transform`（shared value `sc`／`ox`／`oy`，
+  畫面 = 地圖座標 × sc + o），GPU 每格重播份記錄，唔使重新排版、唔使 React 重畫；向量，放幾大都清楚。**唔好返轉頭用 react-native-svg 逐格改 viewBox**
+  （手機每次要重畫成幅圖，好卡；用 transform 郁已畫好嘅圖、放手先重畫都仲會頓）。站名用 Skia Paragraph（系統字 + 自動後備字型，`locale: 'zh-HK'`），
+  以 100 倍大小排版再縮返（`TS`），底色描邊先畫一次再畫字。手勢照用 PanResponder（JS 只計三個數）。
+  Expo 網頁預覽（`MtrMap.web.tsx`）：`WithSkiaWeb` 由 jsDelivr 載入 CanvasKit 同 Noto Sans TC（CanvasKit 冇系統字），只係開發測試用。
 
 ## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）
 
@@ -390,7 +393,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   內容溢出卡外（2026-11 自訂常用工具頂部一行就係咁，包住 ToolTile 嘅拖拉 View 要 `flexDirection: 'row'`）。
 - App iOS 26 起 stack 畫面預設**成個畫面向右掃都返上一頁**（`fullScreenGestureEnabled` 預設 true），會搶咗 PanResponder 嘅橫向拖拉；
   有橫向拖拉嘅畫面（例如 `tools`）要喺 `_layout.tsx` 設 `fullScreenGestureEnabled: false`（左邊邊緣掃返照用得）。
-- App 預覽：`EXPO_PUBLIC_API_BASE=http://localhost:3000 npx expo start --web`（`RouteMap.web.tsx` 係地圖佔位 `MapPlaceholder`，react-native-maps 冇 web）。
+- App 預覽：`EXPO_PUBLIC_API_BASE=http://localhost:3000 npx expo start --web`（`RouteMap.web.tsx` 係地圖佔位 `MapPlaceholder`，react-native-maps 冇 web；港鐵路綫圖 `MtrMap.web.tsx` 要上網載 CanvasKit）。
   改完 code 截圖前要殺咗 server 再用 `--clear` 重開：Metro web 延遲載入嘅 chunk 會繼續送舊 code。
 
 ## 已知未做
