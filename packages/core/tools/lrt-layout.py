@@ -166,8 +166,10 @@ CHAIN_ORDER = [
 ]
 # 終點站路線號碼（似港鐵輕鐵圖）：
 #   stack = 盡頭站：色綫入站前散開，每條駁住自己個號碼，成排號碼就係個站（白色膠囊包住）；兩邊都有綫入站就排兩行
-#   end   = 中途終點站：喺度完嘅綫，號碼黐住站膠囊嗰頭（end+／end- 指定邊頭）
-CAPS = {'元朗': 'stack', '三聖': 'stack', '屯門碼頭': 'stack', '友愛': 'end-', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'end'}
+#   end   = 中途終點站：喺度完嘅綫，號碼擺喺條綫嘅尾（喺站度，向外伸出）；同一邊幾條並排就前後錯開，外面嗰條喺前面完
+#           end:-1 = 循環綫：由呢邊入站嗰啲綫當係完（喺度切開個圈）
+#   dot   = 只得一條綫嘅站：號碼就係個站
+CAPS = {'元朗': 'stack', '三聖': 'stack', '屯門碼頭': 'stack', '友愛': 'dot', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'end:-1'}
 # 站名位置
 LABELS = {}
 for n in ['天逸', '天富', '頌富', '天瑞', '樂湖', '天耀']: LABELS[n] = 'w'
@@ -595,25 +597,43 @@ for name, mode in CAPS.items():
         markers[s] = {'kind': 'box', 'x': round(cx, 4), 'y': round(cy, 4), 'w': round(w, 4), 'h': round(h, 4)}
     else:
         m = markers[s]
-        half = m['r'] if m['kind'] == 'dot' else m['len'] / 2
         c = (m['x'] - px) * N[0] + (m['y'] - py) * N[1]
-        offs = {}
-        for e in adj[s]:
-            for r in edges[e]:
-                if r in rs: offs.setdefault(r, []).append(side_of[(s, e)] * (lane_port[(s, e, r)] + shift[s] * side_of[(s, e)]))
-        ends_ = {1: [], -1: []}
-        for r in rs:
-            o = sum(offs[r]) / len(offs[r])
-            end = int(mode[-1] + '1') if mode[-1] in '+-' else (1 if o >= c else -1)
-            ends_[end].append((o, r))
-        for end, items in ends_.items():
-            items.sort(key=lambda x: -x[0])
-            k = len(items)
-            for j, (o, r) in enumerate(items):
-                on = c + end * (half + capN / 2 - 0.08)
-                oa = ((k - 1) / 2 - j) * (capA + 0.06)
-                cx, cy = px + N[0] * on + ax[0] * oa, py + N[1] * on + ax[1] * oa
+        cut_side = int(mode.split(':')[1]) if ':' in mode else None
+        term = {}
+        for lane in lanes:
+            r, pts, (u, v), _ = lane
+            if s not in (u, v) or r not in rs: continue
+            sd = side_of[(s, frozenset((u, v)))]
+            if cut_side is not None and sd != cut_side: continue
+            q = pts[0] if u == s else pts[-1]
+            term.setdefault(r, []).append(((q[0] - px) * N[0] + (q[1] - py) * N[1], sd, lane, u == s))
+        if mode == 'dot':
+            for r, items in term.items():
+                o = items[0][0]
+                cx, cy = px + N[0] * o, py + N[1] * o
                 caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4), 'sta': s})
+                w, h = (capA + 0.1, capN + 0.3) if vertN else (capN + 0.3, capA + 0.1)
+                markers[s] = {'kind': 'box', 'x': round(cx, 4), 'y': round(cy, 4), 'w': round(w, 4), 'h': round(h, 4)}
+            continue
+        groups = {}
+        for r, items in term.items():
+            if len(items) > 1: continue          # 兩邊都有（循環綫未指定切邊）：唔處理
+            o, sd, lane, first = items[0]
+            e = 1 if o >= c else -1
+            groups.setdefault((e, sd), []).append((abs(o - c), o, r, lane, first))
+        for (e, sd), items in groups.items():
+            items.sort(key=lambda x: -x[0])
+            for k, (_, o, r, lane, first) in enumerate(reversed(items)):
+                t = k * (capA + 0.06)
+                a_ = (ax[0] * sd, ax[1] * sd)
+                on = o + e * (capN / 2 - G / 2)
+                cx, cy = px + N[0] * on + a_[0] * t, py + N[1] * on + a_[1] * t
+                caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4), 'sta': s})
+                if t > 0:                          # 條綫喺號碼度完
+                    end = (px + N[0] * o + a_[0] * t, py + N[1] * o + a_[1] * t)
+                    pts = lane[1]
+                    if first: pts[0] = end
+                    else: pts[-1] = end
 def cap_box(c): return (c['x'] - CAP_W / 2, c['y'] - CAP_H / 2, CAP_W, CAP_H)
 
 # 單方向箭咀：每條單向色綫最長嗰段直綫中間一個
