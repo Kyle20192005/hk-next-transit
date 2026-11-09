@@ -172,6 +172,7 @@ CHAIN_ORDER = [
 #   end   = 中途終點站：喺度完嘅綫散開，號碼蓋喺站中間，同一邊幾個由內至外排；站膠囊大細唔變
 #   loop  = 循環綫起點（天水圍）：兩邊嘅色綫都散開穿過自己個號碼（號碼由內至外疊喺站中間）
 #   dot   = 只得一條綫經過嘅中途終點站：號碼蓋喺圓點上面
+PILL_COVERS_CAPS = {'兆康', '天逸'}   # 中途終點站：站膠囊拉長包埋號碼（2026-11，用戶要求）
 CAPS = {'元朗': 'stack', '三聖': 'stack', '屯門碼頭': 'stack', '友愛': 'dot', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'side+'}
 # 站名位置
 LABELS = {}
@@ -714,6 +715,11 @@ for name, mode in CAPS.items():
             a = (ax[0] * sd, ax[1] * sd)
             cx, cy = fan_into(s, lane, first, a, N, o, ci, 0.0, capA)
             cap_at(r, cx, cy)
+            if name in PILL_COVERS_CAPS and m['kind'] == 'pill':     # 站膠囊拉長包埋號碼（兩頭露出少少）
+                lo, hi = c - m['len'] / 2, c + m['len'] / 2
+                lo, hi = min(lo, ci - capN / 2 - 0.1), max(hi, ci + capN / 2 + 0.1)
+                c = (lo + hi) / 2
+                m.update({'x': round(px + N[0] * c, 4), 'y': round(py + N[1] * c, 4), 'len': round(hi - lo, 4)})
             ci += e * (capN + 0.06)
 def cap_box(c): return (c['x'] - CAP_W / 2, c['y'] - CAP_H / 2, CAP_W, CAP_H)
 
