@@ -679,11 +679,15 @@ for name, mode in CAPS.items():
         order = sorted({r for _, r, *_ in term}, key=lambda r: min(o for o, rr, *_ in term if rr == r) * e)
         base = max(thr, key=lambda o: o * e) if thr else min(o for o, *_ in term) - e * G
         ci = base + e * (G / 2 + 0.02 + capN / 2)
+        bounds = [b for o in thr for b in (o - G / 2 - PAD, o + G / 2 + PAD)]
         for r in order:
             for o, rr, sd, lane, first in term:
                 if rr == r: cx, cy = fan_into(s, lane, first, (ax[0] * sd, ax[1] * sd), N, o, ci, 0.0, capA)
             cap_at(r, cx, cy)
+            bounds += [ci - capN / 2 - 0.1, ci + capN / 2 + 0.1]
             ci += e * (capN + 0.06)
+        lo, hi = min(bounds), max(bounds)          # 站膠囊拉長，包埋號碼（兩頭露出少少）
+        m.update({'kind': 'pill', 'x': round(px + N[0] * (lo + hi) / 2, 4), 'y': round(py + N[1] * (lo + hi) / 2, 4), 'len': round(hi - lo, 4)})
         continue
     if mode.startswith('side'):   # 循環綫起點：號碼並排蓋喺站膠囊嗰頭
         e = 1 if mode.endswith('+') else -1
