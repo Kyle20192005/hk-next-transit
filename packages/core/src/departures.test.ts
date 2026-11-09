@@ -80,3 +80,16 @@ describe('orderNearCards', () => {
     expect(orderNearCards([], b, 'rail', 5)).toEqual(b);
   });
 });
+
+describe('groupFavsByRoute', () => {
+  it('groups by company + route (MTR by line), keeping first-seen order', async () => {
+    const { groupFavsByRoute } = await import('./departures');
+    const f = (co: string, route: string, stopId?: string) => ({ co, route, dir: 'O' as const, dest: '', companies: [], stopId });
+    const g = groupFavsByRoute([f('ctb', '1', 'A'), f('mtr', 'TWL', 'MOK'), f('kmb', '1', 'B'), f('ctb', '1', 'C'), f('mtr', 'TWL', 'ADM')]);
+    expect(g.map((x) => [x.key, x.favs.map((y) => y.stopId)])).toEqual([
+      ['ctb/1', ['A', 'C']],
+      ['mtr/TWL', ['MOK', 'ADM']],
+      ['kmb/1', ['B']],
+    ]);
+  });
+});

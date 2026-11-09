@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { minutesLabel, mtrDepartureRows, mtrLine, mtrStationLines, type DepartureRow, type Eta, type FavGroupDef } from '@hknt/core';
+import { minutesLabel, mtrDepartureRows, mtrLine, mtrStationLines, type DepartureRow, type Eta, type FavGroupDef, type FavRouteGroup } from '@hknt/core';
 import { api, type Co } from '@/lib/api';
 import { isMtrFav, removeFavorite, type Favorite } from '@/lib/favorites';
 import { openMtr } from '@/lib/open-mtr';
@@ -14,7 +14,46 @@ import { EtaInline } from './EtaInline';
 
 const REFRESH_MS = 30_000;
 
-/** 收藏一行（收藏頁同首頁共用）：收藏咗嘅站直接顯示下一班；港鐵站顯示每條綫每個方向下一班 */
+/**
+ * 收藏頁：一條路線（港鐵綫）一張卡（同網頁 FavRouteCard 一樣，core groupFavsByRoute）：
+ * 頂部路線號碼同公司（撳入路線）或者綫色 + 綫名，下面每行一個收藏咗嘅站。
+ */
+export function FavRouteCard({ g, groups, onPickGroup }: { g: FavRouteGroup<Favorite>; groups: FavGroupDef[]; onPickGroup: (f: Favorite) => void }) {
+  const t = useTheme();
+  const f0 = g.favs[0]!;
+  const line = isMtrFav(f0) && f0.route ? mtrLine(f0.route) : undefined;
+  const co = f0.co as Co;
+  return (
+    <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
+      {isMtrFav(f0) ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: t.line }}>
+          {line ? <View style={{ width: 6, height: 22, borderRadius: 3, backgroundColor: line.color }} /> : <Icon name="train" size={20} color={t.text} />}
+          <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: t.text }}>{line ? line.zh : '港鐵站'}</Text>
+          <Text style={{ fontSize: 13, color: t.muted }}>港鐵</Text>
+        </View>
+      ) : (
+        <Pressable
+          onPressIn={() => warmRoute(co, f0.route, { dir: f0.dir })}
+          onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: f0.route, dir: f0.dir } })}
+          accessibilityRole="link"
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: t.line, backgroundColor: pressed ? t.surface2 : 'transparent' })}
+        >
+          <Text style={{ fontSize: 22, fontWeight: '800', color: t.text, ...tabular }}>{f0.route}</Text>
+          <CompanyTag companies={f0.companies} />
+          <View style={{ flex: 1 }} />
+          <Icon name="chevron-right" size={18} color={t.muted} />
+        </Pressable>
+      )}
+      {g.favs.map((f, i) => (
+        <View key={`${f.co}/${f.route}/${f.dir}/${f.stopId ?? ''}`} style={{ borderTopWidth: i ? 1 : 0, borderTopColor: t.line }}>
+          <FavItem f={f} groups={groups} onPickGroup={() => onPickGroup(f)} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** 路線卡入面一行：收藏咗嘅站（站名、往邊、下一班），成條路線，或者港鐵站（嗰條綫兩個方向下一班） */
 export function FavItem({ f, groups = [], onPickGroup }: { f: Favorite; groups?: FavGroupDef[]; onPickGroup?: () => void }) {
   if (isMtrFav(f)) return <MtrFavItem f={f} groups={groups} onPickGroup={onPickGroup} />;
   return <BusFavItem f={f} groups={groups} onPickGroup={onPickGroup} />;
@@ -24,28 +63,23 @@ function BusFavItem({ f, groups, onPickGroup }: { f: Favorite; groups: FavGroupD
   const t = useTheme();
   const co = f.co as Co;
   return (
-    <View style={{ backgroundColor: t.card, borderRadius: radius.l, ...shadow }}>
+    <View>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Pressable
           onPressIn={() => warmRoute(co, f.route, { dir: f.dir, stopId: f.stopId })}
           onPress={() => router.push({ pathname: '/[co]/[route]', params: { co, route: f.route, dir: f.dir, ...(f.stopId ? { stop: f.stopId } : {}) } })}
           accessibilityRole="link"
           style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 4 }}>
-          <View style={{ width: 108, paddingVertical: 12, paddingLeft: 16, gap: 4 }}>
-            <Text style={{ fontSize: 24, fontWeight: '800', color: t.text, ...tabular }}>{f.route}</Text>
-            <CompanyTag companies={f.companies} />
-          </View>
-          <View style={{ flex: 1, gap: 2, paddingVertical: 12 }}>
-            <Text numberOfLines={1} style={{ fontWeight: '700', color: t.text, fontSize: 16 }}>
-              <Text style={{ color: t.muted, fontWeight: '500', fontSize: 13 }}>往 </Text>
-              {f.dest}
-            </Text>
+          <View style={{ flex: 1, gap: 2, paddingVertical: 12, paddingLeft: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              {f.stopName && <Icon name="pin" size={14} color={t.muted} />}
-              <Text numberOfLines={1} style={{ color: t.muted, fontSize: 13, flexShrink: 1 }}>
+              {f.stopName && <Icon name="pin" size={15} color={t.text} />}
+              <Text numberOfLines={1} style={{ fontWeight: '700', color: t.text, fontSize: 16, flexShrink: 1 }}>
                 {f.stopName ?? '成條路線'}
               </Text>
             </View>
+            <Text numberOfLines={1} style={{ color: t.muted, fontSize: 13 }}>
+              往 {f.dest}
+            </Text>
           </View>
           {f.stopId ? <FavEtas f={f} /> : <Icon name="chevron-right" size={20} color={t.muted} />}
         </Pressable>
@@ -72,7 +106,7 @@ function GroupPick({ f, groups, label, onPickGroup }: { f: Favorite; groups: Fav
   );
 }
 
-/** 收藏咗嘅港鐵站：站名、綫，下面每條綫每個方向下一班（最多 4 行）；撳入路綫圖嗰個站（同網頁 MtrFavItem 一樣） */
+/** 收藏咗嘅港鐵站：站名，下面嗰條綫兩個方向下一班（舊版成個站收藏：所有綫，最多 4 行）；撳入路綫圖嗰個站（同網頁 MtrFavItem 一樣） */
 function MtrFavItem({ f, groups, onPickGroup }: { f: Favorite; groups: FavGroupDef[]; onPickGroup?: () => void }) {
   const t = useTheme();
   const sta = f.stopId!;
@@ -83,7 +117,7 @@ function MtrFavItem({ f, groups, onPickGroup }: { f: Favorite; groups: FavGroupD
     const tick = async () => {
       try {
         const body = await api.mtr(sta);
-        if (!cancelled) setState({ rows: mtrDepartureRows(sta, body.lines, 4), now: Date.now() });
+        if (!cancelled) setState({ rows: mtrDepartureRows(sta, body.lines, 4, f.route ? [f.route] : undefined), now: Date.now() });
       } catch {
         /* 下次再試 */
       }
@@ -94,15 +128,15 @@ function MtrFavItem({ f, groups, onPickGroup }: { f: Favorite; groups: FavGroupD
       cancelled = true;
       clearInterval(id);
     };
-  }, [sta]);
+  }, [sta, f.route]);
   return (
-    <View style={{ backgroundColor: t.card, borderRadius: radius.l, ...shadow }}>
+    <View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
         <Pressable onPress={() => openMtr(sta)} accessibilityRole="link" style={{ flex: 1, gap: 8, paddingVertical: 12, paddingLeft: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
             <Icon name="train" size={18} color={t.text} />
             <Text style={{ fontSize: 17, fontWeight: '800', color: t.text }}>{f.stopName}</Text>
-            {mtrStationLines(sta).map((l) => (
+            {!f.route && mtrStationLines(sta).map((l) => (
               <View key={l} style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, backgroundColor: mtrLine(l)?.color }}>
                 <Text style={{ fontSize: 11, fontWeight: '800', color: mtrLine(l)?.ink }}>{mtrLine(l)?.zh}</Text>
               </View>
@@ -112,9 +146,12 @@ function MtrFavItem({ f, groups, onPickGroup }: { f: Favorite; groups: FavGroupD
           {state?.rows.length === 0 && <Text style={{ color: t.muted }}>{sta === 'RAC' ? '只喺賽馬日開放' : '暫時冇班次'}</Text>}
           {state?.rows.map((r) => (
             <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ minWidth: 50, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: r.badge.bg, alignItems: 'center' }}>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: r.badge.ink }}>{r.badge.text}</Text>
-              </View>
+              {/* 綫卡頂已經有綫色同綫名；舊版成個站收藏先要標籤分綫 */}
+              {!f.route && (
+                <View style={{ minWidth: 50, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: r.badge.bg, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: r.badge.ink }}>{r.badge.text}</Text>
+                </View>
+              )}
               <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: '600', color: t.text }}>
                 往{r.dest}
               </Text>
@@ -127,7 +164,7 @@ function MtrFavItem({ f, groups, onPickGroup }: { f: Favorite; groups: FavGroupD
             </View>
           ))}
         </Pressable>
-        <Pressable onPress={() => removeFavorite(f)} accessibilityLabel={`取消收藏${f.stopName}站`} hitSlop={6} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 4, marginTop: 4 }}>
+        <Pressable onPress={() => removeFavorite(f)} accessibilityLabel={`取消收藏${f.stopName}站${f.route ? (mtrLine(f.route)?.zh ?? '') : ''}`} hitSlop={6} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 4, marginTop: 4 }}>
           <Icon name="star-fill" size={20} color={t.brand} />
         </Pressable>
       </View>

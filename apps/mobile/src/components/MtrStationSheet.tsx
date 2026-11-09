@@ -134,7 +134,7 @@ export function MtrStationSheet({
           <Text style={{ fontSize: 20, fontWeight: '800', color: t.text }}>{mtrStationName(sta)}</Text>
           <Text style={{ fontSize: 14, color: t.muted }}>{mtrStationEn(sta)}</Text>
         </View>
-        <FavButton sta={sta} />
+        <FavButton sta={sta} line={line} />
         <Pressable onPress={onClose} accessibilityLabel="關閉" style={{ width: 32, height: 32, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
           <Icon name="close" size={18} color={t.muted} />
         </Pressable>
@@ -300,12 +300,13 @@ function SheetGrab({ live, children }: { live: RefObject<GrabLive | null>; child
   return <View {...responder.panHandlers}>{children}</View>;
 }
 
-/** 收藏呢個站（收藏頁、首頁大卡「收藏」會出） */
-function FavButton({ sta }: { sta: string }) {
+/** 收藏而家睇緊嗰條綫喺呢個站（同巴士「路線 + 站」一樣；收藏頁、首頁大卡「收藏」會出） */
+function FavButton({ sta, line }: { sta: string; line: string }) {
   const t = useTheme();
-  const [on, toggle] = useFavorite(mtrFavorite(sta));
+  const [on, toggle] = useFavorite(mtrFavorite(sta, line));
+  const what = `${mtrStationName(sta)}站${mtrLine(line)?.zh ?? ''}`;
   return (
-    <Pressable onPress={toggle} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={on ? `取消收藏${mtrStationName(sta)}站` : `收藏${mtrStationName(sta)}站`} style={{ width: 32, height: 32, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
+    <Pressable onPress={toggle} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={on ? `取消收藏${what}` : `收藏${what}`} style={{ width: 32, height: 32, borderRadius: radius.s, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }}>
       <Icon name={on ? 'star-fill' : 'star'} size={18} color={on ? t.brand : t.muted} />
     </Pressable>
   );

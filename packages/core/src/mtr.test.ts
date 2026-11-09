@@ -254,5 +254,12 @@ describe('mtr nearby + departure rows', () => {
     expect(rows[0]).toMatchObject({ dest: '堅尼地城', platform: '2', nowText: '正在離開', link: { co: 'mtr', stop: 'ADM', dir: 'I' } });
     expect(rows[1]?.badge.bg).toBe('#E2231A');
     expect(mtrLineShort('AEL')).toBe('機鐵');
+    // 只要收藏咗嘅綫
+    expect(
+      mtrDepartureRows('ADM', [
+        { line: 'TWL', delayed: false, dirs: [{ dir: 'UP', label: '往 荃灣', trains: [{ dest: 'TSW', destName: '荃灣', plat: '3', time: t(5), mins: 4 }] }] },
+        { line: 'ISL', delayed: false, dirs: [{ dir: 'DOWN', label: '往 堅尼地城', trains: [{ dest: 'KET', destName: '堅尼地城', plat: '2', time: t(1), mins: 0 }] }] },
+      ], 4, ['TWL']).map((r) => r.badge.text),
+    ).toEqual(['荃灣']);
   });
 });

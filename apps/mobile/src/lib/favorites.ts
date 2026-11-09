@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useSyncExternalStore } from 'react';
-import { mtrStationName, type Company } from '@hknt/core';
+import { mtrLine, mtrStationName, type Company } from '@hknt/core';
 import type { Co } from './api';
 import { haptic } from './haptics';
 
@@ -27,8 +27,19 @@ let loaded = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
-/** 港鐵站收藏（路綫圖面板撳星號） */
-export const mtrFavorite = (sta: string): Omit<Favorite, 'at'> => ({ co: 'mtr', route: '', dir: 'O', dest: '', companies: [], stopId: sta, stopName: mtrStationName(sta) });
+/**
+ * 港鐵收藏（路綫圖面板撳星號）：同巴士「路線 + 站」一樣係「綫 + 站」（route = 綫代號）。
+ * 0.18.0 收藏咗成個站嘅（route 空白）照用，顯示所有綫。
+ */
+export const mtrFavorite = (sta: string, line: string): Omit<Favorite, 'at'> => ({
+  co: 'mtr',
+  route: line,
+  dir: 'O',
+  dest: mtrLine(line)?.zh ?? line,
+  companies: [],
+  stopId: sta,
+  stopName: mtrStationName(sta),
+});
 export const isMtrFav = (f: Pick<Favorite, 'co'>): f is Favorite & { co: 'mtr' } => f.co === 'mtr';
 
 export const favKey = (f: Pick<Favorite, 'co' | 'route' | 'dir' | 'stopId'>) => `${f.co}/${f.route}/${f.dir}/${f.stopId ?? ''}`;

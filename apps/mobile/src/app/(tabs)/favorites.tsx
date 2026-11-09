@@ -2,10 +2,10 @@ import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { activeFavGroup, FAV_GROUP_PRESETS, FAV_GROUP_WINDOWS, favGroupWindowLabel, favsInGroup, newFavGroupId, type FavGroupDef } from '@hknt/core';
-import { favKey, setFavoriteGroup, useFavorites, type Favorite } from '@/lib/favorites';
+import { activeFavGroup, FAV_GROUP_PRESETS, FAV_GROUP_WINDOWS, favGroupWindowLabel, favsInGroup, groupFavsByRoute, newFavGroupId, type FavGroupDef } from '@hknt/core';
+import { setFavoriteGroup, useFavorites, type Favorite } from '@/lib/favorites';
 import { deleteFavGroup, saveFavGroup, useFavGroups } from '@/lib/fav-groups';
-import { FavItem } from '@/components/FavItem';
+import { FavRouteCard } from '@/components/FavItem';
 import { Icon } from '@/components/Icon';
 import { radius, shadowLg, useTheme } from '@/lib/theme';
 import { AppBar, EmptyState, PrimaryButton } from '@/components/ui';
@@ -14,7 +14,7 @@ const BLUE = '#2F6FD6';
 const GREEN = '#1E8E3E';
 
 /**
- * 收藏：收藏咗嘅站直接顯示下一班；收藏咗嘅路線一撳就入。
+ * 收藏：按路線分組（巴士路線、港鐵綫一張卡），卡入面列收藏咗嘅站：巴士站直接顯示下一班；成條路線一撳就入；港鐵站顯示嗰條綫兩個方向下一班。
  * 分組（例如「返工」「返屋企」，core fav-groups.ts）：頂部一行揀組，預設揀而家時段嘅組；每個收藏下面揀放入邊組。
  * 同網頁 components/home/Favorites.tsx 一樣。
  */
@@ -40,13 +40,13 @@ export default function FavoritesTab() {
       </AppBar>
       {list.length === 0 ? (
         <EmptyState icon="star" action={{ label: '去路線列表', onPress: () => router.navigate('/routes') }}>
-          <Text style={{ color: t.muted, textAlign: 'center', lineHeight: 22 }}>喺路線頁撳標題列嘅星號收藏路線，{'\n'}或者打開一個站撳「收藏呢個站」。</Text>
+          <Text style={{ color: t.muted, textAlign: 'center', lineHeight: 22 }}>喺路線頁撳標題列嘅星號收藏路線，{'\n'}或者打開一個站撳「收藏呢個站」；{'\n'}港鐵站喺路綫圖撳站再撳星號。</Text>
           <Text style={{ color: t.muted, textAlign: 'center', fontSize: 13 }}>收藏咗嘅站會喺度直接顯示下一班車（只儲存喺呢部機）</Text>
         </EmptyState>
       ) : (
         <FlatList
-          data={shown}
-          keyExtractor={favKey}
+          data={groupFavsByRoute(shown)}
+          keyExtractor={(g) => g.key}
           contentContainerStyle={{ padding: 12, gap: 10 }}
           ListHeaderComponent={
             <View style={{ gap: 10 }}>
@@ -75,7 +75,7 @@ export default function FavoritesTab() {
               <Text style={{ color: t.muted, lineHeight: 20 }}>呢組未有收藏：喺「全部」入面，撳收藏下面嘅「未分組」，揀「{currentGroup?.name ?? '分組'}」。</Text>
             </View>
           }
-          renderItem={({ item }) => <FavItem f={item} groups={groups} onPickGroup={() => setMoving(item)} />}
+          renderItem={({ item }) => <FavRouteCard g={item} groups={groups} onPickGroup={setMoving} />}
         />
       )}
       {editing && (

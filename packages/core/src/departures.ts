@@ -165,3 +165,26 @@ export function orderNearCards<T>(mtr: T[], bus: T[], priority: 'bus' | 'rail', 
   const b = bus.slice(0, Math.max(0, max - m.length));
   return priority === 'rail' ? [...m, ...b] : [...b, ...m];
 }
+
+export interface FavRouteGroup<F> {
+  /** `${co}/${route}`；港鐵 route = 綫代號（舊版成個站收藏 route 係空白） */
+  key: string;
+  co: string;
+  route: string;
+  favs: F[];
+}
+
+/**
+ * 收藏頁：按路線分組（巴士 = 公司 + 路線號碼，港鐵 = 綫），每組下面列收藏咗嘅站（同埋成條路線）。
+ * 組嘅次序跟第一次出現（收藏列表新加嘅排先），組入面次序不變。
+ */
+export function groupFavsByRoute<F extends FavLike>(favs: F[]): FavRouteGroup<F>[] {
+  const groups: FavRouteGroup<F>[] = [];
+  for (const f of favs) {
+    const key = `${f.co}/${f.route}`;
+    const g = groups.find((x) => x.key === key);
+    if (g) g.favs.push(f);
+    else groups.push({ key, co: f.co, route: f.route, favs: [f] });
+  }
+  return groups;
+}

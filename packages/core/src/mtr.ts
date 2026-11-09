@@ -210,14 +210,14 @@ export function nearestMtrStations(lat: number, lng: number, maxM = 2000, limit 
 }
 
 /**
- * 港鐵站到站卡嘅行（首頁大卡）：每條綫每個方向下一班，按時間排，最多 limit 行；標籤用綫色同簡稱，有月台。
- * 撳落去開港鐵路綫圖嗰個站（link.co = 'mtr'）。
+ * 港鐵站到站卡嘅行（首頁大卡、收藏）：每條綫每個方向下一班，按時間排，最多 limit 行；標籤用綫色同簡稱，有月台。
+ * only = 只要呢幾條綫（收藏咗嘅綫；冇或者空 = 全部）。撳落去開港鐵路綫圖嗰個站（link.co = 'mtr'）。
  */
-export function mtrDepartureRows(sta: string, lines: MtrLineEtas[], limit = 4): DepartureRow[] {
+export function mtrDepartureRows(sta: string, lines: MtrLineEtas[], limit = 4, only?: string[]): DepartureRow[] {
   const rows: DepartureRow[] = [];
   for (const l of lines) {
     const info = mtrLine(l.line);
-    if (!info || l.noData) continue;
+    if (!info || l.noData || (only?.length && !only.includes(l.line))) continue;
     for (const d of l.dirs) {
       const t = d.trains[0];
       if (!t) continue;

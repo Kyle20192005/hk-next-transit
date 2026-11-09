@@ -498,6 +498,19 @@ svg[data-duo] [fill="currentColor"] { fill-opacity: 1; }
 @media (min-width: 768px) { .sheet-backdrop { align-items: center; } .sheet { border-radius: var(--radius); } }
 .fav-remove { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: var(--radius-s); background: none; color: var(--brand); cursor: pointer; }
 .fav:has(.fav-eta) .fav-main { padding-right: 52px; }
+/* 收藏頁按路線分組：一條路線（港鐵綫）一張卡，下面每行一個站 */
+.fav-routes { display: flex; flex-direction: column; gap: 10px; }
+.fav-route { padding: 0; overflow: hidden; }
+.fav-route-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--text); text-decoration: none; }
+.fav-route-head .route-num { font-size: 1.375rem; font-weight: 800; }
+.fav-route-go { margin-left: auto; }
+.fav-route-bar { flex: none; width: 6px; height: 22px; border-radius: 3px; }
+.fav-route-line { font-size: 1.0625rem; }
+.fav-route-sub { margin-left: auto; font-size: 0.8125rem; }
+.fav-route-rows { list-style: none; margin: 0; padding: 0; }
+.fav-route-rows .fav + .fav { border-top: 1px solid var(--line); }
+.fav-route-rows .fav-main { padding-left: 14px; }
+.fav-route-rows .fav-dest { display: flex; align-items: center; gap: 4px; }
 /* 收藏咗嘅港鐵站：站名、綫，下面每條綫每個方向下一班 */
 .fav-mtr .fav-main { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 52px 12px 14px; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
 .fav-mtr-name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }

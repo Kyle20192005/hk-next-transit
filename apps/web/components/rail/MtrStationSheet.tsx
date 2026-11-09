@@ -151,7 +151,7 @@ const MtrStationSheet = forwardRef<
             <h2>{mtrStationName(sta)}</h2>
             <span className="muted">{mtrStationEn(sta)}</span>
           </div>
-          <FavButton sta={sta} />
+          <FavButton sta={sta} line={line} />
           <button className="drawer-close" onClick={onClose} aria-label="關閉">
             <Icon name="close" size={20} />
           </button>
@@ -252,11 +252,12 @@ const MtrStationSheet = forwardRef<
 });
 export default MtrStationSheet;
 
-/** 收藏呢個站（收藏頁、首頁大卡「收藏」會出） */
-function FavButton({ sta }: { sta: string }) {
-  const [on, toggle] = useFavorite(mtrFavorite(sta));
+/** 收藏而家睇緊嗰條綫喺呢個站（同巴士「路線 + 站」一樣；收藏頁、首頁大卡「收藏」會出） */
+function FavButton({ sta, line }: { sta: string; line: string }) {
+  const [on, toggle] = useFavorite(mtrFavorite(sta, line));
+  const what = `${mtrStationName(sta)}站${mtrLine(line)?.zh ?? ''}`;
   return (
-    <button className={on ? 'drawer-close mtr-fav on' : 'drawer-close mtr-fav'} onClick={toggle} aria-pressed={on} aria-label={on ? `取消收藏${mtrStationName(sta)}站` : `收藏${mtrStationName(sta)}站`}>
+    <button className={on ? 'drawer-close mtr-fav on' : 'drawer-close mtr-fav'} onClick={toggle} aria-pressed={on} aria-label={on ? `取消收藏${what}` : `收藏${what}`} title={on ? `取消收藏${what}` : `收藏${what}`}>
       <Icon name={on ? 'star-fill' : 'star'} size={20} />
     </button>
   );

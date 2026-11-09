@@ -297,7 +297,10 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     15 分鐘內即刻顯示再背景靜靜雞更新（App 背景唔彈權限）；定位分兩步：先快（網頁 `enableHighAccuracy: false`、App `getLastKnownPositionAsync`），
     再準（GPS），同顯示緊／問緊嘅位置相差 40 米內就唔再問 `/api/nearby`。
   - 收藏（`lib/favorites.ts`，localStorage，try/catch）：路線頁標題列星號收藏路線（某方向），打開站撳「收藏呢個站」；
-    港鐵站喺路綫圖面板撳星號（`co: 'mtr'`、`stopId` = 站代號，`mtrFavorite`／`isMtrFav`；收藏頁 `MtrFavItem`、大卡 `MtrFavCard` 顯示每條綫每個方向下一班，撳入路綫圖）；
+    港鐵同巴士一樣係「綫 + 站」：路綫圖面板撳星號收藏**而家睇緊嗰條綫**喺呢個站（`mtrFavorite(sta, line)`：`co: 'mtr'`、`route` = 綫代號、`stopId` = 站代號；`isMtrFav`）；
+    0.18.0 收藏咗成個站嘅（`route` 空白）照用，顯示所有綫。收藏頁 `MtrFavItem`、大卡 `MtrFavCard` 顯示收藏咗嘅綫兩個方向下一班（`mtrDepartureRows` 嘅 `only`），撳入路綫圖；
+    **收藏頁按路線分組**（core `groupFavsByRoute`：巴士公司 + 路線號碼、港鐵綫一張卡，卡頂路線號碼同公司（撳入路線）或者綫色 + 綫名，
+    下面每行一個收藏咗嘅站：站名、往邊、下一班，或者「成條路線」；網頁 `FavRouteCard`、App `components/FavItem.tsx` 嘅 `FavRouteCard`）。首頁大卡「收藏」照舊一個站一張卡；
     收藏頁同首頁直接顯示收藏咗嘅站嘅下一班（`/api/eta`，同方向；App `components/FavItem.tsx`）。
   - **收藏分組**（core `fav-groups.ts`，`hknt.favGroups.v1`；網頁 `lib/fav-groups.ts`、App `src/lib/fav-groups.ts`）：例如「返工」「返屋企」，
     最多 8 組，每組可以設時段（`FAV_GROUP_WINDOWS`，深夜跨午夜）；收藏記 `group`（冇 = 未分組，刪組變返未分組，收藏唔刪）。

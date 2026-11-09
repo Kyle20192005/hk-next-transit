@@ -234,7 +234,7 @@ function FavPane({ favs, onAll, onMtr }: { favs: Favorite[]; onAll: () => void; 
         </>
       )}
       action={() => ({ label: '全部', onClick: onAll })}
-      card={(g, active) => (g.favs[0] && isMtrFav(g.favs[0]) ? <MtrFavCard sta={g.favs[0].stopId!} active={active} onMtr={onMtr} /> : <FavCard group={g} active={active} />)}
+      card={(g, active) => (g.favs[0] && isMtrFav(g.favs[0]) ? <MtrFavCard sta={g.favs[0].stopId!} only={g.favs.some((f) => !f.route) ? undefined : g.favs.map((f) => f.route)} active={active} onMtr={onMtr} /> : <FavCard group={g} active={active} />)}
     />
   );
 }
@@ -322,13 +322,13 @@ function FavCard({ group, active }: { group: FavGroup<Favorite>; active: boolean
   return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} empty="暫時冇班次" />;
 }
 
-/** 收藏咗嘅港鐵站：每條綫每個方向下一班 */
-function MtrFavCard({ sta, active, onMtr }: { sta: string; active: boolean; onMtr: (sta: string) => void }) {
+/** 收藏咗嘅港鐵站：收藏咗嘅綫（only；冇 = 所有綫）每個方向下一班 */
+function MtrFavCard({ sta, only, active, onMtr }: { sta: string; only?: string[]; active: boolean; onMtr: (sta: string) => void }) {
   const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
-  usePoll(active, `mtr-${sta}`, async () => {
+  usePoll(active, `mtr-${sta}-${only?.join(',') ?? ''}`, async () => {
     const res = await liveClient.mtr(sta);
     const body = (await res.json()) as { lines?: MtrLineEtas[] };
-    setState({ rows: res.ok ? mtrDepartureRows(sta, body.lines ?? [], ROWS) : [], now: Date.now() });
+    setState({ rows: res.ok ? mtrDepartureRows(sta, body.lines ?? [], ROWS, only) : [], now: Date.now() });
   });
   return <RowsCard rows={state?.rows ?? null} now={state?.now ?? 0} empty={sta === 'RAC' ? '只喺賽馬日開放' : '暫時冇班次'} onMtr={onMtr} />;
 }
