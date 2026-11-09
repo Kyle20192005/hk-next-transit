@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LINES, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
+import { MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LINES, MTR_MAP_LINKS, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
 import Icon from '../Icon';
 
 type View = { x: number; y: number; w: number };
@@ -22,8 +22,21 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
   const waterD = useMemo(() => MTR_MAP_WATER.map((w) => `${mtrRoundPathD(w, [], 0.3)} Z`).join(' '), []);
   // 綫：轉角圓弧（並排綫同心）
   const linePaths = useMemo(
-    () => MTR_MAP_LINES.flatMap((l) => l.paths.map((p, i) => ({ key: `${l.line}-${i}`, color: mtrLine(l.line)?.color, d: mtrLinePathD(p) }))),
+    () => MTR_MAP_LINES.flatMap((l) => l.paths.map((p, i) => ({ key: `${l.line}-${i}`, color: mtrLine(l.line)?.color, d: mtrLinePathD(p), dashed: l.dashed?.includes(i) ?? false }))),
     [],
+  );
+  // 香港 ↔ 中環：兩個站最近嗰兩個圈之間一條細黑綫
+  const links = useMemo(
+    () =>
+      MTR_MAP_LINKS.flatMap(([a, b]) => {
+        const sa = stations.find((s) => s.code === a);
+        const sb = stations.find((s) => s.code === b);
+        if (!sa || !sb) return [];
+        let best: [readonly number[], readonly number[]] = [sa.pts[0]!, sb.pts[0]!];
+        for (const p of sa.pts) for (const q of sb.pts) if (Math.hypot(p[0] - q[0], p[1] - q[1]) < Math.hypot(best[0][0]! - best[1][0]!, best[0][1]! - best[1][1]!)) best = [p, q];
+        return [{ key: `${a}-${b}`, p: best[0], q: best[1] }];
+      }),
+    [stations],
   );
 
   // 量容器大細；第一次以九龍為中心
@@ -132,13 +145,16 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
             </g>
           ))}
           {linePaths.map((l) => (
-            <path key={l.key} d={l.d} className="mtr-line" stroke={l.color} strokeWidth={MTR_MAP_GAP} />
+            <path key={l.key} d={l.d} className={l.dashed ? 'mtr-line dashed' : 'mtr-line'} stroke={l.color} strokeWidth={MTR_MAP_GAP} />
+          ))}
+          {links.map((k) => (
+            <line key={k.key} x1={k.p[0]} y1={k.p[1]} x2={k.q[0]} y2={k.q[1]} className="mtr-link" />
           ))}
           {stations.map((s) => {
             const lp = mtrLabelPos(s.box, s.label, 0.14 + s.labelGap);
             // 轉車站先有綫色短棒（分岔站雙圈但同一條綫，唔使）
             const inter = s.lines.length > 1;
-            // 「8」字方向（由第一點去最遠嗰點）：短棒沿住呢個方向
+            // 「8」字方向（由第一點去最遠嗰點）：短棒沿住呢個方向，每條長一個 G，相鄰兩條黐埋
             const far = s.pts.reduce((m, p) => (Math.hypot(p[0] - s.pts[0]![0], p[1] - s.pts[0]![1]) > Math.hypot(m[0] - s.pts[0]![0], m[1] - s.pts[0]![1]) ? p : m), s.pts[0]!);
             const len = Math.hypot(far[0] - s.pts[0]![0], far[1] - s.pts[0]![1]) || 1;
             const ux = ((far[0] - s.pts[0]![0]) / len) * (MTR_MAP_TICK.len / 2);
@@ -159,7 +175,7 @@ export default function MtrMap({ selected, onStation }: { selected: string | nul
                 ))}
                 {inter &&
                   s.pts.map((p, i) => (
-                    <line key={`t${i}`} x1={p[0] - ux} y1={p[1] - uy} x2={p[0] + ux} y2={p[1] + uy} stroke={mtrLine(s.lines[i]!)?.color} strokeWidth={MTR_MAP_TICK.width} strokeLinecap="round" />
+                    <line key={`t${i}`} x1={p[0] - ux} y1={p[1] - uy} x2={p[0] + ux} y2={p[1] + uy} stroke={mtrLine(s.lines[i]!)?.color} strokeWidth={MTR_MAP_TICK.width} />
                   ))}
                 <text x={lp.x} y={zhY} textAnchor={lp.anchor} className="mtr-zh">
                   {mtrStationName(s.code)}

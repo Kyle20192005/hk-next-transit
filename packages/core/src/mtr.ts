@@ -33,6 +33,8 @@ export const isMtrStation = (code: string): boolean => /^[A-Z]{3}$/.test(code) &
 
 /** 經過呢個站嘅綫（按 MTR_LINES 次序），例如金鐘 → 港島、荃灣、東鐵、南港島 */
 export function mtrStationLines(sta: string): string[] {
+  // 馬場唔喺站序（賽馬日先停），屬東鐵綫
+  if (sta === 'RAC') return ['EAL'];
   const set = new Set<string>();
   for (const [key, list] of Object.entries(MTR_LINE_STATIONS)) if (list.includes(sta)) set.add(key.split(':')[0]!);
   return MTR_LINES.map((l) => l.code).filter((c) => set.has(c));

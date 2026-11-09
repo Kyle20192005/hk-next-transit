@@ -797,6 +797,8 @@ button.variant.variant-current { background: var(--card); border-radius: var(--r
 .mtr-map:active { cursor: grabbing; }
 .mtr-map svg { display: block; width: 100%; height: 100%; }
 .mtr-line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.mtr-line.dashed { stroke-dasharray: 0.22 0.14; stroke-linecap: butt; }
+.mtr-link { stroke: #23262b; stroke-width: 0.05; }
 .mtr-hit { fill: transparent; }
 .mtr-sta { cursor: pointer; }
 .mtr-ring { fill: #23262b; }

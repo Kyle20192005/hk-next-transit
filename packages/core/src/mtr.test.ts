@@ -87,13 +87,13 @@ describe('mtr map geometry', () => {
       }
     }
   });
-  it('every turn is 45° or 90° and every segment has room for its bends', () => {
+  it('every turn is 45°, 90° or 135° (Disneyland) and every segment has room for its bends', () => {
     for (const l of MTR_MAP_LINES)
       for (const path of l.paths) {
         const t = path.map((_, i) => (i === 0 || i === path.length - 1 ? 0 : turn(path, i).t));
         for (let i = 1; i < path.length - 1; i++) {
           const { deg } = turn(path, i);
-          expect(Math.min(Math.abs(deg - 45), Math.abs(deg - 90)), `${l.line} corner ${path[i]}`).toBeLessThan(0.5);
+          expect(Math.min(Math.abs(deg - 45), Math.abs(deg - 90), Math.abs(deg - 135)), `${l.line} corner ${path[i]}`).toBeLessThan(0.5);
         }
         for (let i = 1; i < path.length; i++) expect(dist(path[i - 1]!, path[i]!), `${l.line} ${path[i - 1]}→${path[i]}`).toBeGreaterThanOrEqual(t[i - 1]! + t[i]! - 1e-6);
       }
@@ -108,12 +108,34 @@ describe('mtr map geometry', () => {
     expect(d.startsWith('M0 0')).toBe(true);
     expect(d.endsWith('L5 5')).toBe(true);
   });
-  it('branch stations (Sheung Shui, Tseung Kwan O) are double circles on one line', () => {
-    for (const code of ['SHS', 'TKO']) {
+  it('branch stations (Sheung Shui, Tseung Kwan O): main line top circle, branch starts at the bottom circle', () => {
+    for (const [code, branchEnd] of [
+      ['SHS', 'LMC'],
+      ['TKO', 'LHP'],
+    ] as const) {
       const s = mtrMapStations().find((x) => x.code === code)!;
       expect(s.pts.length, code).toBe(2);
       expect(s.lines.length, code).toBe(1);
+      // 支綫 path 由下面個圈出發，去支綫總站
+      const line = MTR_MAP_LINES.find((l) => l.line === s.lines[0])!;
+      const branch = line.paths.find((p) => p[0]![0] === s.pts[1]![0] && p[0]![1] === s.pts[1]![1])!;
+      expect(branch, code).toBeDefined();
+      const end = branch[branch.length - 1]!;
+      expect([end[0], end[1]]).toEqual([...line.stations[branchEnd]!]);
+      expect(s.pts[1]![1]).toBeGreaterThan(s.pts[0]![1]);
     }
+  });
+  it('Racecourse is on a dashed East Rail path; Hong Kong sits right above Central', () => {
+    const eal = MTR_MAP_LINES.find((l) => l.line === 'EAL')!;
+    expect(eal.dashed?.length).toBe(1);
+    const dashed = eal.paths[eal.dashed![0]!]!;
+    const rac = eal.stations.RAC!;
+    expect(dashed.some((p, i) => i > 0 && Math.abs(Math.hypot(rac[0] - p[0], rac[1] - p[1]) + Math.hypot(rac[0] - dashed[i - 1]![0], rac[1] - dashed[i - 1]![1]) - Math.hypot(p[0] - dashed[i - 1]![0], p[1] - dashed[i - 1]![1])) < 0.01)).toBe(true);
+    const st = mtrMapStations();
+    const hok = st.find((s) => s.code === 'HOK')!;
+    const cen = st.find((s) => s.code === 'CEN')!;
+    expect(hok.pts.every((p) => p[0] === cen.pts[0]![0])).toBe(true);
+    expect(Math.max(...hok.pts.map((p) => p[1]))).toBeLessThan(Math.min(...cen.pts.map((p) => p[1])));
   });
   it('interchange points line up horizontally, vertically or at 45°, circles touching (G apart)', () => {
     for (const s of mtrMapStations()) {

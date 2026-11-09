@@ -1,8 +1,9 @@
 // 由港鐵開放數據 mtr_lines_and_stations.csv 生成（opendata.mtr.com.hk），再人手執：「茘」統一做「荔」。
 // 重新生成：見 docs 或者 git log；站名、站序好少變。
 
-/** 站名（中、英） */
+/** 站名（中、英）；馬場（RAC）CSV 冇，人手加（東鐵綫，賽馬日先停） */
 export const MTR_STATION_NAMES: Record<string, readonly [zh: string, en: string]> = {
+  RAC: ["馬場", "Racecourse"],
   ADM: ["金鐘", "Admiralty"],
   AIR: ["機場", "Airport"],
   AUS: ["柯士甸", "Austin"],
