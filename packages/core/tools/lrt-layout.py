@@ -879,3 +879,52 @@ if '--svg' in sys.argv:
     o.append('</svg>')
     open(out_path, 'w').write('\n'.join(o))
     print(f'預覽：{out_path}', file=sys.stderr)
+
+# ---------------------------------------------------------------------------
+# 寫入 core（src/lrt-map.ts）：網頁 SVG、App Skia 共用
+if '--write' in sys.argv:
+    if errors: sys.exit('有錯，唔寫入')
+    def r3(v): return round(v, 3)
+    def js(v): return json.dumps(v, ensure_ascii=False, separators=(',', ':'))
+    under = [(r, pts) for r, pts, uv, _ in lanes if (frozenset(uv), r) not in over_keys] + cap_lanes
+    over = [(r, pts) for r, pts, uv, _ in lanes if (frozenset(uv), r) in over_keys]
+    lane_rows = [{'r': r, 'd': path_d(pts)} for r, pts in under] + [{'r': r, 'd': path_d(pts), 'o': 1} for r, pts in over]
+    st_rows = []
+    for s in STATIONS:
+        m, lb = markers[s], labels[s]
+        row = {'id': s, 'k': m['kind'], 'x': r3(m['x']), 'y': r3(m['y'])}
+        if m['kind'] == 'dot': row['r'] = r3(m['r'])
+        elif m['kind'] == 'pill': row.update({'len': r3(m['len']), 'th': r3(m['thick']), 'a': r3(m['angle'])})
+        else: row.update({'w': r3(m['w']), 'h': r3(m['h'])})
+        bx, by, bw, bh = marker_box(s)
+        for c in caps:
+            if c['sta'] != s: continue
+            x0, y0, w0, h0 = cap_box(c)
+            x1, y1 = max(bx + bw, x0 + w0), max(by + bh, y0 + h0)
+            bx, by = min(bx, x0), min(by, y0)
+            bw, bh = x1 - bx, y1 - by
+        row.update({'hit': [r3(bx), r3(by), r3(bw), r3(bh)], 'lx': r3(lb['x']), 'zy': r3(lb['zhY']), 'ey': r3(lb['enY']), 'an': lb['anchor']})
+        st_rows.append(row)
+    vx, vy, vw, vh = VIEW
+    out = [
+        '// 由 tools/lrt-layout.py --write 生成（輕鐵示意圖），唔好人手改。',
+        '/** 成幅圖範圍（地圖單位） */',
+        f'export const LRT_MAP_VIEW = {{ minX: {vx}, minY: {vy}, width: {vw}, height: {vh} }} as const;',
+        '/** 尺寸：色綫闊、色綫之間黑綫、外面黑邊、號碼膠囊、站名字款 */',
+        f'export const LRT_MAP_SIZE = {{ lane: {G}, sep: {SEP}, casing: {CASE}, capW: {CAP_W}, capH: {CAP_H}, ring: 0.045, zh: {ZH}, en: {EN} }} as const;',
+        '/** 色綫（SVG path d，轉角已經係圓弧）：o = 跨過其他綫，最後先畫，有自己黑邊 */',
+        'export interface LrtMapLane { r: string; d: string; o?: 1 }',
+        f'export const LRT_MAP_LANES: readonly LrtMapLane[] = {js(lane_rows)};',
+        '/** 單方向箭咀（白色 V 形，angle 度） */',
+        f'export const LRT_MAP_ARROWS: readonly {{ x: number; y: number; a: number }}[] = {js([{"x": r3(a["x"]), "y": r3(a["y"]), "a": a["angle"]} for a in arrows])};',
+        '/** 站：k = dot（圓點）／pill（膠囊，len 長、th 厚、a 角度）／box（盡頭站白色膠囊）；hit = 撳得嘅範圍（包埋號碼）；站名 lx、zy（中文 baseline）、ey（英文）、an（對齊） */',
+        'export interface LrtMapStation { id: string; k: "dot" | "pill" | "box"; x: number; y: number; r?: number; len?: number; th?: number; a?: number; w?: number; h?: number; hit: readonly [number, number, number, number]; lx: number; zy: number; ey: number; an: "start" | "middle" | "end" }',
+        f'export const LRT_MAP_STATIONS: readonly LrtMapStation[] = {js(st_rows)};',
+        '/** 終點站路線號碼（膠囊中心） */',
+        f'export const LRT_MAP_CAPS: readonly {{ r: string; x: number; y: number; sta: string }}[] = {js([{"r": c["route"], "x": c["x"], "y": c["y"], "sta": c["sta"]} for c in caps])};',
+        '/** 圖例 */',
+        f'export const LRT_MAP_LEGEND = {js({"x": lx, "y": ly, "w": lw, "h": lh, "cols": LEGEND_COLS, "rows": [list(r) for r in LEGEND_ROWS]})} as const;',
+        '',
+    ]
+    open(os.path.join(ROOT, 'src/lrt-map.ts'), 'w').write('\n'.join(out))
+    print('寫咗 src/lrt-map.ts', file=sys.stderr)

@@ -34,4 +34,5 @@ export * from './mtr-geo';
 export * from './lrt';
 export * from './lrt-data';
 export * from './lrt-geo';
+export * from './lrt-map';
 export * from './mtr-map';

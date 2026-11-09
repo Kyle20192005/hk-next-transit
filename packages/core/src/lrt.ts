@@ -1,4 +1,7 @@
+import { metresBetween } from './geo';
 import { LRT_ROUTE_STOPS, LRT_STOPS } from './lrt-data';
+import { LRT_STOP_LL } from './lrt-geo';
+import { hkClock, type Prefs } from './prefs';
 
 /**
  * 輕鐵：路線（顏色）、站、實時到站（data.gov.hk「輕鐵列車到站時間」API，rt.data.gov.hk，同巴士 API 同一個 host）。
@@ -127,4 +130,27 @@ export function searchLrtStops(query: string, limit = 8): string[] {
     .sort((a, b) => a.score - b.score || a.len - b.len || Number(a.id) - Number(b.id))
     .slice(0, limit)
     .map((h) => h.id);
+}
+
+/**
+ * 輕鐵班次顯示：「正在離開」「即將到站」，其他 N 分鐘（設定揀鐘數就顯示 HH:MM，由 now 起計）。
+ * API 冇時間（「-」）就顯示「—」。
+ */
+export function lrtTrainEta(t: Pick<LrtTrain, 'mins' | 'status'>, fmt: Prefs['etaFormat'], now = Date.now()): { main: string; unit: string; now: boolean } {
+  if (t.status === 'departing') return { main: '正在離開', unit: '', now: true };
+  if (t.status === 'arriving' || t.mins === 0) return { main: '即將到站', unit: '', now: true };
+  if (t.mins == null) return { main: '—', unit: '', now: false };
+  return fmt === 'clock' ? { main: hkClock(now + t.mins * 60_000), unit: '', now: false } : { main: String(t.mins), unit: '分鐘', now: false };
+}
+
+/** 單卡／孖卡 */
+export const lrtCars = (n: number): string => (n >= 2 ? '孖卡' : '單卡');
+
+/** 最近嘅輕鐵站（直線距離，米）：maxM 內最多 limit 個，近嘅排先 */
+export function nearestLrtStops(lat: number, lng: number, maxM = 2000, limit = 3): { sta: string; distance: number }[] {
+  return Object.entries(LRT_STOP_LL)
+    .map(([sta, ll]) => ({ sta, distance: Math.round(metresBetween([lat, lng], [ll[0], ll[1]])) }))
+    .filter((s) => s.distance <= maxM)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, limit);
 }

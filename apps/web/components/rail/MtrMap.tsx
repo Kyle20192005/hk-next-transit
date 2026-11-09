@@ -1,11 +1,11 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { MTR_LINES, MTR_MAP_DOT_R, MTR_MAP_GAP, MTR_MAP_LEGEND, MTR_MAP_LEGEND_SYMBOLS, MTR_MAP_LINES, MTR_MAP_LINKS, MTR_MAP_RING, MTR_MAP_TICK, MTR_MAP_REGIONS, MTR_MAP_VIEW, MTR_MAP_WATER, mtrLabelPos, mtrLine, mtrLinePathD, mtrMapStations, mtrRoundPathD, mtrStationEn, mtrStationName } from '@hknt/core';
 import Icon from '../Icon';
+import { useMapView, type MapFocus, type MapInset } from './useMapView';
 
-type View = { x: number; y: number; w: number };
-export type MtrFocus = { sta: string; zoom: boolean };
-export type MtrInset = { right: number; bottom: number };
+export type MtrFocus = MapFocus;
+export type MtrInset = MapInset;
 /** 一格幾多 px 先睇得清（開頁用）；縮放範圍（一格 px） */
 const START_PX = 34;
 const MIN_PX = 9;
@@ -13,7 +13,7 @@ const MAX_PX = 90;
 
 /**
  * 港鐵路綫圖（core mtr-map.ts 嘅自畫示意圖，站位置同海參考真實地理）：拖動、兩隻手指或者滑鼠轆縮放、撳站。
- * 用 viewBox 做平移縮放（SVG 本身唔郁），站名喺任何大細都清楚。
+ * 用 viewBox 做平移縮放（SVG 本身唔郁，useMapView），站名喺任何大細都清楚。
  */
 export default function MtrMap({
   selected,
@@ -31,9 +31,6 @@ export default function MtrMap({
   /** 附近嘅站（藍色光圈，同揀咗嘅站嘅橙色分開） */
   near?: string[];
 }) {
-  const box = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  const [view, setView] = useState<View | null>(null);
   const stations = useMemo(() => mtrMapStations(), []);
   // 海：所有環一條 path（evenodd：海入面嘅島係陸地）
   const waterD = useMemo(() => MTR_MAP_WATER.map((w) => `${mtrRoundPathD(w, [], 0.3)} Z`).join(' '), []);
@@ -56,158 +53,15 @@ export default function MtrMap({
     [stations],
   );
 
-  // 量容器大細；第一次以九龍為中心
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  useEffect(() => {
-    if (!size.w || view) return;
-    const w = Math.min(MTR_MAP_VIEW.width, size.w / START_PX);
-    const h = (w * size.h) / size.w;
-    setView({ x: 16.5 - w / 2, y: 13 - h / 2, w });
-  }, [size, view]);
-
-  const aspect = size.w ? size.h / size.w : 1;
-  const clamp = (v: View): View => {
-    const w = Math.min(size.w / MIN_PX, Math.max(size.w / MAX_PX, v.w));
-    const h = w * aspect;
-    const { minX, minY, width, height } = MTR_MAP_VIEW;
-    // 唔准拖到成幅圖離開畫面（留返一半）
-    const x = Math.min(minX + width - w / 2, Math.max(minX - w / 2, v.x));
-    const y = Math.min(minY + height - h / 2, Math.max(minY - h / 2, v.y));
-    return { x, y, w };
+  // 拖、縮放、飛去個站（同輕鐵路綫圖共用）；第一次以九龍為中心
+  const locate = (sta: string) => {
+    const s = stations.find((x) => x.code === sta);
+    return s ? { x: s.box.x + s.box.w / 2, y: s.box.y + s.box.h / 2 } : null;
   };
-  /** 以畫面上 (px, py) 為中心縮放 factor 倍（> 1 放大） */
-  const zoomAt = (v: View, factor: number, px: number, py: number): View => {
-    const w = v.w / factor;
-    const ux = v.x + (px / size.w) * v.w;
-    const uy = v.y + (py / size.w) * v.w;
-    return clamp({ x: ux - (px / size.w) * w, y: uy - (py / size.w) * w, w });
-  };
-
-  // ---------- 手勢 ----------
-  const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const gesture = useRef<{ moved: number; sta: string | null; pinch: number | null }>({ moved: 0, sta: null, pinch: null });
-  const local = (e: { clientX: number; clientY: number }) => {
-    const r = box.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  };
-  const onDown = (e: React.PointerEvent) => {
-    stopAnim();
-    box.current!.setPointerCapture(e.pointerId);
-    pointers.current.set(e.pointerId, local(e));
-    if (pointers.current.size === 1) gesture.current = { moved: 0, sta: (e.target as Element).closest('[data-sta]')?.getAttribute('data-sta') ?? null, pinch: null };
-  };
-  const onMove = (e: React.PointerEvent) => {
-    const prev = pointers.current.get(e.pointerId);
-    if (!prev || !view) return;
-    const p = local(e);
-    pointers.current.set(e.pointerId, p);
-    const pts = [...pointers.current.values()];
-    if (pts.length === 1) {
-      const dx = p.x - prev.x;
-      const dy = p.y - prev.y;
-      gesture.current.moved += Math.abs(dx) + Math.abs(dy);
-      const k = view.w / size.w;
-      setView(clamp({ ...view, x: view.x - dx * k, y: view.y - dy * k }));
-    } else if (pts.length === 2) {
-      const [a, b] = pts as [{ x: number; y: number }, { x: number; y: number }];
-      const d = Math.hypot(a.x - b.x, a.y - b.y);
-      const g = gesture.current;
-      g.moved += 100; // 兩隻手指唔當撳
-      if (g.pinch) setView(zoomAt(view, d / g.pinch, (a.x + b.x) / 2, (a.y + b.y) / 2));
-      g.pinch = d;
-    }
-  };
-  const onUp = (e: React.PointerEvent) => {
-    pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) gesture.current.pinch = null;
-    if (pointers.current.size === 0 && gesture.current.moved < 8 && gesture.current.sta) onStation(gesture.current.sta);
-  };
-  // 滑鼠轆：要 passive: false 先可以 preventDefault（唔好捲成頁）
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      stopAnim();
-      const p = local(e);
-      setView((v) => (v ? zoomAt(v, Math.exp(-e.deltaY * 0.0022), p.x, p.y) : v));
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  });
-
-  // ---------- 飛去某個站（搜尋、撳站之後面板遮住咗） ----------
-  const viewRef = useRef(view);
-  useEffect(() => {
-    viewRef.current = view;
-  });
-  const anim = useRef(0);
-  const stopAnim = () => cancelAnimationFrame(anim.current);
-  const handled = useRef<{ focus: MtrFocus; at: number } | null>(null);
-  useEffect(() => {
-    const v = viewRef.current;
-    if (!focus || !v || !size.w) return;
-    const s = stations.find((x) => x.code === focus.sta);
-    if (!s) return;
-    const cx = s.box.x + s.box.w / 2;
-    const cy = s.box.y + s.box.h / 2;
-    const visW = Math.max(80, size.w - inset.right);
-    const visH = Math.max(80, size.h - inset.bottom);
-    const first = handled.current?.focus !== focus;
-    // 面板高度變（載入完）：只喺啱啱揀站嗰 1.5 秒內跟住調整，之後用戶自己拖開咗就唔好扯返轉頭
-    if (!first && performance.now() - handled.current!.at > 1500) return;
-    if (first) handled.current = { focus, at: performance.now() };
-    // 搜尋：放大（最少開頁咁大）再置中
-    const center = focus.zoom;
-    const w = center ? Math.min(v.w, size.w / START_PX) : v.w;
-    if (!center) {
-      // 撳站：站仲喺睇得到嘅地方就唔郁
-      const k = size.w / v.w;
-      const sx = (cx - v.x) * k;
-      const sy = (cy - v.y) * k;
-      const m = 48;
-      if (sx > m && sx < visW - m && sy > m && sy < visH - m) return;
-    }
-    const k = w / size.w;
-    const target = clamp({ x: cx - (visW / 2) * k, y: cy - (visH / 2) * k, w });
-    // 動畫：插值「可見範圍中心」嘅世界座標同縮放（對數），站唔會飄
-    const from = v;
-    const fc = { x: from.x + (visW / 2) * (from.w / size.w), y: from.y + (visH / 2) * (from.w / size.w) };
-    const tc = { x: target.x + (visW / 2) * k, y: target.y + (visH / 2) * k };
-    const t0 = performance.now();
-    stopAnim();
-    const step = (t: number) => {
-      const p = Math.min(1, (t - t0) / 380);
-      const e = 1 - (1 - p) ** 3;
-      const ww = from.w * (target.w / from.w) ** e;
-      const c = { x: fc.x + (tc.x - fc.x) * e, y: fc.y + (tc.y - fc.y) * e };
-      setView({ x: c.x - (visW / 2) * (ww / size.w), y: c.y - (visH / 2) * (ww / size.w), w: ww });
-      if (p < 1) anim.current = requestAnimationFrame(step);
-    };
-    anim.current = requestAnimationFrame(step);
-    // clamp 每次 render 都係新 function，唔放入 deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focus, inset.right, inset.bottom, size.w, size.h, stations, view === null]);
-  useEffect(() => stopAnim, []);
-
-  const zoomBtn = (f: number) => {
-    stopAnim();
-    if (view) setView(zoomAt(view, f, (size.w - inset.right) / 2, (size.h - inset.bottom) / 2));
-  };
-  const fitAll = () => {
-    stopAnim();
-    const w = Math.max(MTR_MAP_VIEW.width, MTR_MAP_VIEW.height / aspect);
-    setView(clamp({ x: MTR_MAP_VIEW.minX + MTR_MAP_VIEW.width / 2 - w / 2, y: MTR_MAP_VIEW.minY + MTR_MAP_VIEW.height / 2 - (w * aspect) / 2, w }));
-  };
+  const { box, size, view, aspect, handlers, zoomBtn, fitAll } = useMapView({ bounds: MTR_MAP_VIEW, start: { x: 16.5, y: 13 }, startPx: START_PX, minPx: MIN_PX, maxPx: MAX_PX, focus, inset, locate, onStation });
 
   return (
-    <div className="mtr-map" ref={box} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+    <div className="mtr-map" ref={box} {...handlers}>
       {view && (
         <svg viewBox={`${view.x} ${view.y} ${view.w} ${view.w * aspect}`} role="img" aria-label="港鐵路綫圖">
           <path d={waterD} fillRule="evenodd" className="mtr-water" />

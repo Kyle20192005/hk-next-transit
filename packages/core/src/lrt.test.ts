@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { isLrtStop, lrtStopName, lrtStopRoutes, parseLrtSchedule, searchLrtStops } from './lrt';
-import { LRT_ROUTE_STOPS } from './lrt-data';
+import { isLrtStop, lrtRoute, lrtStopName, lrtStopRoutes, lrtTrainEta, nearestLrtStops, parseLrtSchedule, searchLrtStops } from './lrt';
+import { LRT_ROUTE_STOPS, LRT_STOPS } from './lrt-data';
+import { LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_STATIONS } from './lrt-map';
 
 describe('lrt', () => {
   it('has routes and stops from the CSV', () => {
@@ -28,5 +29,31 @@ describe('lrt', () => {
     expect(searchLrtStops('元朗')[0]).toBe('600');
     expect(lrtStopName(searchLrtStops('tin shui wai')[0]!)).toBe('天水圍');
     expect(searchLrtStops('zzz')).toEqual([]);
+  });
+});
+
+describe('lrtTrainEta', () => {
+  it('正在離開、即將到站、分鐘、鐘數、冇時間', () => {
+    expect(lrtTrainEta({ mins: 0, status: 'departing' }, 'minutes').main).toBe('正在離開');
+    expect(lrtTrainEta({ mins: 0, status: 'arriving' }, 'minutes').main).toBe('即將到站');
+    expect(lrtTrainEta({ mins: 6 }, 'minutes')).toEqual({ main: '6', unit: '分鐘', now: false });
+    expect(lrtTrainEta({ mins: 6 }, 'clock', Date.parse('2026-11-09T10:00:00+08:00')).main).toBe('10:06');
+    expect(lrtTrainEta({ mins: null }, 'minutes').main).toBe('—');
+  });
+});
+
+describe('LRT_MAP', () => {
+  it('每個站都有畫、號碼都係終點站嘅路線', () => {
+    expect(LRT_MAP_STATIONS.length).toBe(Object.keys(LRT_STOPS).length);
+    for (const c of LRT_MAP_CAPS) expect(lrtRoute(c.r)).toBeTruthy();
+    for (const l of LRT_MAP_LANES) expect(l.d.startsWith('M')).toBe(true);
+  });
+});
+
+describe('nearestLrtStops', () => {
+  it('元朗站附近搵到元朗輕鐵站', () => {
+    const n = nearestLrtStops(22.4455, 114.0346, 800, 3);
+    expect(n.length).toBeGreaterThan(0);
+    expect(n.map((x) => lrtStopName(x.sta))).toContain('元朗');
   });
 });
