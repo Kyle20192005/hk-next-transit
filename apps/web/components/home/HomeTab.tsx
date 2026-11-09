@@ -38,7 +38,7 @@ export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, p
   const railNear = state.kind === 'ok' ? nearestRailStation(state.mtr, state.lat, state.lng) : null;
   const mtrLineEl = railNear && (
     <button className="hero-line hero-mtr" onClick={() => onMtr(railNear.sta, railNear.kind === 'lrt')}>
-      <Icon name={railNear.kind === 'lrt' ? 'lrt' : 'train'} size={14} /> {railNear.kind === 'lrt' ? `最近輕鐵站：${lrtStopName(railNear.sta)}` : `最近港鐵站：${mtrStationName(railNear.sta)}`}
+      <Icon name={railNear.kind === 'lrt' ? 'lrt' : 'train'} size={12} /> {railNear.kind === 'lrt' ? `最近輕鐵站：${lrtStopName(railNear.sta)}` : `最近港鐵站：${mtrStationName(railNear.sta)}`}
       <span className="hero-mtr-dots" aria-hidden="true">
         {(railNear.kind === 'lrt' ? lrtStopRoutes(railNear.sta).slice(0, 5).map((r) => lrtRoute(r)?.color) : mtrStationLines(railNear.sta).map((l) => mtrLine(l)?.color)).map((c, i) => (
           <i key={i} style={{ background: c }} />
@@ -71,7 +71,7 @@ export default function HomeTab({ go, onEditTools, onMtr }: { go: (to: ToolId, p
             <>
               {prefs.priority === 'rail' && mtrLineEl}
               <span className="hero-line">
-                <Icon name="navigate" size={14} /> {head ? `最近巴士站：${head.name} · ${formatDistance(head.distance)}` : `${radiusLabel(prefs.nearbyRadius)}內冇巴士站`}
+                <Icon name="navigate" size={12} /> {head ? `最近巴士站：${head.name} · ${formatDistance(head.distance)}` : `${radiusLabel(prefs.nearbyRadius)}內冇巴士站`}
               </span>
               {prefs.priority !== 'rail' && mtrLineEl}
             </>

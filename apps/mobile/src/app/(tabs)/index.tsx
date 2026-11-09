@@ -16,6 +16,8 @@ import { usePrefs } from '@/lib/prefs';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 
 const RECENT_SHOWN = 5;
+/** 大字下面兩行（最近鐵路站、最近巴士站）字大細（2026-11 用戶要求細啲：14 → 12，同網頁 .hero-sub 一樣） */
+const SUB = 12;
 const NEWS_SHOWN = 3;
 
 /**
@@ -45,8 +47,8 @@ export default function HomeTab() {
   const railLrt = railNear?.kind === 'lrt';
   const mtrLineEl = railNear && (
     <Pressable onPress={() => (railLrt ? openLrt(railNear.sta) : openMtr(railNear.sta))} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-      <Icon name={railLrt ? 'lrt' : 'train'} size={14} color={t.onBrand} />
-      <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
+      <Icon name={railLrt ? 'lrt' : 'train'} size={12} color={t.onBrand} />
+      <Text numberOfLines={1} style={{ fontSize: SUB, fontWeight: '600', color: t.onBrand }}>
         {railLrt ? `最近輕鐵站：${lrtStopName(railNear.sta)}` : `最近港鐵站：${mtrStationName(railNear.sta)}`}
       </Text>
       <View style={{ flexDirection: 'row', gap: 2, marginLeft: 2 }}>
@@ -54,7 +56,7 @@ export default function HomeTab() {
           <View key={i} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)' }} />
         ))}
       </View>
-      <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>· {formatDistance(railNear.distance)}</Text>
+      <Text style={{ fontSize: SUB, fontWeight: '600', color: t.onBrand }}>· {formatDistance(railNear.distance)}</Text>
     </Pressable>
   );
   // 首頁 header（HomeHeader，一件嘢，會收縮；同網頁一樣）：浮喺捲動區上面，捲動內容頂留返 header 咁高
@@ -219,11 +221,11 @@ export default function HomeTab() {
         sub={
           state.kind === 'ok' ? (
             // 最近港鐵站（2 公里內，撳入路綫圖）同最近巴士站；設定「交通工具優先」揀港鐵就港鐵排先
-            <View style={{ alignItems: 'center', gap: 3, opacity: 0.75 }}>
+            <View style={{ alignItems: 'center', gap: 2, opacity: 0.75 }}>
               {prefs.priority === 'rail' && mtrLineEl}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Icon name="navigate" size={14} color={t.onBrand} />
-                <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '600', color: t.onBrand }}>
+                <Icon name="navigate" size={12} color={t.onBrand} />
+                <Text numberOfLines={1} style={{ fontSize: SUB, fontWeight: '600', color: t.onBrand }}>
                   {head ? `最近巴士站：${head.name} · ${formatDistance(head.distance)}` : `${radiusLabel(prefs.nearbyRadius)}內冇巴士站`}
                 </Text>
               </View>
@@ -231,7 +233,7 @@ export default function HomeTab() {
             </View>
           ) : (
             <Pressable onPress={state.kind === 'error' || state.kind === 'idle' ? () => void locate() : undefined}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: t.onBrand, opacity: 0.75, textDecorationLine: state.kind === 'error' || state.kind === 'idle' ? 'underline' : 'none' }}>
+              <Text style={{ fontSize: SUB, fontWeight: '600', color: t.onBrand, opacity: 0.75, textDecorationLine: state.kind === 'error' || state.kind === 'idle' ? 'underline' : 'none' }}>
                 {state.kind === 'error' ? `${state.message} · 再試` : state.kind === 'idle' ? '撳呢度定位，搵附近巴士站同港鐵站' : '搵緊你附近嘅巴士站同港鐵站'}
               </Text>
             </Pressable>

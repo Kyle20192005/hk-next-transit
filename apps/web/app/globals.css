@@ -355,7 +355,7 @@ button.nc-row { width: 100%; border: 0; background: none; font: inherit; text-al
 .hero-loc { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; text-align: center; }
 .hero-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 3rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.2; }
 .hero-en { margin-top: -4px; font-size: 1.25rem; font-weight: 800; letter-spacing: 0.01em; opacity: 0.85; }
-.hero-sub { margin-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 0.875rem; font-weight: 600; opacity: 0.75; }
+.hero-sub { margin-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.75rem; font-weight: 600; opacity: 0.75; }
 .hero-line { display: inline-flex; align-items: center; gap: 4px; }
 .hero-mtr { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; pointer-events: auto; }
 .hero-mtr-dots { display: inline-flex; gap: 2px; margin-left: 2px; }

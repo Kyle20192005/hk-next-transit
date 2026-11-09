@@ -318,7 +318,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   - **首頁**（網頁 `HomeTab.tsx`、App `(tabs)/index.tsx`，參考港鐵 App）由上至下：
     黃色區大字顯示**地區名**＋英文（似港鐵「青衣 Tsing Yi」；2026-11 用戶嫌唔夠大：網頁 `.hh-name` 3rem、App `NAME_SIZE` 48；`/api/nearby` 回傳 `area`，core `pickArea`：大區優先，
     quarter 權重 1.4、屋苑 3.5，村名只喺 1.2 公里內冇其他地區名先用；冇地區數據就用最近站頭名），
-    下面兩行：鐵路站一行（港鐵站同輕鐵站**邊個近出邊個，唔好兩個都出**，2026-11 用戶要求；core `nearestRailStation`：「最近港鐵站：X ●●」或者「最近輕鐵站：X ●●」· N 米，
+    下面兩行（細字 12px，2026-11 用戶要求）：鐵路站一行（港鐵站同輕鐵站**邊個近出邊個，唔好兩個都出**，2026-11 用戶要求；core `nearestRailStation`：「最近港鐵站：X ●●」或者「最近輕鐵站：X ●●」· N 米，
     2 公里內，港鐵用 `/api/nearby` 回傳嘅 `mtr`（core `nearestMtrStations`，唔計馬場），輕鐵前端計；綫色／路線色圓點；撳入路綫圖嗰個站）同「最近巴士站：X · N 米」。**頂部一行 + 大字 + 搜尋欄係同一個 component `HomeHeader`**（網頁 `components/home/HomeHeader.tsx`、
     App `src/components/HomeHeader.tsx`），浮喺捲動區上面（網頁放捲動區入面一個高度 0 嘅 sticky 外框，後面 spacer 留位；App 絕對定位 +
     `contentContainerStyle.paddingTop`）。捲上去時黃色底同捲動 1:1 收起（內容黐住佢底，唔會捲入佢下面、唔會留空白黃色），收到剩頂部一行；
