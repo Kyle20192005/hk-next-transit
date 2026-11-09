@@ -25,10 +25,12 @@ const loadFares = (from: string) => {
 const money = (n: number) => `$${n.toFixed(1)}`;
 /** 目的地選單：按中文名排 */
 const STOP_OPTIONS = Object.keys(LRT_STOPS).sort((a, b) => lrtStopName(a).localeCompare(lrtStopName(b), 'zh-HK'));
+/** 車費（揀目的地）：2026-11 用戶要求先隱藏；FareBox 同 /api/lrt/fare 保留（港鐵開放數據 light_rail_fares.csv） */
+const SHOW_FARES = false;
 
 /**
- * 輕鐵站面板（撳輕鐵路綫圖個站或者搜尋）：每個月台嘅班次（路線號碼、往邊、單／孖卡、幾分鐘），30 秒更新；
- * 下面揀目的地睇車費（八達通各種、單程票，港鐵開放數據）。手機貼底拉板、闊螢幕右邊面板（同港鐵面板共用）。
+ * 輕鐵站面板（撳輕鐵路綫圖個站或者搜尋）：每個月台嘅班次（路線號碼、往邊、單／孖卡、幾分鐘），30 秒更新。
+ * 車費（八達通各種、單程票）暫時隱藏（SHOW_FARES）。手機貼底拉板、闊螢幕右邊面板（同港鐵面板共用）。
  */
 const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => void; all: boolean; onAll: (all: boolean) => void; sheet: boolean }>(function LrtStationSheet(
   { sta, onClose, all, onAll, sheet },
@@ -113,7 +115,7 @@ const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => vo
               ))}
             </section>
           ))}
-        <FareBox sta={sta} />
+        {SHOW_FARES && <FareBox sta={sta} />}
       </div>
 
       <footer className="mtr-panel-foot">
