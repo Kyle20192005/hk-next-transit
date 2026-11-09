@@ -328,15 +328,19 @@ def main():
     for (rno, d), l in clists.items():
         cand_lists[(rno, d)] = [(d, s) for s in l]
     # 循環線：城巴 O 列表尾同 I 列表頭可以重疊（例如 78 嘅華貴邨至田灣商場兩邊都有）。
-    # 城巴到站時間將重疊段當 I，站序就接住 O 繼續數（78：華貴邨 I seq 11），
-    # 所以駁埋時重疊段用 I 嗰份；走法嘅 I 站預期 seq 要加 len(O) - 重疊數（見下面 expSeq）
+    # 城巴到站時間將重疊段當 I，站序就接住呢班車 O 段繼續數（78：華貴邨 I seq 11；95C 由利南道開：
+    # O 18 個站，置富徑 I seq 19），所以駁埋時重疊段用 I 嗰份；走法嘅 I 站預期 seq 接住 O 數（見下面 expSeq）。
+    # I 列表頭可以多咗一兩個其他走法嘅起點站先到重疊段（95C：I 頭係洛陽街，之後先係置富徑…），
+    # 呢啲站唔入 O+I（佢哋喺 O 段前面已經出過），而且重疊最少 2 個站先算，免得撞啱同一個站
     loop_overlap = {}
     for rno in {k[0] for k in clists}:
         if (rno, 'O') in clists and (rno, 'I') in clists:
             o, i_ = clists[(rno, 'O')], clists[(rno, 'I')]
-            k = max([k for k in range(1, min(len(o), len(i_))) if o[-k:] == i_[:k]] or [0])
+            k, j = max(((k, -j) for j in range(3) for k in range(1 if j == 0 else 2, min(len(o), len(i_) - j))
+                        if o[-k:] == i_[j:j + k]), default=(0, 0))
+            j = -j
             loop_overlap[rno] = k
-            cand_lists[(rno, 'O+I')] = cand_lists[(rno, 'O')][:len(o) - k] + cand_lists[(rno, 'I')]
+            cand_lists[(rno, 'O+I')] = cand_lists[(rno, 'O')][:len(o) - k] + cand_lists[(rno, 'I')][j if k else 0:]
 
     report, unmatched_routes = [], []
     variants_by_route = collections.defaultdict(list)
@@ -417,9 +421,12 @@ def main():
                         pos.setdefault(s, l.index(s))
                 if not pos: continue
                 lo, hi, n = min(pos.values()), max(pos.values()), 0
-                # 有重疊嘅循環線：I 段嘅 seq 接住 O 數落去
+                # 有重疊嘅循環線：O 段一路行到重疊段先轉 I，中間城巴獨有站都要計（50M：屯門站-C1出口）
+                if d == 'O' and 'I' in v['stopDirs'] and loop_overlap.get(rno) and 'I' in dirs:
+                    hi = max(hi, len(l) - loop_overlap[rno] - 1)
+                # 有重疊嘅循環線：I 段嘅 seq 接住呢個走法 O 段數落去（O 喺 dirs 先處理）
                 if d == 'I' and 'O' in v['stopDirs'] and loop_overlap.get(rno) and 'O' in dirs:
-                    n = len(dirs['O']) - loop_overlap[rno]
+                    n = max((x for key, x in v['expSeq'].items() if key.startswith('O:')), default=0)
                 mine = set(pos)
                 for s in l[lo:hi + 1]:
                     if s in mine or (d, s) in orphan:
