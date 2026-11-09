@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Pressable, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
-import { COMPANIES, filterNews, formatDistance, groupStopHeads, LRT_BRAND, lrtRoute, lrtStopName, lrtStopRoutes, mtrLine, mtrStationLines, mtrStationName, nearestRailStation, radiusLabel, toolById, type NewsFilter, type ToolId } from '@hknt/core';
+import { COMPANIES, filterNews, formatDistance, groupStopHeads, LRT_BRAND, lrtRoute, lrtStopName, lrtStopRoutes, mtrLine, mtrStationLines, mtrStationName, nearestRailStation, radiusLabel, toolById, TRAM_BRAND, tramStopTitle, type NewsFilter, type ToolId } from '@hknt/core';
 import { Icon } from '@/components/Icon';
 import { HomeHeader } from '@/components/HomeHeader';
 import { useNearbyStops } from '@/components/Nearby';
@@ -10,7 +10,7 @@ import { ToolTile } from '@/components/ToolTile';
 import { NewsChips, NewsList } from '@/components/NewsList';
 import { useNews, useTools } from '@/lib/news';
 import { warmRoute } from '@/lib/prefetch';
-import { openLrt, openMtr } from '@/lib/open-mtr';
+import { openLrt, openMtr, openTram } from '@/lib/open-mtr';
 import { useRecent } from '@/lib/recent';
 import { usePrefs } from '@/lib/prefs';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
@@ -143,12 +143,26 @@ export default function HomeTab() {
           )}
         </Section>
 
-        {/* 最近睇過：巴士路線、港鐵站同輕鐵站；未有記錄都出，話俾人知點樣先會記低 */}
+        {/* 最近睇過：巴士路線、港鐵站、輕鐵站同電車站；未有記錄都出，話俾人知點樣先會記低 */}
         <Section title="最近睇過">
           <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
-            {recent.length === 0 && <Text style={{ padding: 14, color: t.muted, lineHeight: 20 }}>未有記錄：打開巴士路線、港鐵站或者輕鐵站就會喺度見到，方便再開。</Text>}
+            {recent.length === 0 && <Text style={{ padding: 14, color: t.muted, lineHeight: 20 }}>未有記錄：打開巴士路線、港鐵站、輕鐵站或者電車站就會喺度見到，方便再開。</Text>}
             {recent.slice(0, RECENT_SHOWN).map((r, i) => {
               const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: t.line };
+              if (r.co === 'tram') {
+                // 東西行同一條街嘅站同名：tramStopTitle 分方向（例如「銀行街站（西行）」）
+                return (
+                  <Pressable key={`tram-${r.route}`} onPress={() => openTram(r.route)} accessibilityRole="link" style={row}>
+                    <View style={{ minWidth: 56, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignItems: 'center', backgroundColor: TRAM_BRAND.color }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: TRAM_BRAND.ink }}>{TRAM_BRAND.zh}</Text>
+                    </View>
+                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 16, fontWeight: '600', color: t.text }}>
+                      {tramStopTitle(r.route)}
+                    </Text>
+                    <Icon name="chevron-right" size={18} color={t.muted} />
+                  </Pressable>
+                );
+              }
               if (r.co === 'lrt')
                 return (
                   <Pressable key={`lrt-${r.route}`} onPress={() => openLrt(r.route)} accessibilityRole="link" style={row}>

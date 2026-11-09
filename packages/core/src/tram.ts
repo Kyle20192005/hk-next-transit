@@ -185,10 +185,31 @@ export function tramStopSchedule(tt: TramTimetable, calendar: Calendar, sta: str
   return out.sort((a, b) => (a.next[0] ?? Infinity) - (b.next[0] ?? Infinity) || tramStationName(a.dest).localeCompare(tramStationName(b.dest)));
 }
 
+/** 首頁「最近睇過」：打開電車站記低（co = 'tram'，route = 站 ID，dest = 站名；撳返開電車圖嗰個站） */
+export const tramRecent = (sta: string) => ({ co: 'tram' as const, route: sta, dir: 'O' as const, dest: tramStationName(sta), companies: [] });
+
+/** 卡／列表用嘅站名：東西行同名嘅站加方向，例如「銀行街（西行）」；總站、跑馬地環綫唔加 */
+export function tramStationLabel(id: string): string {
+  const s = BY_ID.get(id);
+  if (!s) return id;
+  return s.dir === 'W' || s.dir === 'E' ? `${s.zh}（${TRAM_DIR_ZH[s.dir]}）` : s.zh;
+}
+
+/**
+ * 電車站標題（首頁「最近睇過」、附近車站頁）：「站」字擺喺方向前面，例如「銀行街站（西行）」；
+ * 本身已經叫「…站」（金鐘港鐵站）唔再加；總站、跑馬地環綫冇方向（「筲箕灣站」）。
+ */
+export function tramStopTitle(sta: string): string {
+  const name = tramStationName(sta);
+  const label = tramStationLabel(sta);
+  const dir = label.startsWith(name) ? label.slice(name.length) : '';
+  return `${name}${name.endsWith('站') ? '' : '站'}${dir}`;
+}
+
 /** 路線名（例如「筲箕灣 ↔ 上環（西港城）」） */
 export const tramRouteName = (id: string): string => TRAM_ROUTES.find((r) => r.id === id)?.zh ?? id;
 
-/** 首頁卡／收藏：每個目的地下一班（實時有就用實時，冇就時間表，標「約」） */
+/** 附近車站頁：每個目的地下一班（實時有就用實時，冇就時間表，scheduled = 推算，介面標「約」）；電車冇首頁大卡同收藏（用戶決定） */
 export function tramDepartureRows(sta: string, live: readonly TramEta[] | null, sched: readonly TramStopDest[], limit = 4): DepartureRow[] {
   const badge = { text: TRAM_BRAND.zh, bg: TRAM_BRAND.color, ink: TRAM_BRAND.ink };
   const link = { co: 'tram', route: '', dir: 'O' as const, stop: sta };

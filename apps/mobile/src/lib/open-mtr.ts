@@ -12,3 +12,8 @@ export function openMtr(sta: string) {
 export function openLrt(sta: string) {
   router.navigate({ pathname: '/routes', params: { mode: 'rail', sta, lrt: '1', n: String(Date.now()) } });
 }
+
+/** 打開電車路綫圖嗰個站（最近睇過、附近車站）：去「路線」分頁揀電車（?mode=tram&sta=&n=） */
+export function openTram(sta: string) {
+  router.navigate({ pathname: '/routes', params: { mode: 'tram', sta, n: String(Date.now()) } });
+}

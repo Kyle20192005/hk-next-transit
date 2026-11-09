@@ -215,7 +215,7 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
 
 「路線」分頁 →「電車」（2026-11，用戶要求）：自己畫嘅電車路綫圖 + 站面板 + 搜尋。網頁 `components/rail/{TramView,TramMap,TramStationSheet,TramSearch}.tsx`，
 App `src/components/{TramView,TramMap,TramMapSkia,TramStationSheet}.tsx`（`(tabs)/routes.tsx` 揀電車，搜尋欄喺標題列；`?mode=tram&sta=&n=` 打開某個站）。
-網頁 Home 有 `openTram(sta)`（將來首頁卡、收藏用）。
+網頁 Home `openTram(sta)`、App `lib/open-mtr.ts` 嘅 `openTram`（`/routes?mode=tram&sta=&n=`）：由首頁「最近睇過」、附近車站頁打開電車站。
 
 - **數據**：站 = data.gov.hk「電車站」開放數據（`fetch.py` 嘅 `fetch_tram_stops`，行駛方向、站代號、站名中英）；路線、站序、班次 = 運輸署 GTFS（agency `TRAM`，6 條路線）。
   `pipeline/tram.py` 兩邊共用：GTFS 站名「英皇道(健康東街)(西行方向)」同方向內先用括號入面嘅街名、再用路名對站；跑馬地環綫冇方向，按喺跑馬地總站前（南行 S）後（北行 N）分；
@@ -242,7 +242,11 @@ App `src/components/{TramView,TramMap,TramMapSkia,TramStationSheet}.tsx`（`(tab
   撳站範圍：東行站向右、西行站向左（兩條軌只隔 0.2，唔好重疊）。附近 600 米內嘅站藍色虛綫圈（core `nearestTramStations`）。
 - **站面板**：站名、方向（西行往上環、堅尼地城方向等）、「對面（東行）」轉去對面方向最近嘅站（core `oppositeTramStation`，400 米內）、
   實時或者時間表、車費「成人 $3.3（全程同價，落車付款）· 樂悠咭（60–64 歲）$2」。core `searchTramStations`（同名東西行站都出、寫方向）。
-- 首頁卡、收藏、最近睇過、附近車站頁：未做（core `tramDepartureRows` 預備咗）。
+- **最近睇過、附近車站頁**（2026-11）：打開電車站記低（core `tramRecent`，`co: 'tram'`、`route` = 站 ID），首頁「最近睇過」寫 core `tramStopTitle`
+  （「銀行街站（西行）」，東西行同名站分得開），撳返開電車圖；附近車站頁同巴士站、港鐵站、輕鐵站按距離混埋排，範圍內最多 4 個電車站，
+  每個目的地下一班（core `tramDepartureRows`，時間表推算標「約」，下面寫明按運輸署時間表推算），撳入路綫圖。
+  App 分頁一直開住，由首頁再撳開同一個站都要重新記低（`openKey`，港鐵、輕鐵一樣）。
+- **電車唔做首頁大卡同收藏**（2026-11-09 用戶決定），唔好加返。
 
 ## 新大嶼山巴士（NLB）同港鐵巴士（MTRB）
 
@@ -403,8 +407,8 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
     揀最多 4 個，記喺 localStorage／AsyncStorage `hknt.tools`；圖示直接放白卡上（唔好再包淺色方塊），用雙色大圖示（`Icon duo`：線條實色 + 20% 同色填色）；交通消息工具有附近消息數目紅點）。「自訂」入「自訂常用工具」頁（參考港鐵 App：
     網頁 `ToolEditor.tsx`（Home 入面嘅 view）、App `src/app/tools.tsx`）：頂部黃色區揀咗嘅（紅「−」），下面分組全部工具（藍「+」），已揀嘅拖住左右移排位置（core `moveTool`／`dragShift`；網頁 pointer 事件，手指同滑鼠一樣，鍵盤左右箭嘴；App 用 PanResponder，橫向移動先算拖），撳「儲存」先生效；
     App 首頁同呢頁共用 `useTools` 嘅同一份狀態；**大卡**（下面加提示條：附近最新一條交通消息）；**交通消息**（全部／附近／港鐵，頭 3 條）；
-    最近睇過（`lib/recent.ts`，最多 8 條；巴士路線同港鐵站（`co: 'mtr'`、`route` = 站代號，core `mtrRecent`，路綫圖打開站就記低，撳返開路綫圖）；
-    未有記錄都出呢一節，寫「打開巴士路線或者港鐵站就會喺度見到」）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。
+    最近睇過（`lib/recent.ts`，最多 8 條；巴士路線、港鐵站（`co: 'mtr'`、`route` = 站代號，core `mtrRecent`，路綫圖打開站就記低，撳返開路綫圖）、輕鐵站（`lrtRecent`）同電車站（`tramRecent`）；
+    未有記錄都出呢一節，寫「打開巴士路線、港鐵站、輕鐵站或者電車站就會喺度見到」）。網頁 `.home-feed > *` 要 `flex-shrink: 0`，否則內容長咗大卡會俾壓扁。
     網頁闊螢幕：內容限 1100px 置中（設定頁 720px）；頂部欄由分頁列做（`.hh-bar` 收埋）；到站卡有左右箭嘴（只限有滑鼠）、圓點撳得；≥ 1024px 兩條獨立直欄（`.home-col-main` 大卡 + 最近睇過、`.home-col-side` 常用工具 + 交通消息），
     手機 `.home-col { display: contents }` 再用 `order` 排返「工具、大卡、消息、最近」。到站卡每張最闊 440px，闊螢幕一次見幾張。
   - **交通消息**（`/api/news`）：運輸署特別交通消息（`resource.data.one.gov.hk/td/tc/specialtrafficnews.xml`）+ 事故消息

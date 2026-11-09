@@ -1,12 +1,13 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { formatDistance, nearestTramStations, tramStationName } from '@hknt/core';
+import { formatDistance, nearestTramStations, tramRecent, tramStationName } from '@hknt/core';
 import TramMap from './TramMap';
 import TramStationSheet from './TramStationSheet';
 import type { MapFocus, MapInset } from './useMapView';
 import Icon from '../Icon';
 import { useNearbyStops } from '../home/Nearby';
 import { isNarrow, useNarrow } from './RailView';
+import { addRecent } from '@/lib/recent';
 
 /**
  * 「路線」分頁 → 電車：電車路綫圖（打直），撳站（或者喺標題列搜尋）睇班次。
@@ -44,6 +45,11 @@ export default function TramView({ pick }: { pick: { sta: string; n: number } | 
   }, [pick, open]);
   const onStation = useCallback((s: string) => open(s, false), [open]);
   const onClose = useCallback(() => setSta(null), []);
+
+  // 打開咗嘅電車站記入首頁「最近睇過」（同港鐵、輕鐵一樣）
+  useEffect(() => {
+    if (sta) addRecent(tramRecent(sta));
+  }, [sta]);
 
   useLayoutEffect(() => {
     const w = wrap.current;

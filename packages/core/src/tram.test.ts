@@ -5,6 +5,9 @@ import {
   parseTramEta,
   searchTramStations,
   tramDepartureRows,
+  tramRecent,
+  tramStationLabel,
+  tramStopTitle,
   tramStationByCode,
   tramStopSchedule,
   type TramTimetable,
@@ -61,6 +64,19 @@ describe('搜尋、附近、對面', () => {
   it('對面方向嘅站', () => {
     expect(oppositeTramStation('68W')).toBe('31E');
     expect(oppositeTramStation('HVT')).toBeNull();
+  });
+});
+
+describe('最近睇過、站名', () => {
+  it('tramRecent、tramStationLabel', () => {
+    expect(tramRecent('68W')).toMatchObject({ co: 'tram', route: '68W', dest: '銀行街' });
+    expect(tramStationLabel('68W')).toBe('銀行街（西行）');
+    expect(tramStationLabel('31E')).toBe('銀行街（東行）');
+    expect(tramStationLabel('HVT')).toBe('跑馬地');
+    expect(tramStationLabel('105')).toBe('富明街');
+    expect(tramStopTitle('68W')).toBe('銀行街站（西行）');
+    expect(tramStopTitle('64W')).toBe('金鐘港鐵站（西行）');
+    expect(tramStopTitle('SKT')).toBe('筲箕灣站');
   });
 });
 

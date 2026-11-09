@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { formatDistance, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrStationName, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, type DepartureRow, type NearbyCache, type NearMtr } from '@hknt/core';
+import { formatDistance, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrStationName, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, parseNearbyCache, tramDepartureRows, tramStopTitle, type DepartureRow, type NearbyCache, type NearMtr } from '@hknt/core';
 import { api, type NearStop } from '@/lib/api';
 import { radius, shadow, tabular, useTheme } from '@/lib/theme';
 import { warmRoute } from '@/lib/prefetch';
@@ -11,7 +11,7 @@ import { CompanyTag, ScheduledTag } from './ui';
 import { Icon } from './Icon';
 import { EtaInline } from './EtaInline';
 import { getPrefs, usePrefs } from '@/lib/prefs';
-import { openLrt, openMtr } from '@/lib/open-mtr';
+import { openLrt, openMtr, openTram } from '@/lib/open-mtr';
 
 const REFRESH_MS = 30_000;
 
@@ -109,9 +109,8 @@ export function useNearbyStops(auto = false) {
   return { state, locate: useCallback(() => void locate(false), [locate]) };
 }
 
-/** 一個附近嘅站：撳開顯示每條線下一班（同網頁 components/home/Nearby.tsx 一樣） */
-/** 附近嘅港鐵站／輕鐵站（同網頁 NearbyRail 一樣）：每條綫（路線）每個方向下一班，撳入路綫圖嗰個站 */
-export function NearbyRail({ kind, sta, distance, autoLoad }: { kind: 'mtr' | 'lrt'; sta: string; distance: number; autoLoad: boolean }) {
+/** 附近嘅港鐵站／輕鐵站／電車站（同網頁 NearbyRail 一樣）：每條綫（路線）每個方向（電車：每個目的地）下一班，撳入路綫圖嗰個站 */
+export function NearbyRail({ kind, sta, distance, autoLoad }: { kind: 'mtr' | 'lrt' | 'tram'; sta: string; distance: number; autoLoad: boolean }) {
   const t = useTheme();
   const { etaFormat } = usePrefs();
   const [open, setOpen] = useState(autoLoad);
@@ -123,7 +122,12 @@ export function NearbyRail({ kind, sta, distance, autoLoad }: { kind: 'mtr' | 'l
     const tick = async () => {
       try {
         const now = Date.now();
-        const rows = lrt ? lrtDepartureRows(sta, (await api.lrt(sta)).platforms, now, 8) : mtrDepartureRows(sta, (await api.mtr(sta)).lines, 8);
+        let rows: DepartureRow[];
+        if (kind === 'tram') {
+          // 電車冇官方實時：realtime 多數係 null，用運輸署時間表推算（rows 標 scheduled）
+          const body = await api.tram(sta);
+          rows = tramDepartureRows(sta, body.realtime, body.schedule, 8);
+        } else rows = lrt ? lrtDepartureRows(sta, (await api.lrt(sta)).platforms, now, 8) : mtrDepartureRows(sta, (await api.mtr(sta)).lines, 8);
         if (!cancelled) setState({ rows, now });
       } catch {
         /* 下次再試 */
@@ -135,13 +139,14 @@ export function NearbyRail({ kind, sta, distance, autoLoad }: { kind: 'mtr' | 'l
       cancelled = true;
       clearInterval(id);
     };
-  }, [open, sta, lrt]);
-  const go = () => (lrt ? openLrt(sta) : openMtr(sta));
+  }, [open, sta, lrt, kind]);
+  const go = () => (kind === 'tram' ? openTram(sta) : lrt ? openLrt(sta) : openMtr(sta));
+  const title = kind === 'tram' ? `電車${tramStopTitle(sta)}` : `${lrt ? '輕鐵' : '港鐵'}${lrt ? lrtStopName(sta) : mtrStationName(sta)}站`;
   return (
     <View style={{ backgroundColor: t.card, borderRadius: radius.l, overflow: 'hidden', ...shadow }}>
       <Pressable onPress={() => setOpen((o) => !o)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingLeft: 16, paddingRight: 14 }}>
-        <Icon name={lrt ? 'lrt' : 'train'} size={18} color={t.accent} />
-        <Text style={{ flex: 1, fontWeight: '700', fontSize: 16, color: t.text }}>{`${lrt ? '輕鐵' : '港鐵'}${lrt ? lrtStopName(sta) : mtrStationName(sta)}站`}</Text>
+        <Icon name={kind === 'tram' ? 'tram' : lrt ? 'lrt' : 'train'} size={18} color={t.accent} />
+        <Text style={{ flex: 1, fontWeight: '700', fontSize: 16, color: t.text }}>{title}</Text>
         <Text style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: 'hidden', backgroundColor: t.surface2, color: t.muted, fontSize: 12, fontWeight: '700', ...tabular }}>
           {formatDistance(distance)}
         </Text>
@@ -166,9 +171,13 @@ export function NearbyRail({ kind, sta, distance, autoLoad }: { kind: 'mtr' | 'l
                   <Text style={{ fontSize: 12, fontWeight: '800', color: r.badge.ink }}>{r.platform}</Text>
                 </View>
               ) : null}
+              {r.scheduled && (kind === 'tram' ? <EstimateTag /> : <ScheduledTag />)}
               <Text style={{ minWidth: 64, textAlign: 'right', fontSize: r.nowText ? 14 : 16, fontWeight: '800', color: t.text, ...tabular }}>{r.nowText ?? minutesLabel(r.at, state.now, etaFormat)}</Text>
             </Pressable>
           ))}
+          {kind === 'tram' && state?.rows.some((r) => r.scheduled) && (
+            <Text style={{ paddingTop: 8, paddingHorizontal: 16, fontSize: 12, color: t.muted }}>電車冇實時到站資料，以上按運輸署時間表推算</Text>
+          )}
           <Pressable onPress={go} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 10 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: t.accent }}>喺路綫圖打開</Text>
             <Icon name="chevron-right" size={16} color={t.accent} />
@@ -179,6 +188,15 @@ export function NearbyRail({ kind, sta, distance, autoLoad }: { kind: 'mtr' | 'l
   );
 }
 
+/** 電車班次標「約」（冇實時，按運輸署時間表推算；同網頁一樣，樣式同 ScheduledTag） */
+function EstimateTag() {
+  const t = useTheme();
+  return (
+    <Text style={{ fontSize: 11, fontWeight: '700', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, overflow: 'hidden', backgroundColor: t.surface2, color: t.muted }}>約</Text>
+  );
+}
+
+/** 一個附近嘅站：撳開顯示每條線下一班（同網頁 components/home/Nearby.tsx 一樣） */
 export function NearbyStop({ stop, autoLoad }: { stop: NearStop; autoLoad: boolean }) {
   const t = useTheme();
   const [open, setOpen] = useState(autoLoad);

@@ -147,10 +147,10 @@ export function RailView({ query, onPicked, open }: { query: string; onPicked: (
     jump(h.lrt ? 'lrt' : 'mtr', h.sta);
   };
   const close = useCallback(() => setSta(null), []);
-  // 打開咗嘅港鐵站、輕鐵站記入首頁「最近睇過」
+  // 打開咗嘅港鐵站、輕鐵站記入首頁「最近睇過」；分頁一直開住，由首頁再撳開同一個站都要排返第一（openKey 變）
   useEffect(() => {
     if (sta) addRecent(kind === 'lrt' ? lrtRecent(sta) : mtrRecent(sta));
-  }, [sta, kind]);
+  }, [sta, kind, openKey]);
 
   const onPanelLayout = (e: LayoutChangeEvent) => {
     const { x, y } = e.nativeEvent.layout;

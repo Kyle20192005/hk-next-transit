@@ -4,7 +4,7 @@ import Link from 'next/link';
 import CompanyTag from '@/components/CompanyTag';
 import type { Co } from '@/lib/data';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { formatDistance, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrStationName, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, nearestLrtStops, parseNearbyCache, radiusLabel, type Company, type DepartureRow, type LrtPlatform, type MtrLineEtas, type NearbyCache, type NearMtr } from '@hknt/core';
+import { formatDistance, lrtDepartureRows, lrtStopName, minutesLabel, mtrDepartureRows, mtrStationName, NEARBY_CACHE_KEY, nearbyCacheUse, nearbyMoved, nearestLrtStops, nearestTramStations, parseNearbyCache, radiusLabel, tramDepartureRows, tramStopTitle, type Company, type DepartureRow, type LrtPlatform, type MtrLineEtas, type NearbyCache, type NearMtr, type TramEta, type TramStopDest } from '@hknt/core';
 import Icon from '@/components/Icon';
 import { warmRoute } from '@/lib/prefetch';
 import EtaInline from '@/components/EtaInline';
@@ -134,11 +134,11 @@ export function useNearbyStops(auto = false) {
   return { state, locate: useCallback(() => locate(false), [locate]) };
 }
 
-/** 附近車站（由首頁或者巴士路線頁撳入嚟，唔係分頁）：定位搵附近（設定範圍）嘅站，顯示每條路線下一班車 */
-/** 附近車站頁一項：巴士站，或者範圍內嘅港鐵站、輕鐵站（按距離混埋排） */
-type NearItem = { kind: 'bus'; stop: NearStop; distance: number } | { kind: 'mtr' | 'lrt'; sta: string; distance: number };
+/** 附近車站頁一項：巴士站，或者範圍內嘅港鐵站、輕鐵站、電車站（按距離混埋排） */
+type NearItem = { kind: 'bus'; stop: NearStop; distance: number } | { kind: 'mtr' | 'lrt' | 'tram'; sta: string; distance: number };
 
-export default function Nearby({ onBack, onRail }: { onBack: () => void; onRail: (sta: string, lrt?: boolean) => void }) {
+/** 附近車站（由首頁或者巴士路線頁撳入嚟，唔係分頁）：定位搵附近（設定範圍）嘅站，顯示每條路線下一班車 */
+export default function Nearby({ onBack, onRail, onTram }: { onBack: () => void; onRail: (sta: string, lrt?: boolean) => void; onTram: (sta: string) => void }) {
   const { state, locate } = useNearbyStops(true);
   const { nearbyRadius: radius } = usePrefs();
   const items: NearItem[] =
@@ -147,6 +147,7 @@ export default function Nearby({ onBack, onRail }: { onBack: () => void; onRail:
           ...state.stops.map((s) => ({ kind: 'bus' as const, stop: s, distance: s.distance })),
           ...state.mtr.filter((m) => m.distance <= radius).map((m) => ({ kind: 'mtr' as const, sta: m.sta, distance: m.distance })),
           ...nearestLrtStops(state.lat, state.lng, radius, 6).map((m) => ({ kind: 'lrt' as const, sta: m.sta, distance: m.distance })),
+          ...nearestTramStations(state.lat, state.lng, radius, 4).map((m) => ({ kind: 'tram' as const, sta: m.sta, distance: m.distance })),
         ].sort((a, b) => a.distance - b.distance)
       : [];
 
@@ -175,7 +176,7 @@ export default function Nearby({ onBack, onRail }: { onBack: () => void; onRail:
           <span className="empty-icon">
             <Icon name="pin" size={32} />
           </span>
-          <p>搵你附近 {radiusLabel(radius)}內嘅巴士站、港鐵站同輕鐵站，同埋每條路線下一班車。</p>
+          <p>搵你附近 {radiusLabel(radius)}內嘅巴士站、港鐵站、輕鐵站同電車站，同埋每條路線下一班車。</p>
           {state.kind === 'error' && <p className="error">{state.message}</p>}
           <button className="primary-btn" onClick={locate} disabled={state.kind === 'locating'}>
             <Icon name="locate" size={20} />
@@ -195,7 +196,14 @@ export default function Nearby({ onBack, onRail }: { onBack: () => void; onRail:
             it.kind === 'bus' ? (
               <NearbyStop key={`${it.stop.co}-${it.stop.id}`} stop={it.stop} autoLoad={i < AUTO_LOAD} />
             ) : (
-              <NearbyRail key={`${it.kind}-${it.sta}`} kind={it.kind} sta={it.sta} distance={it.distance} autoLoad={i < AUTO_LOAD} onRail={onRail} />
+              <NearbyRail
+                key={`${it.kind}-${it.sta}`}
+                kind={it.kind}
+                sta={it.sta}
+                distance={it.distance}
+                autoLoad={i < AUTO_LOAD}
+                onOpen={it.kind === 'tram' ? () => onTram(it.sta) : () => onRail(it.sta, it.kind === 'lrt')}
+              />
             ),
           )}
         </ul>
@@ -204,22 +212,29 @@ export default function Nearby({ onBack, onRail }: { onBack: () => void; onRail:
   );
 }
 
-/** 附近嘅港鐵站／輕鐵站：每條綫（路線）每個方向下一班，撳一行或者「開路綫圖」入路綫圖嗰個站 */
-function NearbyRail({ kind, sta, distance, autoLoad, onRail }: { kind: 'mtr' | 'lrt'; sta: string; distance: number; autoLoad: boolean; onRail: (sta: string, lrt?: boolean) => void }) {
+/**
+ * 附近嘅港鐵站／輕鐵站／電車站：每條綫（路線）每個方向（電車：每個目的地）下一班，撳一行或者「喺路綫圖打開」入路綫圖嗰個站。
+ * 電車冇實時，時間按運輸署時間表推算（DepartureRow.scheduled）：每班標「約」，下面寫明。
+ */
+function NearbyRail({ kind, sta, distance, autoLoad, onOpen }: { kind: 'mtr' | 'lrt' | 'tram'; sta: string; distance: number; autoLoad: boolean; onOpen: () => void }) {
   const { etaFormat } = usePrefs();
   const [open, setOpen] = useState(autoLoad);
   const [state, setState] = useState<{ rows: DepartureRow[]; now: number } | null>(null);
-  const lrt = kind === 'lrt';
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     const tick = async () => {
       try {
         const now = Date.now();
-        if (lrt) {
+        if (kind === 'lrt') {
           const res = await liveClient.lrt(sta);
           const body = (await res.json()) as { platforms?: LrtPlatform[] };
           if (!cancelled) setState({ rows: res.ok ? lrtDepartureRows(sta, body.platforms ?? [], now, 8) : [], now });
+        } else if (kind === 'tram') {
+          // 電車唔經 tracker（冇營辦商實時數據），直接問 Vercel
+          const res = await fetch(`/api/tram?sta=${encodeURIComponent(sta)}`);
+          const body = (await res.json()) as { realtime?: TramEta[] | null; schedule?: TramStopDest[] };
+          if (!cancelled) setState({ rows: res.ok ? tramDepartureRows(sta, body.realtime ?? null, body.schedule ?? [], 8) : [], now });
         } else {
           const res = await liveClient.mtr(sta);
           const body = (await res.json()) as { lines?: MtrLineEtas[] };
@@ -235,13 +250,14 @@ function NearbyRail({ kind, sta, distance, autoLoad, onRail }: { kind: 'mtr' | '
       cancelled = true;
       clearInterval(t);
     };
-  }, [open, sta, lrt]);
-  const name = `${lrt ? '輕鐵' : '港鐵'}${lrt ? lrtStopName(sta) : mtrStationName(sta)}站`;
+  }, [open, sta, kind]);
+  const name = kind === 'tram' ? `電車${tramStopTitle(sta)}` : kind === 'lrt' ? `輕鐵${lrtStopName(sta)}站` : `港鐵${mtrStationName(sta)}站`;
+  const estimated = !!state?.rows.some((r) => r.scheduled);
   return (
     <li className="nearby-stop card">
       <button className="nearby-stop-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <span className="nearby-stop-name">
-          <Icon name={lrt ? 'lrt' : 'train'} size={18} />
+          <Icon name={kind === 'tram' ? 'tram' : kind === 'lrt' ? 'lrt' : 'train'} size={18} />
           {name}
         </span>
         <span className="distance-chip">{formatDistance(distance)}</span>
@@ -252,7 +268,7 @@ function NearbyRail({ kind, sta, distance, autoLoad, onRail }: { kind: 'mtr' | '
           {state === null && <p className="muted nearby-rail-note">…</p>}
           {state?.rows.length === 0 && <p className="muted nearby-rail-note">暫時冇班次</p>}
           {state?.rows.map((r) => (
-            <button key={r.key} className="nearby-rail-row" onClick={() => onRail(sta, lrt)}>
+            <button key={r.key} className="nearby-rail-row" onClick={onOpen}>
               <span className="nc-badge" style={{ background: r.badge.bg, color: r.badge.ink }}>
                 {r.badge.text}
               </span>
@@ -262,10 +278,14 @@ function NearbyRail({ kind, sta, distance, autoLoad, onRail }: { kind: 'mtr' | '
                   {r.platform}
                 </span>
               )}
-              <span className={r.nowText ? 'nc-min nc-now' : 'nc-min'}>{r.nowText ?? minutesLabel(r.at, state.now, etaFormat)}</span>
+              <span className={r.nowText ? 'nc-min nc-now' : 'nc-min'}>
+                {r.scheduled && <span className="scheduled">{kind === 'tram' ? '約' : '原定'}</span>}
+                {r.nowText ?? minutesLabel(r.at, state.now, etaFormat)}
+              </span>
             </button>
           ))}
-          <button className="nearby-rail-open" onClick={() => onRail(sta, lrt)}>
+          {estimated && kind === 'tram' && <p className="muted nearby-rail-note">電車冇實時到站資料，以上按運輸署時間表推算</p>}
+          <button className="nearby-rail-open" onClick={onOpen}>
             喺路綫圖打開
             <Icon name="chevron-right" size={16} />
           </button>

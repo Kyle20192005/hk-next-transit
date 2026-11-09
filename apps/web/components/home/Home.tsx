@@ -66,7 +66,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
   const favCount = useFavorites().length;
   // 港鐵站（首頁大卡、收藏、路綫圖搜尋）：入「路線」分頁揀港鐵，飛去嗰個站並打開到站時間
   const [railPick, setRailPick] = useState<RailPick | null>(null);
-  // 電車站（首頁、收藏、附近、搜尋）：入「路線」分頁揀電車，飛去嗰個站並打開班次（n 每次唔同，同一個站都會再飛）
+  // 電車站（首頁「最近睇過」、附近車站頁、搜尋；電車冇首頁大卡同收藏）：入「路線」分頁揀電車，飛去嗰個站並打開班次（n 每次唔同，同一個站都會再飛）
   const [tramPick, setTramPick] = useState<{ sta: string; n: number } | null>(null);
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
     <main className={`home tab-${view ? view.kind : tab}`}>
       <div className="home-body">
         {view?.kind === 'nearby' ? (
-          <Nearby onBack={() => setView(null)} onRail={openMtr} />
+          <Nearby onBack={() => setView(null)} onRail={openMtr} onTram={openTram} />
         ) : view?.kind === 'news' ? (
           <News pos={view.pos} onBack={() => setView(null)} />
         ) : view?.kind === 'tools' ? (
@@ -118,6 +118,7 @@ export default function Home({ routes, updated }: { routes: RouteIndex['routes']
               <HomeTab
                 onEditTools={() => setView({ kind: 'tools' })}
                 onMtr={openMtr}
+                onTram={openTram}
                 go={(to: ToolId, pos) => {
                   const m = toolById(to).mode;
                   if (m) {

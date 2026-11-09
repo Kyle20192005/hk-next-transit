@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
-import { formatDistance, nearestTramStations, searchTramStations, TRAM_BRAND, TRAM_DIR_ZH, tramStation, tramStationName } from '@hknt/core';
+import { formatDistance, nearestTramStations, searchTramStations, TRAM_BRAND, TRAM_DIR_ZH, tramRecent, tramStation, tramStationName } from '@hknt/core';
 import { Icon } from './Icon';
 import { useNearbyStops } from './Nearby';
 import { radius, shadow, shadowLg, useTheme } from '@/lib/theme';
+import { addRecent } from '@/lib/recent';
 import { TramMap } from './TramMap';
 import { TramStationSheet } from './TramStationSheet';
 import type { MapFocus, MapInset } from './SchematicMap';
@@ -42,7 +43,7 @@ export function TramView({ query, onPicked, open }: { query: string; onPicked: (
     },
     [wide],
   );
-  // 由首頁、收藏撳入嚟（?mode=tram&sta=&n=）：飛去（放大置中）再打開
+  // 由首頁最近睇過、附近車站撳入嚟（?mode=tram&sta=&n=，openTram）：飛去（放大置中）再打開
   const openKey = open ? `${open.sta}:${open.n}` : null;
   const [seenOpen, setSeenOpen] = useState<string | null>(null);
   if (openKey !== seenOpen) {
@@ -54,6 +55,10 @@ export function TramView({ query, onPicked, open }: { query: string; onPicked: (
       if (!wide) setAll(false);
     }
   }
+  // 打開咗嘅電車站記入首頁「最近睇過」（同 RailView 一樣）；分頁一直開住，由最近睇過再撳開同一個站都要排返第一（openKey 變）
+  useEffect(() => {
+    if (sta) addRecent(tramRecent(sta));
+  }, [sta, openKey]);
   const onStation = useCallback((s: string) => openSta(s, false), [openSta]);
   const close = useCallback(() => setSta(null), []);
   const onPanelLayout = (e: LayoutChangeEvent) => {
