@@ -136,6 +136,10 @@ body:has(.home), body:has(.route-page) { height: 100dvh; overflow: hidden; displ
 /* ================= 首頁 ================= */
 .home { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; }
 /* 內容區底色（body 係品牌黃，見上面）；viewport-fit=cover（PWA）：橫放手機唔好俾瀏海遮住（直放係 0） */
+/* iOS 26 主畫面 App（同 Safari 26）：狀態列喺頂部中間撞到全闊 fixed／sticky 元素先畫實色，冇就畫模糊漸變（2026-11 除咗首頁都係）。
+   首頁有 .hh-sticky 所以冇事；其他頁靠呢條：6px 高（≤ 10px 會取佢 4–6px 嘅顏色），所有頁頂黃色區最少 8px padding，唔會遮到嘢；
+   z-index 低過彈出面板嘅背景（60），面板打開時狀態列跟住變暗 */
+.status-tint { position: fixed; z-index: 50; top: 0; left: 0; right: 0; height: 6px; background: var(--brand); } /* 唔加 pointer-events: none：只遮 6px 空白黃色，穩陣啲俾 Safari 撞到 */
 .home, .route-page { background: var(--bg); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); box-sizing: border-box; }
 .home-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 

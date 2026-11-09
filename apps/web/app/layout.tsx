@@ -27,6 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: PWA_SCRIPT }} />
       </head>
       <body>
+        {/* iOS 26 主畫面 App：頂部要有全闊 fixed 元素，狀態列先係實色（冇就會有模糊漸變），見 globals.css .status-tint */}
+        <div className="status-tint" aria-hidden="true" />
         <OfflineBanner />
         <PwaSetup />
         {children}

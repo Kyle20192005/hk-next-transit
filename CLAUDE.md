@@ -249,6 +249,9 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
   **iOS 26 主畫面 App（同 Safari 26）唔睇 `theme-color`**：狀態列顏色由頁面決定：頂部中間有全闊（≥ 90%）`fixed`／`sticky` 元素就用佢底色，
   冇就用 **body 底色**（2026-11 用戶截圖：路線分頁狀態列灰色 = 以前嘅 `--bg`）。所以 `html, body` 底色係品牌黃 `--brand`，
   內容區 `.home`、`.route-page` 自己用 `--bg`（新頁面根元素都要加，否則成頁變黃）。`theme-color` 照留俾 Chrome／Android。
+  冇撞到 fixed／sticky 元素嗰陣狀態列仲會畫**模糊漸變**（用戶：除咗首頁都有 blur；首頁有 `.hh-sticky` 所以冇），所以 layout 有一條
+  `.status-tint`：`position: fixed`、全闊、6px 高、品牌黃（≤ 10px 嘅元素 Safari 取佢 4–6px 嘅顏色；所有頁頂黃色區最少 8px padding，唔會遮到嘢），
+  z-index 50（低過彈出面板背景 60，面板打開時跟住變暗）。Safari 撞嘅時候唔理 `pointer-events`，但係都唔好加 none，穩陣啲。
   狀態列樣式（default／black-translucent）iOS 只喺加至主畫面嗰陣讀，改咗要刪咗再加；black-translucent 喺 iOS 26 有 viewport 矮咗一條狀態列嘅 bug（WebKit 301108），唔好用。
 - `public/sw.js`（`lib/pwa.ts` 嘅 `startPwa` 只喺正式版註冊，開發版唔註冊；`next.config.ts` 俾 `/sw.js` no-cache 同 CSP）：
   `/api/*`、其他網站（tracker、地圖、營辦商）、Next RSC 請求（`?_rsc`、`RSC` header）**一律唔 cache**；
