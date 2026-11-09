@@ -5,7 +5,8 @@ import { minutesLabel } from './departures';
 describe('prefs', () => {
   it('cleans unknown values', () => {
     expect(cleanPrefs(null)).toEqual(DEFAULT_PREFS);
-    expect(cleanPrefs({ theme: 'dark', nearbyRadius: 999, autoLocate: false })).toEqual({ ...DEFAULT_PREFS, theme: 'dark', autoLocate: false });
+    expect(cleanPrefs({ theme: 'dark', nearbyRadius: 999, autoLocate: false, lrtGroup: 'route' })).toEqual({ ...DEFAULT_PREFS, theme: 'dark', autoLocate: false, lrtGroup: 'route' });
+    expect(cleanPrefs({ lrtGroup: 'x' }).lrtGroup).toBe('platform');
   });
   it('orders modes by priority', () => {
     expect(orderedModes('rail')[0]!.id).toBe('rail');

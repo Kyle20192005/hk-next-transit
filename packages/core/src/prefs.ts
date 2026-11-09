@@ -17,9 +17,11 @@ export interface Prefs {
   homeCard: 'last' | 'next' | 'favs';
   /** 開首頁、路線頁自動定位 */
   autoLocate: boolean;
+  /** 輕鐵站面板：按月台（似車站顯示屏）定按路線（每條路線、每個方向一組）；面板頂切換都會記住 */
+  lrtGroup: 'platform' | 'route';
 }
 
-export const DEFAULT_PREFS: Prefs = { theme: 'system', priority: 'bus', etaFormat: 'minutes', nearbyRadius: 600, homeCard: 'last', autoLocate: true };
+export const DEFAULT_PREFS: Prefs = { theme: 'system', priority: 'bus', etaFormat: 'minutes', nearbyRadius: 600, homeCard: 'last', autoLocate: true, lrtGroup: 'platform' };
 export const PREFS_KEY = 'hknt.prefs';
 export const NEARBY_RADII = [300, 600, 1000] as const;
 
@@ -37,6 +39,7 @@ export function cleanPrefs(raw: unknown): Prefs {
     nearbyRadius: pick('nearbyRadius', NEARBY_RADII),
     homeCard: pick('homeCard', ['last', 'next', 'favs']),
     autoLocate: typeof r.autoLocate === 'boolean' ? r.autoLocate : DEFAULT_PREFS.autoLocate,
+    lrtGroup: pick('lrtGroup', ['platform', 'route']),
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isLrtStop, lrtRoute, lrtStopName, lrtStopRoutes, lrtTrainEta, nearestLrtStops, parseLrtSchedule, searchLrtStops } from './lrt';
+import { isLrtStop, lrtRoute, lrtStopName, lrtStopRoutes, lrtTrainEta, nearestLrtStops, parseLrtSchedule, searchLrtStops, lrtByRoute, type LrtTrain } from './lrt';
 import { LRT_ROUTE_STOPS, LRT_STOPS } from './lrt-data';
 import { LRT_MAP_CAPS, LRT_MAP_LANES, LRT_MAP_STATIONS } from './lrt-map';
 
@@ -57,3 +57,22 @@ describe('nearestLrtStops', () => {
     expect(n.map((x) => lrtStopName(x.sta))).toContain('元朗');
   });
 });
+
+describe('lrtByRoute', () => {
+  it('按路線、目的地分組，記住月台，按路線次序同時間排', () => {
+    const tr = (route: string, dest: string, mins: number | null, extra: Partial<LrtTrain> = {}): LrtTrain => ({ route, dest, destEn: '', mins, cars: 1, ...extra });
+    const groups = lrtByRoute([
+      { platform: '1', trains: [tr('761P', '天逸', 6), tr('761P', '天逸', 13)] },
+      { platform: '3', trains: [tr('610', '屯門碼頭', 19), tr('610', '屯門碼頭', 7)] },
+      { platform: '4', trains: [tr('615', '屯門碼頭', 11), tr('610', '屯門碼頭', null), tr('610', '元朗', 0, { status: 'arriving' })] },
+    ]);
+    expect(groups.map((g) => `${g.route}${g.dest}`)).toEqual(['610元朗', '610屯門碼頭', '615屯門碼頭', '761P天逸']);
+    const g610 = groups[1]!;
+    expect(g610.trains.map((t) => [t.platform, t.mins])).toEqual([
+      ['3', 7],
+      ['3', 19],
+      ['4', null],
+    ]);
+  });
+});
+

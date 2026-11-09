@@ -65,6 +65,16 @@ export default function SettingsTab() {
             ]}
           />
           <Choice
+            label="輕鐵到站顯示"
+            hint={p.lrtGroup === 'route' ? '輕鐵站面板每條路線、每個方向一組，寫埋幾號月台。' : '輕鐵站面板按月台分組，同車站顯示屏一樣。'}
+            value={p.lrtGroup}
+            onChange={(v) => setPref('lrtGroup', v)}
+            options={[
+              ['platform', '按月台'],
+              ['route', '按路線'],
+            ]}
+          />
+          <Choice
             label="附近車站範圍"
             hint="首頁下班車同附近車站搵幾遠嘅站；範圍大啲站多啲，但載入慢啲。"
             value={String(p.nearbyRadius)}

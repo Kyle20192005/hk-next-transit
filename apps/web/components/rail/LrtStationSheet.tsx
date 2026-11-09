@@ -1,8 +1,8 @@
 'use client';
 import { forwardRef, useEffect, useMemo, useState } from 'react';
-import { LIVE_REFRESH, LRT_STOPS, hkClockSec, lrtCars, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtTrainEta, mtrXferOf, type LrtPlatform, type LrtTrain } from '@hknt/core';
+import { LIVE_REFRESH, LRT_STOPS, hkClockSec, lrtCars, lrtRoute, lrtStopEn, lrtStopName, lrtStopRoutes, lrtByRoute, lrtTrainEta, mtrXferOf, type LrtPlatform, type LrtTrain } from '@hknt/core';
 import { liveClient } from '@/lib/buses';
-import { usePrefs } from '@/lib/prefs';
+import { setPref, usePrefs } from '@/lib/prefs';
 import Icon from '../Icon';
 import { useSheetDrag } from './useSheetDrag';
 import { XferButton } from './XferButton';
@@ -37,7 +37,7 @@ const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => vo
   { sta, onClose, all, onAll, sheet, onXfer },
   ref,
 ) {
-  const { etaFormat } = usePrefs();
+  const { etaFormat, lrtGroup } = usePrefs();
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,10 +93,21 @@ const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => vo
             <Icon name="close" size={20} />
           </button>
         </header>
-        <div className="lrt-routes" aria-label="經過路線">
-          {routes.map((r) => (
-            <RouteChip key={r} r={r} />
-          ))}
+        <div className="lrt-sub">
+          <div className="lrt-routes" aria-label="經過路線">
+            {routes.map((r) => (
+              <RouteChip key={r} r={r} />
+            ))}
+          </div>
+          {/* 班次按月台定按路線排（記入設定，設定頁都改得） */}
+          <div className="lrt-group-switch" role="tablist" aria-label="班次排法">
+            <button role="tab" aria-selected={lrtGroup === 'platform'} onClick={() => setPref('lrtGroup', 'platform')}>
+              月台
+            </button>
+            <button role="tab" aria-selected={lrtGroup === 'route'} onClick={() => setPref('lrtGroup', 'route')}>
+              路線
+            </button>
+          </div>
         </div>
       </div>
 
@@ -105,15 +116,30 @@ const LrtStationSheet = forwardRef<HTMLElement, { sta: string; onClose: () => vo
         {!fresh && error && <p className="eta-failed">載入失敗：{error}</p>}
         {fresh?.failed && <p className="eta-failed">輕鐵資料暫時攞唔到，稍後會自動再試</p>}
         {fresh && !fresh.failed && !fresh.platforms.some((p) => p.trains.length) && <p className="muted mtr-nodata">暫時冇班次</p>}
-        {fresh?.platforms
-          .filter((p) => p.trains.length)
-          .map((p) => (
-            <section key={p.platform} className="mtr-next lrt-plat" aria-label={`${p.platform} 號月台`}>
-              <div className="mtr-next-head">
-                <h3>{p.platform} 號月台</h3>
+        {lrtGroup === 'platform' &&
+          fresh?.platforms
+            .filter((p) => p.trains.length)
+            .map((p) => (
+              <section key={p.platform} className="mtr-next lrt-plat" aria-label={`${p.platform} 號月台`}>
+                <div className="mtr-next-head">
+                  <h3>{p.platform} 號月台</h3>
+                </div>
+                {p.trains.map((t, i) => (
+                  <TrainRow key={i} t={t} fmt={etaFormat} now={now} />
+                ))}
+              </section>
+            ))}
+        {/* 按路線：每條路線、每個方向一組，每班車寫幾號月台 */}
+        {lrtGroup === 'route' &&
+          fresh &&
+          lrtByRoute(fresh.platforms).map((g) => (
+            <section key={`${g.route}|${g.dest}`} className="mtr-next lrt-plat" aria-label={`${g.route} 往 ${g.dest}`}>
+              <div className="mtr-next-head lrt-route-head">
+                <RouteChip r={g.route} />
+                <h3>往 {g.dest}</h3>
               </div>
-              {p.trains.map((t, i) => (
-                <TrainRow key={i} t={t} fmt={etaFormat} now={now} />
+              {g.trains.map((t, i) => (
+                <TrainRow key={i} t={t} fmt={etaFormat} now={now} platform={t.platform} />
               ))}
             </section>
           ))}
@@ -149,12 +175,13 @@ export function RouteChip({ r }: { r: string }) {
   );
 }
 
-function TrainRow({ t, fmt, now }: { t: LrtTrain; fmt: 'minutes' | 'clock'; now: number }) {
+/** 一班車：按月台 =「[路線] 往 X」；按路線（有 platform）=「N 號月台」 */
+function TrainRow({ t, fmt, now, platform }: { t: LrtTrain; fmt: 'minutes' | 'clock'; now: number; platform?: string }) {
   const e = lrtTrainEta(t, fmt, now);
   return (
     <div className="mtr-next-row lrt-row">
-      <RouteChip r={t.route} />
-      <span className="mtr-next-dest">往 {t.dest}</span>
+      {platform === undefined && <RouteChip r={t.route} />}
+      <span className="mtr-next-dest">{platform === undefined ? `往 ${t.dest}` : `${platform} 號月台`}</span>
       <small className="muted lrt-cars">{lrtCars(t.cars)}</small>
       <span className="mtr-next-eta">
         <span className={e.now ? 'mtr-eta now' : 'mtr-eta'}>

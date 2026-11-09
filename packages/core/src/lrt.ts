@@ -94,6 +94,37 @@ export function parseLrtSchedule(body: unknown): LrtPlatform[] | null {
   }));
 }
 
+/** 按路線分組（站面板「按路線」）：同一條路線、同一個目的地一組，每班車記住幾號月台 */
+export interface LrtRouteGroup {
+  route: string;
+  dest: string;
+  trains: (LrtTrain & { platform: string })[];
+}
+
+/**
+ * 將各月台嘅班次改做按路線分組：路線按 LRT_ROUTES 次序（唔認得嘅排後），同一條路線按最快一班排；
+ * 每組班次按時間排（正在離開、即將到站當 0 分鐘；冇時間排最後）。
+ */
+export function lrtByRoute(platforms: readonly LrtPlatform[]): LrtRouteGroup[] {
+  const groups = new Map<string, LrtRouteGroup>();
+  for (const p of platforms) {
+    for (const t of p.trains) {
+      const key = `${t.route}|${t.dest}`;
+      let g = groups.get(key);
+      if (!g) groups.set(key, (g = { route: t.route, dest: t.dest, trains: [] }));
+      g.trains.push({ ...t, platform: p.platform });
+    }
+  }
+  const mins = (t: LrtTrain) => t.mins ?? Infinity;
+  const order = (r: string) => {
+    const i = LRT_ROUTES.findIndex((x) => x.route === r);
+    return i < 0 ? LRT_ROUTES.length : i;
+  };
+  const list = [...groups.values()];
+  for (const g of list) g.trains.sort((a, b) => mins(a) - mins(b));
+  return list.sort((a, b) => order(a.route) - order(b.route) || a.route.localeCompare(b.route) || mins(a.trains[0]!) - mins(b.trains[0]!));
+}
+
 export const LRT_API = 'https://rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule';
 
 /** 一個輕鐵站所有月台嘅到站時間；攞唔到 failed = true */

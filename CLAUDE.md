@@ -170,6 +170,8 @@ App `src/components/{RailView,MtrMap,MtrMapSkia,MtrStationSheet}.tsx`（`(tabs)/
 - 到站：`rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule?station_id=`（同巴士 API 同一個 host，計埋上限）。網頁 `/api/lrt?sta=`、tracker `/api/lrt`、
   前端 `liveClient.lrt`（App `api.lrt`）。tracker 未部署到 `/api/lrt` 會 404，前端自動改問 Vercel。
 - 站面板：經過嘅路線號碼、每個月台嘅班次（號碼、往邊、單／孖卡、時間），30 秒更新；拉板同港鐵面板共用。
+  路線號碼右邊「月台｜路線」切換（2026-11 用戶要求）：按路線 = core `lrtByRoute`，每條路線、每個目的地一組，每班寫「N 號月台」；
+  揀咗記入設定 `Prefs.lrtGroup`（設定頁「輕鐵到站顯示」都改得）。
 - 車費：`/api/lrt/fare?from=`（`apps/web/lib/lrt-fares.json`，`tools/lrt-fares.py` 由港鐵開放數據 light_rail_fares.csv 生成，加價後重跑）。
   **介面先隱藏**（2026-11 用戶要求，`LrtStationSheet` 嘅 `SHOW_FARES`）。收費區地圖唔畫。
 - 路綫圖：core `lrt-map.ts` 由 `packages/core/tools/lrt-layout.py --write` 生成（`--svg 預覽.svg` 出預覽、印出檢查結果），**唔好人手改**。
@@ -356,6 +358,7 @@ GTFS trip_id 格式：`<route_id>-<方向>-<service_id>-<開車時間HHMM>`。
   - 交通工具優先（巴士／港鐵）：「路線」分頁預設同分類次序（`orderedModes`）；首頁大字兩行（最近港鐵站／巴士站）同大卡「下班車」嘅卡次序（core `orderNearCards`：
     港鐵 → 港鐵站卡排先；巴士 → 巴士站卡排先，港鐵站卡跟後，但一定會出）。
   - 到站時間顯示（分鐘／鐘數）：core `etaParts`、`etaRest`、`minutesLabel(at, now, fmt)`；一行內嘅用 `EtaInline`（兩邊都有），站點列表 `StopRow` 大細字對調。
+  - 輕鐵到站顯示（按月台／按路線，`lrtGroup`，輕鐵站面板頂都切換得）。
   - 附近車站範圍（300／600／1000 米，`/api/nearby?r=`，最多 1000）；自動定位開關（首頁、附近、路線頁）；首頁大卡預設分頁（上次／下班車／收藏）。
   - 資料：重設常用工具、清除最近睇過、清除所有收藏（要確認）。
 - 地圖走線、時間線、巴士圖示用公司代表色（城巴 #FFD800、九巴 #D01A1E，`lib/company.ts`）；地圖走線底加深色外框，
