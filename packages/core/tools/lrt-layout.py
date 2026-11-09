@@ -72,7 +72,7 @@ for i, n in enumerate(['鍾屋村', '泥圍', '藍地']): put(n, 19.5 - i, 15.0 
 KX, KY = 16.6, 18.5            # 兆康（同麒麟一行之間留位，505 號碼放得落）
 put('兆康', KX, KY, 'v')
 Y1 = KY + 1.7                  # 屯門北一行
-for n, x in [('麒麟', 14.0), ('青松', 12.2), ('建生', 10.4), ('田景', 8.6)]: put(n, x, Y1, 'h')
+for n, x in [('麒麟', 14.0), ('青松', 12.5), ('建生', 11.0), ('田景', 9.5)]: put(n, x, Y1, 'h')
 XW = 7.6                       # 西面直綫
 put('良景', XW, 21.2, 'v')
 put('新圍', XW, 22.4, 'v')
@@ -167,14 +167,12 @@ CHAIN_ORDER = [
     (['石排', 'J505N', '鳴琴'], ['610', '615', '615P', '505']),
     (['鳴琴', '青雲', '青山村', '龍門', '輕鐵車廠', '蝴蝶', '美樂', '屯門碼頭'], ['610', '615', '615P']),
 ]
-# 終點站路線號碼（似港鐵輕鐵圖）：
-#   stack = 盡頭站：色綫入站前散開，每條駁住自己個號碼，成排號碼就係個站（白色膠囊包住）；兩邊都有綫入站就排兩行
-#   end   = 中途終點站：喺度完嘅綫，號碼擺喺條綫嘅尾（喺站度，向外伸出）；同一邊幾條並排就前後錯開，外面嗰條喺前面完
-#           end:-1 = 循環綫：由呢邊入站嗰啲綫當係完（喺度切開個圈）
-#   side+／side- = 循環綫起點：號碼並排喺站膠囊嗰頭（天水圍向環綫入面）
-#   tail  = 只得一條綫嘅盡頭站：站係圓點，色綫穿過圓點再駁住號碼
-#   dot+／dot- = 只得一條綫嘅中途終點站：站係圓點，號碼喺旁邊（+／- = 法綫方向）
-CAPS = {'元朗': 'stack', '三聖': 'tail', '屯門碼頭': 'stack', '友愛': 'dot-', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'side+'}
+# 終點站路線號碼（似港鐵輕鐵圖；號碼一律同條綫對正中，喺度完嘅綫入站前散開）：
+#   stack = 盡頭站（全部綫喺度完）：號碼排一行（兩邊入站就兩行），白色膠囊喺後面沿號碼方向拉長；只得一條綫就蓋喺圓點上面
+#   end   = 中途終點站：喺度完嘅綫散開，號碼蓋喺站中間，同一邊幾個由內至外排；站膠囊大細唔變
+#   side+／side- = 循環綫起點：號碼並排蓋喺站膠囊嗰頭（天水圍向環綫入面）
+#   dot   = 只得一條綫經過嘅中途終點站：號碼蓋喺圓點上面
+CAPS = {'元朗': 'stack', '三聖': 'stack', '屯門碼頭': 'stack', '友愛': 'dot', '田景': 'end', '兆康': 'end', '天逸': 'end', '天水圍': 'side+'}
 # 站名位置
 LABELS = {}
 for n in ['天逸', '天富', '頌富', '天瑞', '樂湖', '天耀']: LABELS[n] = 'w'
@@ -541,8 +539,8 @@ for e in edges:
             m = (L - dl) / 2
             a, b = g
             pts = [(a[0] + nx * pu, a[1] + ny * pu),
-                   (a[0] + dx * m + nx * pu, a[1] + dy * m + ny * pu, 0.3),
-                   (a[0] + dx * (m + dl) + nx * pv, a[1] + dy * (m + dl) + ny * pv, 0.3),
+                   (a[0] + dx * m + nx * pu, a[1] + dy * m + ny * pu, R),
+                   (a[0] + dx * (m + dl) + nx * pv, a[1] + dy * (m + dl) + ny * pv, R),
                    (b[0] + nx * pv, b[1] + ny * pv)]
         else:
             k = len(g) - 1
@@ -610,8 +608,22 @@ def marker_box(s):
     return (m['x'] - hx, m['y'] - hy, 2 * hx, 2 * hy)
 
 # ---------------------------------------------------------------------------
-# 終點站路線號碼
+# 終點站路線號碼（2026-11，用戶要求）：號碼蓋喺站（圓點／膠囊）上面，同自己條綫對正中；
+# 站唔因號碼改大細（盡頭站除外：白色膠囊沿號碼方向拉長）；喺度完嘅綫入站前用統一彎位散開，號碼唔壓其他綫、唔重疊。
 caps, cap_lanes = [], []
+def fan_into(s, lane, first, a, N, o0, o1, tc, capA):
+    """色綫喺站嗰頭：沿軸到 T+|o1-o0|，45° 移去 o1，再直行到號碼中心 tc（T = 號碼近站嗰邊）"""
+    px, py = P[s]
+    def at(o, t): return (px + N[0] * o + a[0] * t, py + N[1] * o + a[1] * t)
+    d = abs(o1 - o0)
+    T = tc + capA / 2 + 0.05
+    pts = lane[1]
+    cut = at(o0, T + d + 0.45)
+    if first: pts[0] = cut
+    else: pts[-1] = cut
+    seg = [cut, (*at(o0, T + d), R), (*at(o1, T), R), at(o1, tc)] if d > 1e-6 else [cut, at(o1, tc)]
+    cap_lanes.append((lane[0], seg))
+    return at(o1, tc)
 for name, mode in CAPS.items():
     s = sid(name)
     rs = [r for r in ORDER if r in ends.get(s, set())]
@@ -621,105 +633,70 @@ for name, mode in CAPS.items():
     vertN = abs(N[1]) > abs(N[0])
     capN, capA = (CAP_H, CAP_W) if vertN else (CAP_W, CAP_H)   # 號碼膠囊沿法綫、沿軸嘅長度
     px, py = P[s]
+    lanes_here = []
+    for lane in lanes:
+        r, pts, (u, v), _ = lane
+        if s not in (u, v): continue
+        q = pts[0] if u == s else pts[-1]
+        lanes_here.append(((q[0] - px) * N[0] + (q[1] - py) * N[1], r, side_of[(s, frozenset((u, v)))], lane, u == s))
+    def cap_at(r, x, y): caps.append({'route': r, 'x': round(x, 4), 'y': round(y, 4), 'sta': s})
     if mode == 'stack':
         groups = {1: [], -1: []}
-        for lane in lanes:
-            r, pts, (u, v), _ = lane
-            if s not in (u, v): continue
-            sd = side_of[(s, frozenset((u, v)))]
-            q = pts[0] if u == s else pts[-1]
-            groups[sd].append(((q[0] - px) * N[0] + (q[1] - py) * N[1], r, lane, u == s))
+        for o, r, sd, lane, first in lanes_here: groups[sd].append((o, r, lane, first))
         both = groups[1] and groups[-1]
         boxes = []
         for sd, items in groups.items():
             if not items: continue
             items.sort(key=lambda x: -x[0])
             k = len(items)
-            pitch = capN + 0.06
             c0 = sum(x[0] for x in items) / k
             tc = (capA / 2 + 0.03) if both else 0.0
             a = (ax[0] * sd, ax[1] * sd)
-            def at(o, t): return (px + N[0] * o + a[0] * t, py + N[1] * o + a[1] * t)
             for i, (off, r, lane, first) in enumerate(items):
-                ci = c0 + ((k - 1) / 2 - i) * pitch
-                dl = ci - off
-                t1 = tc + capA / 2 + abs(dl)
-                pts = lane[1]
-                cut = at(off, t1 + 0.12)
-                if first: pts[0] = cut
-                else: pts[-1] = cut
-                if abs(dl) > 1e-6:
-                    seg = [cut, (*at(off, t1), 0.15), (*at(ci, tc + capA / 2), 0.15), at(ci, tc)]
-                else:
-                    seg = [cut, at(ci, tc)]
-                cap_lanes.append((r, seg))
-                cx, cy = at(ci, tc)
-                caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4), 'sta': s})
+                ci = c0 + ((k - 1) / 2 - i) * (capN + 0.06)
+                cx, cy = fan_into(s, lane, first, a, N, off, ci, tc, capA)
+                cap_at(r, cx, cy)
                 boxes.append((cx, cy))
-        # 白色站膠囊喺號碼後面：沿號碼排列方向拉長（兩頭圓角露出嚟），闊度窄過號碼
-        cx = (max(b[0] for b in boxes) + min(b[0] for b in boxes)) / 2
-        cy = (max(b[1] for b in boxes) + min(b[1] for b in boxes)) / 2
-        spanN = max(abs((b[0] - cx) * N[0] + (b[1] - cy) * N[1]) for b in boxes) * 2
-        long_ = spanN + capN + 0.34
-        short = 0.55 * capA if vertN else capA + 0.1
-        w, h = (short, long_) if vertN else (long_, short)
-        markers[s] = {'kind': 'box', 'x': round(cx, 4), 'y': round(cy, 4), 'w': round(w, 4), 'h': round(h, 4)}
-    else:
-        m = markers[s]
-        c = (m['x'] - px) * N[0] + (m['y'] - py) * N[1]
-        cut_side = int(mode.split(':')[1]) if ':' in mode else None
-        term = {}
-        for lane in lanes:
-            r, pts, (u, v), _ = lane
-            if s not in (u, v) or r not in rs: continue
-            sd = side_of[(s, frozenset((u, v)))]
-            if cut_side is not None and sd != cut_side: continue
-            q = pts[0] if u == s else pts[-1]
-            term.setdefault(r, []).append(((q[0] - px) * N[0] + (q[1] - py) * N[1], sd, lane, u == s))
-        if mode.startswith('dot'):
-            e = 1 if mode.endswith('+') else -1
-            for r, items in term.items():
-                o = items[0][0] + e * (DOT + 0.06 + capN / 2)
-                caps.append({'route': r, 'x': round(px + N[0] * o, 4), 'y': round(py + N[1] * o, 4), 'sta': s})
-            continue
-        if mode.startswith('side'):
-            e = 1 if mode.endswith('+') else -1
-            half = m['r'] if m['kind'] == 'dot' else m['len'] / 2
-            k = len(rs)
-            for j, r in enumerate(rs):
-                on = c + e * (half + capN / 2 - 0.08)
-                oa = ((k - 1) / 2 - j) * (capA + 0.06)
-                caps.append({'route': r, 'x': round(px + N[0] * on + ax[0] * oa, 4), 'y': round(py + N[1] * on + ax[1] * oa, 4), 'sta': s})
-            continue
-        if mode == 'tail':
-            for r, items in term.items():
-                o, sd, lane, first = items[0]
-                out = (-ax[0] * sd, -ax[1] * sd)
-                q = (px + N[0] * o, py + N[1] * o)
-                t = DOT + 0.1 + capA / 2
-                cx, cy = q[0] + out[0] * t, q[1] + out[1] * t
-                cap_lanes.append((r, [q, (cx, cy)]))
-                caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4), 'sta': s})
-            continue
-        groups = {}
-        for r, items in term.items():
-            if len(items) > 1: continue          # 兩邊都有（循環綫未指定切邊）：唔處理
-            o, sd, lane, first = items[0]
-            e = 1 if o >= c else -1
-            groups.setdefault((e, sd), []).append((abs(o - c), o, r, lane, first))
-        for (e, sd), items in groups.items():
-            items.sort(key=lambda x: -x[0])
-            for k, (_, o, r, lane, first) in enumerate(reversed(items)):
-                t = k * (capA + 0.06)
-                a_ = (ax[0] * sd, ax[1] * sd)
-                on = o + e * (capN / 2 - G / 2)
-                cx, cy = px + N[0] * on + a_[0] * t, py + N[1] * on + a_[1] * t
-                caps.append({'route': r, 'x': round(cx, 4), 'y': round(cy, 4), 'sta': s})
-                if t > 0:                          # 條綫喺號碼度完
-                    end = (px + N[0] * o + a_[0] * t, py + N[1] * o + a_[1] * t)
-                    pts = lane[1]
-                    if first: pts[0] = end
-                    else: pts[-1] = end
+        if len(boxes) > 1:   # 白色站膠囊喺號碼後面，沿號碼方向拉長（兩頭露出），窄過號碼
+            cx = (max(b[0] for b in boxes) + min(b[0] for b in boxes)) / 2
+            cy = (max(b[1] for b in boxes) + min(b[1] for b in boxes)) / 2
+            spanN = max(abs((b[0] - cx) * N[0] + (b[1] - cy) * N[1]) for b in boxes) * 2
+            long_, short = spanN + capN + 0.34, (0.55 * capA if vertN else capA + 0.1)
+            w, h = (short, long_) if vertN else (long_, short)
+            markers[s] = {'kind': 'box', 'x': round(cx, 4), 'y': round(cy, 4), 'w': round(w, 4), 'h': round(h, 4)}
+        continue
+    if mode == 'dot':          # 只得一條綫（經過）：號碼蓋喺圓點上面
+        for o, r, sd, lane, first in lanes_here[:1]:
+            cap_at(r, px + N[0] * o, py + N[1] * o)
+        continue
+    m = markers[s]
+    c = (m['x'] - px) * N[0] + (m['y'] - py) * N[1]
+    if mode.startswith('side'):   # 循環綫起點：號碼並排蓋喺站膠囊嗰頭
+        e = 1 if mode.endswith('+') else -1
+        half = m['r'] if m['kind'] == 'dot' else m['len'] / 2
+        k = len(rs)
+        for j, r in enumerate(rs):
+            on = c + e * (half - 0.02)
+            oa = ((k - 1) / 2 - j) * (capA + 0.06)
+            cap_at(r, px + N[0] * on + ax[0] * oa, py + N[1] * on + ax[1] * oa)
+        continue
+    # end：中途終點站。喺度完嘅綫（喺一束嘅邊）散開，號碼對正條綫、蓋喺站中間；同一邊幾個由內至外排
+    term = {}
+    for o, r, sd, lane, first in lanes_here:
+        if r in rs: term.setdefault(r, []).append((o, sd, lane, first))
+    through = [o for o, r, sd, lane, first in lanes_here if r not in term]
+    for e in (1, -1):
+        mine = sorted([(o, r, *rest) for r, items in term.items() if len(items) == 1 for o, *rest in items[:1]
+                       if (o - c) * e >= 0], key=lambda x: x[0] * e)          # 由內至外
+        if not mine: continue
+        inner = [o for o in through if (o - mine[0][0]) * e < 0]
+        base = (max(inner, key=lambda o: o * e) if inner else mine[0][0] - e * G)
+        ci = base + e * (G / 2 + 0.02 + capN / 2)
+        for o, r, sd, lane, first in mine:
+            a = (ax[0] * sd, ax[1] * sd)
+            cx, cy = fan_into(s, lane, first, a, N, o, ci, 0.0, capA)
+            cap_at(r, cx, cy)
+            ci += e * (capN + 0.06)
 def cap_box(c): return (c['x'] - CAP_W / 2, c['y'] - CAP_H / 2, CAP_W, CAP_H)
 
 # 單方向箭咀：每條單向色綫最長嗰段直綫中間一個
