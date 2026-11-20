@@ -1,0 +1,45 @@
+{
+ "counts": {
+  "ctb": {
+   "routes": 396,
+   "variants": 884,
+   "stops": 2594,
+   "withSchedule": 850,
+   "withLine": 850,
+   "withFare": 850
+  },
+  "kmb": {
+   "routes": 680,
+   "variants": 1379,
+   "stops": 5957,
+   "withSchedule": 1212,
+   "withLine": 1306,
+   "withFare": 1212
+  },
+  "nlb": {
+   "routes": 39,
+   "variants": 97,
+   "stops": 332,
+   "withSchedule": 91,
+   "withLine": 91,
+   "withFare": 93
+  },
+  "mtrb": {
+   "routes": 26,
+   "variants": 56,
+   "stops": 675,
+   "withSchedule": 54,
+   "withLine": 32,
+   "withFare": 56
+  },
+  "gmb": {
+   "routes": 572,
+   "variants": 1164,
+   "stops": 4773,
+   "withSchedule": 1164,
+   "withLine": 1136,
+   "withFare": 1162
+  },
+  "allStops": 14090
+ }
+}
